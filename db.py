@@ -171,14 +171,32 @@ def init_db() -> None:
                 created_at        REAL NOT NULL
             );
 
+            -- Append-only, never edited or deleted - the real approval trail.
+            -- vouchers.approved_by/approved_at only ever reflect the CURRENT
+            -- state (and are cleared on rejection, since a rejected voucher
+            -- isn't approved by anyone), so on their own they lose who
+            -- rejected a voucher and when. This table is what list_activity
+            -- reads from instead.
+            CREATE TABLE IF NOT EXISTS voucher_events (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                voucher_id  INTEGER NOT NULL REFERENCES vouchers(id),
+                company_id  INTEGER NOT NULL REFERENCES companies(id),
+                actor_id    INTEGER NOT NULL REFERENCES users(id),
+                event       TEXT NOT NULL,
+                note        TEXT,
+                created_at  REAL NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
             CREATE INDEX IF NOT EXISTS idx_vouchers_company ON vouchers(company_id);
+            CREATE INDEX IF NOT EXISTS idx_voucher_events_company ON voucher_events(company_id);
             """
         )
         _seed_default_plans(conn)
         _migrate_company_plan_id(conn)
+        _migrate_company_ai_settings(conn)
 
 
 def _seed_default_plans(conn: sqlite3.Connection) -> None:
@@ -205,6 +223,22 @@ def _migrate_company_plan_id(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN plan_id INTEGER REFERENCES plans(id)")
     default_id = conn.execute("SELECT id FROM plans WHERE is_default = 1 LIMIT 1").fetchone()["id"]
     conn.execute("UPDATE companies SET plan_id = ? WHERE plan_id IS NULL", (default_id,))
+
+
+# Known chat providers - mirrors providers.py's PROVIDER_KEYS. Duplicated
+# rather than imported so db.py stays storage-only with no dependency on
+# providers.py (same reasoning as ROLES being its own source of truth here).
+AI_PROVIDERS = ("anthropic", "google", "openrouter")
+
+
+def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
+    if "model_provider" not in cols:
+        conn.execute("ALTER TABLE companies ADD COLUMN model_provider TEXT")
+    if "model_model" not in cols:
+        conn.execute("ALTER TABLE companies ADD COLUMN model_model TEXT")
+    if "briefing" not in cols:
+        conn.execute("ALTER TABLE companies ADD COLUMN briefing TEXT NOT NULL DEFAULT ''")
 
 
 # ------------------------------------------------------------------ passwords
@@ -239,9 +273,42 @@ def find_companies_by_name(query: str, limit: int = 8) -> list[dict]:
 def get_company(company_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT id, name, plan_id FROM companies WHERE id = ?", (company_id,)
+            "SELECT id, name, plan_id, model_provider, model_model, briefing "
+            "FROM companies WHERE id = ?", (company_id,)
         ).fetchone()
     return dict(row) if row else None
+
+
+def set_company_model(company_id: int, provider: str | None, model: str) -> dict:
+    """A company's chat provider preference. `provider` must be one of the
+    known providers or None to clear the preference (falls back to the
+    server's default). Whether that provider actually has a key configured
+    on this deployment is checked at request time in server.py, not here -
+    db.py has no knowledge of which keys are set."""
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    provider = (provider or "").strip().lower() or None
+    if provider is not None and provider not in AI_PROVIDERS:
+        raise AuthError("Not a known AI provider.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE companies SET model_provider = ?, model_model = ? WHERE id = ?",
+            (provider, model.strip(), company_id),
+        )
+    return get_company(company_id)
+
+
+def set_company_briefing(company_id: int, briefing: str) -> dict:
+    """Custom instructions folded into every chat conversation at this
+    company - see providers.with_briefing. Finance Supervisor only."""
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE companies SET briefing = ? WHERE id = ?",
+            (briefing.strip()[:4000], company_id),
+        )
+    return get_company(company_id)
 
 
 def set_company_plan(company_id: int, plan_id: int) -> dict:
@@ -750,6 +817,15 @@ def _voucher_row(row: sqlite3.Row) -> dict:
     return d
 
 
+def _log_event(conn: sqlite3.Connection, voucher_id: int, company_id: int,
+                actor_id: int, event: str, note: str | None, when: float) -> None:
+    conn.execute(
+        "INSERT INTO voucher_events (voucher_id, company_id, actor_id, event, note, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (voucher_id, company_id, actor_id, event, note, when),
+    )
+
+
 def create_voucher(
     company_id: int, created_by: int, *, supplier_name: str, invoice_number: str,
     invoice_date: str, received_date: str, credit_terms_days: int, lines: list[dict],
@@ -806,6 +882,7 @@ def create_voucher(
              round(overpayment, 2), now),
         )
         voucher_id = cur.lastrowid
+        _log_event(conn, voucher_id, company_id, created_by, "prepared", None, now)
     return get_voucher(voucher_id)
 
 
@@ -841,6 +918,36 @@ def list_vouchers(company_id: int, viewer_id: int, viewer_role: str) -> list[dic
     return [_voucher_row(r) for r in rows]
 
 
+def list_activity(company_id: int, viewer_id: int, viewer_role: str, limit: int = 200) -> list[dict]:
+    """The real approval trail, scoped by the same downward-only visibility
+    rule as list_vouchers - joins voucher_events to vouchers so a viewer
+    never sees an event for a voucher they couldn't see in the Vouchers view
+    either, and to users for the actor's name."""
+    if viewer_role == "finance_supervisor":
+        scope_sql, scope_args = "v.company_id = ?", (company_id,)
+    elif viewer_role == "senior_accountant":
+        scope_sql = ("v.company_id = ? AND (v.created_by = ? OR "
+                      "EXISTS (SELECT 1 FROM users cu WHERE cu.id = v.created_by AND cu.role = 'account_assistant'))")
+        scope_args = (company_id, viewer_id)
+    else:
+        scope_sql, scope_args = "v.company_id = ? AND v.created_by = ?", (company_id, viewer_id)
+
+    with _cursor() as conn:
+        rows = conn.execute(
+            f"""SELECT e.id, e.event, e.note, e.created_at,
+                       v.id AS voucher_id, v.supplier_name, v.invoice_number,
+                       u.name AS actor_name
+                FROM voucher_events e
+                JOIN vouchers v ON v.id = e.voucher_id
+                JOIN users u ON u.id = e.actor_id
+                WHERE {scope_sql}
+                ORDER BY e.created_at DESC
+                LIMIT ?""",
+            (*scope_args, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def submit_voucher(company_id: int, user_id: int, voucher_id: int) -> dict:
     """Only the preparer can submit their own voucher, and only from draft or
     rejected - approved vouchers are done, and nobody submits someone else's
@@ -852,12 +959,14 @@ def submit_voucher(company_id: int, user_id: int, voucher_id: int) -> dict:
         raise AuthError("You can only submit a voucher you prepared.")
     if v["status"] not in ("draft", "rejected"):
         raise AuthError("Only a draft or a rejected voucher can be submitted.")
+    now = time.time()
     with _cursor() as conn:
         conn.execute(
             "UPDATE vouchers SET status = 'submitted', submitted_at = ?, rejection_reason = NULL "
             "WHERE id = ?",
-            (time.time(), voucher_id),
+            (now, voucher_id),
         )
+        _log_event(conn, voucher_id, company_id, user_id, "submitted", None, now)
     return get_voucher(voucher_id)
 
 
@@ -872,11 +981,13 @@ def approve_voucher(company_id: int, approver_id: int, voucher_id: int) -> dict:
         raise AuthError("Only a submitted voucher can be approved.")
     if v["created_by"] == approver_id:
         raise AuthError("You can't approve a voucher you prepared yourself.")
+    now = time.time()
     with _cursor() as conn:
         conn.execute(
             "UPDATE vouchers SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?",
-            (approver_id, time.time(), voucher_id),
+            (approver_id, now, voucher_id),
         )
+        _log_event(conn, voucher_id, company_id, approver_id, "approved", None, now)
     return get_voucher(voucher_id)
 
 
@@ -891,12 +1002,14 @@ def reject_voucher(company_id: int, approver_id: int, voucher_id: int, reason: s
     reason = reason.strip()
     if not reason:
         raise AuthError("Give a reason so the preparer knows what to fix.")
+    now = time.time()
     with _cursor() as conn:
         conn.execute(
             "UPDATE vouchers SET status = 'rejected', rejection_reason = ?, "
             "approved_by = NULL, approved_at = NULL WHERE id = ?",
             (reason, voucher_id),
         )
+        _log_event(conn, voucher_id, company_id, approver_id, "rejected", reason, now)
     return get_voucher(voucher_id)
 
 

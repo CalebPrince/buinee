@@ -278,7 +278,7 @@ are fully separate front doors.
 Rebuilt to match the sidebar-rail + topbar layout used across the other
 Prince Caleb agent dashboards (`outlook-agent`/`excel-agent`'s
 Clerk/Gridwise consoles) — same skeleton, Buinee's own teal/ochre
-tokens instead of their slate/amber or emerald/iris ones. Three views,
+tokens instead of their slate/amber or emerald/iris ones. Eight views,
 switched client-side with no page reload:
 
 - **Overview** — greeting, KPI tiles, and card(s) for "My vouchers" (and
@@ -286,12 +286,96 @@ switched client-side with no page reload:
   number shown is real, drawn from `/api/vouchers`, never an invented demo
   stat — the reference dashboards are sales prototypes and use fabricated
   activity/metrics; this is a real product, so nothing here is illustrative.
+  One deliberate exception, styled identically to how the reference
+  dashboards handle a not-yet-connected source: "Invoices found" shows "—"
+  with "Waiting for mailbox connection", since that number genuinely can't
+  exist yet — honest about being blocked, not fabricated to look alive.
 - **Vouchers** — prepare, submit, approve/reject. See
   [Vouchers](#vouchers) below.
+- **Flagged** — every voucher visible to this person where `voucher.py`'s
+  `review()` found something arithmetically or procedurally worth a second
+  look (a fallback FX rate, a net payable that doesn't reconcile, etc.) -
+  real data already computed for the Vouchers view, just filtered and
+  surfaced on its own page. Nav item carries a live count badge.
+- **Chat** — an authenticated version of the landing page's demo agent. A
+  general assistant for the person's finance/back-office work - any business
+  question, not a voucher-lookup tool - grounded in their real, role-scoped
+  vouchers for factual claims (`build_voucher_digest`/`build_chat_system` in
+  `server.py`, `/api/chat`). Can also take an attached document: a paperclip
+  button reads a text file client-side (`.txt`/`.md`/`.csv`, capped at 20k
+  chars) and sends it through `providers.py`'s existing `split_docs`/`docs`
+  plumbing, tagged server-side as "attached" - never trusted as reference
+  material, since there's no template library feature to draw from yet.
+  Shows a clear disabled state if no AI provider is configured, rather than a
+  chat box that silently fails - also surfaced as a status pill in the
+  topbar (`assistantPill`, checked via `/api/demo/status`), matching
+  `outlook-agent`'s "Mailbox not connected" pattern. This only ever shows
+  connection *status*, never the key itself - the key stays server-side in
+  `.env`/cPanel env vars, unlike `outlook-agent`'s own Settings page, which
+  by its own code comment stores keys in browser `localStorage` and flags
+  itself as an insecure prototype pattern not meant for production.
+- **Automations** — honest empty state, not a stub hiding real toggles:
+  automations need a connected inbox first, which doesn't exist yet. The
+  intended scope isn't invoice-only - once built, it's meant to triage the
+  whole inbox the way `outlook-agent` already does (correspondence, drafts,
+  flagging anything accounting-relevant), not just extract invoices.
+- **Activity** — the real approval trail: every prepare/submit/approve/reject
+  event, who did it and when, scoped by the same downward-only visibility as
+  everywhere else. Backed by a genuine append-only `voucher_events` table
+  (`db.py`), not derived from the vouchers table's own timestamp columns -
+  those only reflect *current* state and are cleared on rejection
+  (`approved_by`/`approved_at` go back to `NULL` so a rejected voucher isn't
+  shown as approved by anyone), which would have silently lost who rejected
+  a voucher and when. `list_activity`/`/api/activity`. Existing vouchers
+  created before this table existed have no history, honestly - nothing was
+  backfilled or invented for them.
+- **Instructions** (visible to everyone, editable by Finance Supervisor only,
+  read-only for other roles) — two real settings that change Chat's actual
+  behaviour for the whole company:
+  - **AI provider** - a per-company preference among whichever providers
+    have a key configured on this deployment (`db.set_company_model`,
+    `/api/company/model-options`, `/api/company/set-model`). Falls back to
+    the server default the instant the saved choice isn't configured here
+    (`resolve_provider_model` in `server.py`) - a stale preference can never
+    hard-fail. An optional model-string override sits alongside it. This is
+    `outlook-agent`'s model picker, done as a real per-company setting
+    instead of a per-browser one, since one shared deployment key serves
+    every company - see [Vouchers](#vouchers)'s "Fixed while building Chat"
+    note on why `outlook-agent`'s own approach (keys in `localStorage`)
+    isn't appropriate here.
+  - **Custom instructions** - free text folded into every Chat conversation
+    at the company via `providers.with_briefing` (`db.set_company_briefing`,
+    `/api/company/briefing`) - policies, terminology, tone. Cannot switch off
+    Chat's grounding/safety rules, only add context on top of them.
 - **Team** (Finance Supervisor only, nav item hidden otherwise) — the full
   roster and the real pending-approval queue with working Approve/Reject,
   moved off Overview into its own page. The nav item carries a live count
   badge for pending requests, hidden entirely at zero.
+
+The rail also has the other two visual pieces from the reference dashboards:
+a prominent "New voucher" compose button (opens the Vouchers form directly,
+also mirrored as a hero button next to the Overview greeting), and a
+"Connected" sources panel at the bottom showing **Email inbox — Coming
+soon**. Unlike the reference dashboards, that panel is honest about not
+being wired up to anything — no fake "Connect" button, no fabricated
+connected/live state — since real per-user mailbox OAuth (Microsoft Graph/
+Gmail API) is a genuinely separate, unbuilt feature, not a styling exercise.
+See [What's genuinely missing](#whats-genuinely-missing-dont-assume-it-exists).
+
+**Fixed while building Chat**: `providers.py`'s `chat()` was hardcoded to a
+leftover outlook-agent persona - literally "You are Ada, an assistant for
+Rufus" - unconditionally prepended to *every* call, including the landing
+page's own demo agent (which was then telling the model it was simultaneously
+"Ada, for Rufus" and "the assistant on Buinee's landing page", with the
+latter absurdly framed as "written by Rufus himself"). This was already live
+on the public demo, not something introduced by this feature. Fixed by making
+`chat()` take the caller's full system prompt as a required argument instead
+of a hardcoded default - the landing page passes its own visitor-facing
+prompt, the dashboard's Chat passes `build_chat_system()`, and `CHAT_SYSTEM`
+itself was rewritten to describe Buinee/vouchers generically instead of
+Rufus/BDDG specifically. Verified the new call shape reaches Anthropic's real
+API correctly (a deliberately invalid key returns their actual 401, not a
+Python `TypeError` from a signature mismatch).
 
 Caught one bug while verifying the KPI tiles: the original draft tried to
 update a `#kpiTeam` span's `textContent` from inside `loadTeam()` before

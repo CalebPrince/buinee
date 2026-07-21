@@ -118,6 +118,32 @@ def active_provider(cfg: dict) -> str | None:
     return None
 
 
+def configured_providers(cfg: dict) -> list[str]:
+    """Every provider with a key set on this deployment, not just the one
+    active_provider() would pick - what a company's model picker is allowed
+    to choose from. Fixed order matches PROVIDER_KEYS."""
+    return [p for p, key in PROVIDER_KEYS.items() if cfg.get(key, "").strip()]
+
+
+def resolve_provider_model(cfg: dict, company: dict) -> tuple[str | None, str]:
+    """A company's chat provider/model preference, falling back to the
+    server default the moment their choice isn't actually configured here -
+    e.g. an admin removed that provider's key after the company picked it.
+    Never lets a company's stale preference produce a hard failure."""
+    configured = configured_providers(cfg)
+    provider = company.get("model_provider")
+    if provider not in configured:
+        provider = active_provider(cfg)
+    if not provider:
+        return None, ""
+    model = (
+        (company.get("model_model") or "").strip()
+        or cfg.get("CLERK_MODEL", "").strip()
+        or providers.DEFAULT_MODELS[provider]
+    )
+    return provider, model
+
+
 def rate_limited(key: str, max_hits: int = MAX_TURNS, window: int = WINDOW_SECONDS) -> bool:
     now = time.time()
     seen = [t for t in _hits.get(key, []) if now - t < window]
@@ -238,6 +264,59 @@ def compute_voucher(v: dict) -> dict:
         if hasattr(result.get(key), "isoformat"):
             result[key] = result[key].isoformat()
     return result
+
+
+def _user_name(user_id: int | None) -> str | None:
+    if not user_id:
+        return None
+    u = db.get_user(user_id)
+    return u["name"] if u else None
+
+
+def enrich_voucher(v: dict) -> dict:
+    """Attach computed figures and the preparer's/approver's real names -
+    every place a voucher gets serialised for the API should go through
+    this, so the client never has to resolve a bare user id itself."""
+    v["computed"] = compute_voucher(v)
+    v["created_by_name"] = _user_name(v["created_by"])
+    v["approved_by_name"] = _user_name(v.get("approved_by"))
+    return v
+
+
+def build_voucher_digest(vouchers: list[dict]) -> str:
+    """A plain-text summary of the vouchers a signed-in user can see, for
+    grounding the authenticated chat - same role as the demo's `computed`
+    figures, just scoped to a real account instead of one hypothetical."""
+    if not vouchers:
+        return "No vouchers exist yet in what this person can see."
+    lines = [f"{len(vouchers)} voucher(s) visible to this person:"]
+    for v in vouchers:
+        c = v["computed"]
+        line = (
+            f"- #{v['id']} {v['supplier_name']} (invoice {v['invoice_number']}), "
+            f"status: {v['status']}, net payable: {c['currency']} {c['net_payable']:,.2f}"
+        )
+        if c.get("review_notes"):
+            line += f" — FLAGGED: {'; '.join(c['review_notes'])}"
+        if v["status"] == "rejected" and v.get("rejection_reason"):
+            line += f" — rejection reason: {v['rejection_reason']}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def build_chat_system(user: dict) -> str:
+    label = {
+        "account_assistant": "an Account Assistant, who prepares vouchers",
+        "senior_accountant": "a Senior Accountant, who approves and signs vouchers",
+        "finance_supervisor": "the Finance Supervisor, who oversees the whole department",
+    }.get(user["role"], user["role"])
+    return (
+        providers.CHAT_SYSTEM
+        + f"\n\nThey are {user['name']}, {label} at {user['company']['name']}. "
+        "Everything in the digest below is already scoped to what their role "
+        "can see in the product - do not tell them a voucher exists that "
+        "isn't listed, and do not assume they can see more than this."
+    )
 
 
 # ----------------------------------------------------------- the demo itself
@@ -401,14 +480,35 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"team": db.list_team(user["company_id"])})
 
+        if path == "/api/company/model-options":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            cfg = load_env()
+            company = db.get_company(user["company_id"])
+            provider, model = resolve_provider_model(cfg, company)
+            return self._json({
+                "configured": configured_providers(cfg),
+                "current": {"provider": provider, "model": model},
+                "saved": {"provider": company["model_provider"], "model": company["model_model"] or ""},
+            })
+
         if path == "/api/vouchers":
             user = current_user(self)
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
             vouchers = db.list_vouchers(user["company_id"], user["id"], user["role"])
             for v in vouchers:
-                v["computed"] = compute_voucher(v)
+                enrich_voucher(v)
             return self._json({"vouchers": vouchers})
+
+        if path == "/api/activity":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({
+                "events": db.list_activity(user["company_id"], user["id"], user["role"]),
+            })
 
         if path == "/api/join/search":
             q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
@@ -460,9 +560,12 @@ class RouteHandlerMixin:
             "/api/login": self._handle_login,
             "/api/logout": self._handle_logout,
             "/api/company/approve": self._handle_approve,
+            "/api/company/set-model": self._handle_set_company_model,
+            "/api/company/briefing": self._handle_set_company_briefing,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
             "/api/vouchers/review": self._handle_voucher_review,
+            "/api/chat": self._handle_chat,
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
@@ -512,7 +615,7 @@ class RouteHandlerMixin:
             reply = providers.chat(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, "(no inbox — this is the public demo)",
-                history, build_system(computed), None,
+                history, system=build_system(computed),
             )
         except providers.ProviderError as exc:
             return self._json({"error": str(exc)}, 502)
@@ -626,6 +729,42 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
 
+    def _handle_set_company_model(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a finance supervisor can change this."}, 403)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        provider = req.get("provider")
+        cfg = load_env()
+        if provider and provider not in configured_providers(cfg):
+            return self._json({"error": "That provider isn't configured on this server."}, 400)
+        try:
+            company = db.set_company_model(user["company_id"], provider, str(req.get("model") or ""))
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "company": company})
+
+    def _handle_set_company_briefing(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a finance supervisor can change this."}, 403)
+        try:
+            req = self._body(max_len=8000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            company = db.set_company_briefing(user["company_id"], str(req.get("briefing") or ""))
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "company": company})
+
     # ------------------------------------------------------------ vouchers
 
     def _handle_voucher_create(self):
@@ -658,7 +797,7 @@ class RouteHandlerMixin:
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)
-        v["computed"] = compute_voucher(v)
+        enrich_voucher(v)
         return self._json({"ok": True, "voucher": v})
 
     def _handle_voucher_submit(self):
@@ -674,7 +813,7 @@ class RouteHandlerMixin:
             v = db.submit_voucher(user["company_id"], user["id"], voucher_id)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
-        v["computed"] = compute_voucher(v)
+        enrich_voucher(v)
         return self._json({"ok": True, "voucher": v})
 
     def _handle_voucher_review(self):
@@ -700,8 +839,74 @@ class RouteHandlerMixin:
                 return self._json({"error": "action must be approve or reject."}, 400)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
-        v["computed"] = compute_voucher(v)
+        enrich_voucher(v)
         return self._json({"ok": True, "voucher": v})
+
+    def _handle_chat(self):
+        """The signed-in equivalent of the landing page's demo agent. Grounded
+        in this person's real, role-scoped vouchers instead of a hypothetical
+        one - see build_voucher_digest/build_chat_system."""
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if rate_limited(f"chat:{user['id']}"):
+            return self._json(
+                {"error": "That's a fair few questions — give it a few minutes."}, 429)
+        try:
+            req = self._body(max_len=60000)  # higher than the default - a pasted document is bigger than a chat message
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+
+        message = str(req.get("message") or "").strip()[:MAX_MESSAGE]
+        if not message:
+            return self._json({"error": "Say something first."}, 400)
+
+        cfg = load_env()
+        pub = public_user(user)
+        provider, model = resolve_provider_model(cfg, pub["company"])
+        if not provider:
+            return self._json(
+                {"error": "The assistant isn't configured on this server yet."}, 503)
+
+        history = []
+        for t in (req.get("history") or [])[-MAX_HISTORY:]:
+            role = "assistant" if t.get("role") == "assistant" else "user"
+            text = str(t.get("content") or "").strip()[:1500]
+            if text:
+                history.append({"role": role, "content": text})
+
+        # Tagged 'text'/'attached' unconditionally here, never taken from the
+        # request - there's no template/reference-library feature to draw
+        # from, so nothing a client sends should ever be labelled trusted
+        # 'library' content (see providers.split_docs).
+        docs = []
+        for d in (req.get("docs") or [])[:3]:
+            text = str(d.get("text") or "").strip()[:20000]
+            if text:
+                docs.append({
+                    "kind": "text", "source": "attached",
+                    "name": str(d.get("name") or "attachment").strip()[:120],
+                    "text": text,
+                })
+
+        vouchers = db.list_vouchers(user["company_id"], user["id"], user["role"])
+        for v in vouchers:
+            enrich_voucher(v)
+        digest = build_voucher_digest(vouchers)
+
+        try:
+            reply = providers.chat(
+                provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
+                message, digest, history, system=build_chat_system(pub),
+                briefing=pub["company"].get("briefing", ""), docs=docs or None,
+            )
+        except providers.ProviderError as exc:
+            return self._json({"error": str(exc)}, 502)
+        except Exception as exc:
+            print(f"  ! chat failure: {exc}")
+            return self._json({"error": "Something went wrong on our side."}, 500)
+
+        return self._json({"reply": reply})
 
     # ------------------------------------------------------- platform admin
 
