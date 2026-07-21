@@ -302,6 +302,82 @@ Account Assistant: Team nav item and its KPIs correctly don't appear).
 
 ---
 
+## Pricing tiers
+
+Three decisions were made explicitly with the project owner before building
+this: **Paystack** as the eventual payment processor (not wired up yet -
+see below), a **free tier that unlocks more users on paid plans** rather
+than a hard paywall at registration, and **demo pricing** to be replaced
+with real numbers later.
+
+**`plans`** (`db.py`): `name`, `price`, `currency`, `user_limit`,
+`sort_order`, `is_default`. Seeded once, on first `init_db()`, with:
+
+| Plan | Price | Users included |
+|---|---|---|
+| Free (default) | GHS 0 | 3 |
+| Starter | GHS 50/mo | 10 |
+| Growth | GHS 150/mo | 30 |
+
+These are placeholders, not real prices — `admin-plans.html` (Command
+Center → Plans) exists specifically so they can be edited, or new tiers
+added, without touching code. Every company gets `plan_id` pointing at
+whichever plan was `is_default` at the moment they registered (existing
+companies were backfilled to it via an idempotent migration in `init_db()`
+— `ALTER TABLE companies ADD COLUMN plan_id` only runs if the column isn't
+already there, then any `NULL` plan_id gets set to the default).
+
+**Enforcement** (`db.can_add_user`, count of `status='approved'` users
+against the company's plan `user_limit`) sits at both places a user can
+become approved: `db.approve_user` (the normal path — a Finance Supervisor
+approving a pending request) and the bootstrap-supervisor branch of
+`db.request_to_join` (claiming Finance Supervisor when a company has none
+yet). Both raise a plain-English `AuthError` rather than a generic
+rejection. **Downgrading never removes anyone already in** — the check is
+only ever "can one more be *added*," so a company that's over its new,
+lower limit just can't grow further until it upgrades or someone leaves;
+nobody gets auto-kicked. Verified directly, including this exact edge
+case: raised BDDG's plan limit to approve someone, then reverted it,
+leaving the company one user over its own Free-tier cap — confirmed
+`can_add_user` correctly blocks further approvals in that state without
+touching the existing (over-limit) team.
+
+Where this is surfaced:
+- **`admin-plans.html`** — the only place plans get created or edited
+  (`/api/admin/plans`, `/api/admin/plans/create`, `/api/admin/plans/update`,
+  all platform-admin only). Inline edit per card, plus an "add a new tier"
+  form. A banner states plainly that the prices are demo values.
+- **`admin-companies.html`** — each company's card shows its plan name and
+  `used/limit`, with an "— at limit" note once it's reached.
+- **`admin.html` Overview** — the condensed recent-signups cards show
+  `used/limit` in place of a bare count.
+- **`dashboard.html` Team view** — a Finance Supervisor sees a plan banner
+  above their team/pending panels (`renderPlanBanner`), which switches to a
+  warning style once at the limit. The Approve button now surfaces the
+  limit error via a plain alert instead of failing silently, since hitting
+  the cap is an expected, recoverable state now, not an edge case to hide.
+- **`admin-companies.html`**, expanded card — a "Change plan" dropdown
+  (every existing plan, current one pre-selected) plus a Move button, wired
+  to `db.set_company_plan` / `/api/admin/company/set-plan`. Same
+  never-removes-anyone rule as everywhere else: moving a company onto a
+  plan smaller than its current headcount doesn't kick anyone out, it just
+  means no further approvals until it's back under the new limit or
+  upgraded again. Verified directly: moved BDDG (4 users) from Free (limit
+  3, so it was sitting over-limit) to Starter (limit 10) — the "at limit"
+  warning disappeared immediately and the dropdown correctly pre-selected
+  Starter on reload; moved it back to Free and the over-limit warning came
+  right back, all without touching any of the 4 existing users. A company
+  cannot change its own plan — this is Command Center-only, same as
+  creating/editing the tiers themselves.
+
+**Not built**: any actual Paystack integration — no checkout flow, no
+webhooks, no subscription lifecycle (trial, renewal, failed payment,
+cancellation). The tier/limit machinery and the Command Center's ability to
+move a company between tiers are both real and working; what's missing is
+the part where a company would actually pay to get moved there themselves.
+
+---
+
 ## What's genuinely missing (don't assume it exists)
 
 - **The actual voucher workspace.** Uploading an invoice, having an agent

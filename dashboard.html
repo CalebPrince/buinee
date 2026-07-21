@@ -134,6 +134,15 @@
   .kpi .val { font-family: var(--mono); font-size: 27px; font-weight: 600; letter-spacing: -.02em; margin-top: 8px; }
   .kpi .l { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
 
+  .plan-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
+    font-size: 13px; color: var(--ink-2); margin-bottom: 18px;
+  }
+  .plan-banner.at-limit { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+  .plan-banner b { color: var(--ink); }
+  .plan-banner.at-limit b { color: var(--warn); }
+
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
   .card-h { padding: 15px 17px; border-bottom: 1px solid var(--line); }
@@ -241,6 +250,7 @@
         <h1>Team</h1>
         <p>Everyone approved at your company, and anyone waiting on you to let them in.</p>
       </div>
+      <div class="plan-banner" id="planBanner"></div>
       <div class="grid2">
         <div class="card">
           <div class="card-h"><h3>Team</h3><div class="sub" id="teamSub"></div></div>
@@ -370,6 +380,7 @@
       const pendingCount = await loadPending();
       kpis.push({ n: teamCount, l: 'Team members' });
       kpis.push({ n: pendingCount, l: 'Pending requests' });
+      renderPlanBanner(me.company);
     }
 
     kpiBox.innerHTML = kpis.map(k => `<div class="kpi"><div class="eyebrow">${k.l}</div><div class="val num">${k.n}</div></div>`).join('');
@@ -377,6 +388,15 @@
     document.getElementById('loading').style.display = 'none';
     go('overview');
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== 'overview');
+  }
+
+  function renderPlanBanner(company) {
+    const banner = document.getElementById('planBanner');
+    const atLimit = company.user_count >= company.plan.user_limit;
+    banner.classList.toggle('at-limit', atLimit);
+    banner.innerHTML = atLimit
+      ? `<span><b>${escapeHtml(company.plan.name)} plan</b> — ${company.user_count} of ${company.plan.user_limit} users used. At the limit — approving anyone new needs a plan upgrade first.</span>`
+      : `<span><b>${escapeHtml(company.plan.name)} plan</b> — ${company.user_count} of ${company.plan.user_limit} users used.</span>`;
   }
 
   async function loadTeam(companyName) {
@@ -444,16 +464,22 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, action }),
       });
-      if (res.ok) {
-        row.remove();
-        const me = (await (await fetch('/api/me', { credentials: 'same-origin' })).json()).user;
-        await loadTeam(me.company.name);
-        const remaining = document.querySelectorAll('#pendingRows .row[id^="pending-"]').length;
-        const badge = document.getElementById('teamNavCount');
-        if (remaining) { badge.style.display = 'inline-block'; badge.textContent = remaining; }
-        else { badge.style.display = 'none'; }
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Could not do that.');
+        return;
       }
-    } catch { /* leave the row, they can retry */ }
+      row.remove();
+      const me = (await (await fetch('/api/me', { credentials: 'same-origin' })).json()).user;
+      await loadTeam(me.company.name);
+      renderPlanBanner(me.company);
+      const remaining = document.querySelectorAll('#pendingRows .row[id^="pending-"]').length;
+      const badge = document.getElementById('teamNavCount');
+      if (remaining) { badge.style.display = 'inline-block'; badge.textContent = remaining; }
+      else { badge.style.display = 'none'; }
+    } catch {
+      alert('Could not reach the server.');
+    }
   }
 
   main();

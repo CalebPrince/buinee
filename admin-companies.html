@@ -139,6 +139,25 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     padding: 3px 7px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep); white-space: nowrap;
   }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 8px 14px; border-radius: 9px; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  .btn:hover { border-color: var(--violet); color: var(--violet); }
+  .btn.sm { padding: 6px 11px; font-size: 12px; }
+  .msg.error { color: var(--bad); font-size: 12px; }
+
+  .plan-change {
+    margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px;
+  }
+  .plan-change label { font-weight: 600; color: var(--ink-2); }
+  .plan-change select {
+    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--paper); color: var(--ink); font-size: 12.5px; max-width: 260px;
+  }
+
   .danger-zone {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -186,6 +205,10 @@
       <a class="sidebar-link active" href="/admin-companies.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M6 21V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v14"/><path d="M14 21V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v17"/></svg>
         <span class="label">Companies</span>
+      </a>
+      <a class="sidebar-link" href="/admin-plans.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span class="label">Plans</span>
       </a>
       <a class="sidebar-link" href="/admin-settings.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
@@ -254,6 +277,8 @@
     finance_supervisor: 'Finance Supervisor',
   };
 
+  let allPlans = [];
+
   async function main() {
     try {
       const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
@@ -262,9 +287,13 @@
 
     let overview;
     try {
-      const res = await fetch('/api/admin/overview', { credentials: 'same-origin' });
-      if (!res.ok) { throw new Error(); }
-      overview = await res.json();
+      const [overviewRes, plansRes] = await Promise.all([
+        fetch('/api/admin/overview', { credentials: 'same-origin' }),
+        fetch('/api/admin/plans', { credentials: 'same-origin' }),
+      ]);
+      if (!overviewRes.ok) { throw new Error(); }
+      overview = await overviewRes.json();
+      allPlans = plansRes.ok ? (await plansRes.json()).plans : [];
     } catch {
       document.getElementById('loading').textContent = 'Could not load companies.';
       return;
@@ -296,6 +325,7 @@
             <span class="meta">${c.supervisor
               ? `Supervisor: ${escapeHtml(c.supervisor.name)}`
               : '<span class="no-super">no Finance Supervisor yet</span>'}</span>
+            <span class="meta">Plan: <b>${escapeHtml(c.plan.name)}</b> (${c.approved_count}/${c.plan.user_limit} users)${c.approved_count >= c.plan.user_limit ? ' <span class="no-super">— at limit</span>' : ''}</span>
           </div>
           <div class="counts">
             <span class="count-badge" title="Approved employees">${c.approved_count}</span>
@@ -308,6 +338,14 @@
             ? `<div class="supervisor-line">Finance Supervisor: <b>${escapeHtml(c.supervisor.name)}</b> · ${escapeHtml(c.supervisor.email)}</div>`
             : '<div class="supervisor-line"><span class="no-super">No Finance Supervisor yet</span></div>'}
           ${renderTeamAndPending(c)}
+          <div class="plan-change" onclick="event.stopPropagation()">
+            <label for="planSelect-${c.id}">Change plan</label>
+            <select id="planSelect-${c.id}">
+              ${allPlans.map(p => `<option value="${p.id}" ${p.id === c.plan.id ? 'selected' : ''}>${escapeHtml(p.name)} (${p.user_limit} users) — ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}
+            </select>
+            <button class="btn sm" onclick="changePlan(${c.id})">Move</button>
+            <span class="msg error" id="planError-${c.id}" style="display:inline-block;margin:0"></span>
+          </div>
           <div class="danger-zone">
             <button class="btn-delete" onclick="event.stopPropagation(); deleteCompany(${c.id})">
               Delete company
@@ -340,6 +378,29 @@
       document.getElementById(`card-${id}`).remove();
     } catch {
       alert('Could not reach the server.');
+    }
+  }
+
+  async function changePlan(id) {
+    const errBox = document.getElementById(`planError-${id}`);
+    errBox.textContent = '';
+    const planId = parseInt(document.getElementById(`planSelect-${id}`).value, 10);
+    try {
+      const res = await fetch('/api/admin/company/set-plan', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_id: id, plan_id: planId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { errBox.textContent = data.error || 'Could not change plan.'; return; }
+      const wasExpanded = document.getElementById(`card-${id}`).classList.contains('expanded');
+      await main();
+      if (wasExpanded) {
+        const card = document.getElementById(`card-${id}`);
+        if (card) { card.classList.add('expanded'); card.setAttribute('aria-expanded', 'true'); }
+      }
+    } catch {
+      errBox.textContent = 'Could not reach the server.';
     }
   }
 

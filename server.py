@@ -69,6 +69,7 @@ STATIC_PAGES = {
     "/dashboard.html": "dashboard.html",
     "/admin.html": "admin.html",
     "/admin-companies.html": "admin-companies.html",
+    "/admin-plans.html": "admin-plans.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -153,13 +154,23 @@ def current_user(handler) -> dict | None:
 
 
 def public_user(user: dict) -> dict:
+    company = db.get_company(user["company_id"])
+    plan = db.plan_for_company(user["company_id"])
+    company["plan"] = {
+        "id": plan["id"],
+        "name": plan["name"],
+        "price": plan["price"],
+        "currency": plan["currency"],
+        "user_limit": plan["user_limit"],
+    }
+    company["user_count"] = db.company_user_count(user["company_id"])
     return {
         "id": user["id"],
         "name": user["name"],
         "email": user["email"],
         "role": user["role"],
         "status": user["status"],
-        "company": db.get_company(user["company_id"]),
+        "company": company,
     }
 
 
@@ -376,6 +387,12 @@ class RouteHandlerMixin:
                 },
             })
 
+        if path == "/api/admin/plans":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"plans": db.list_plans()})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -399,6 +416,9 @@ class RouteHandlerMixin:
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
             "/api/admin/company/delete": self._handle_admin_delete_company,
+            "/api/admin/plans/create": self._handle_admin_create_plan,
+            "/api/admin/plans/update": self._handle_admin_update_plan,
+            "/api/admin/company/set-plan": self._handle_admin_set_company_plan,
         }
         handler = handlers.get(path)
         if not handler:
@@ -615,6 +635,68 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
+
+    def _handle_admin_create_plan(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            plan = db.create_plan(
+                str(req.get("name") or ""),
+                float(req.get("price") or 0),
+                str(req.get("currency") or "GHS"),
+                int(req.get("user_limit") or 0),
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        return self._json({"ok": True, "plan": plan})
+
+    def _handle_admin_update_plan(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            plan_id = int(req.get("plan_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            plan = db.update_plan(
+                plan_id,
+                name=req.get("name"),
+                price=(float(req["price"]) if req.get("price") is not None else None),
+                currency=req.get("currency"),
+                user_limit=(int(req["user_limit"]) if req.get("user_limit") is not None else None),
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        return self._json({"ok": True, "plan": plan})
+
+    def _handle_admin_set_company_plan(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            company_id = int(req.get("company_id"))
+            plan_id = int(req.get("plan_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            company = db.set_company_plan(company_id, plan_id)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "company": company})
 
 
 def maybe_bootstrap_admin() -> None:

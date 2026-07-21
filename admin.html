@@ -182,6 +182,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M6 21V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v14"/><path d="M14 21V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v17"/></svg>
         <span class="label">Companies</span>
       </a>
+      <a class="sidebar-link" href="/admin-plans.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span class="label">Plans</span>
+      </a>
       <a class="sidebar-link" href="/admin-settings.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
         <span class="label">Settings</span>
@@ -315,7 +319,7 @@
               : '<span class="no-super">no Finance Supervisor yet</span>'}</span>
         </div>
         <div class="counts">
-          <span class="count-badge" title="Approved employees">${c.approved_count}</span>
+          <span class="count-badge" title="${c.plan.name} plan — ${c.approved_count} of ${c.plan.user_limit} users">${c.approved_count}/${c.plan.user_limit}</span>
           <span class="count-badge ${c.pending_count ? 'warn' : ''}" title="Pending requests">${c.pending_count}</span>
         </div>
       </div>

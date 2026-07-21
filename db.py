@@ -118,11 +118,54 @@ def init_db() -> None:
                 expires_at REAL NOT NULL
             );
 
+            -- Pricing tiers. Editable from the Command Center (Plans), not
+            -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
+            -- row has is_default=1; that's what a newly registered company
+            -- gets, and there's always at least the one seeded below.
+            CREATE TABLE IF NOT EXISTS plans (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT NOT NULL,
+                price      REAL NOT NULL DEFAULT 0,
+                currency   TEXT NOT NULL DEFAULT 'GHS',
+                user_limit INTEGER NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
             """
         )
+        _seed_default_plans(conn)
+        _migrate_company_plan_id(conn)
+
+
+def _seed_default_plans(conn: sqlite3.Connection) -> None:
+    if conn.execute("SELECT COUNT(*) AS n FROM plans").fetchone()["n"] > 0:
+        return
+    now = time.time()
+    # Demo pricing - deliberately placeholder numbers, meant to be edited from
+    # the Command Center's Plans page before any real billing happens.
+    for name, price, user_limit, sort_order, is_default in (
+        ("Free", 0, 3, 0, 1),
+        ("Starter", 50, 10, 1, 0),
+        ("Growth", 150, 30, 2, 0),
+    ):
+        conn.execute(
+            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default, created_at)
+               VALUES (?, ?, 'GHS', ?, ?, ?, ?)""",
+            (name, price, user_limit, sort_order, is_default, now),
+        )
+
+
+def _migrate_company_plan_id(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
+    if "plan_id" not in cols:
+        conn.execute("ALTER TABLE companies ADD COLUMN plan_id INTEGER REFERENCES plans(id)")
+    default_id = conn.execute("SELECT id FROM plans WHERE is_default = 1 LIMIT 1").fetchone()["id"]
+    conn.execute("UPDATE companies SET plan_id = ? WHERE plan_id IS NULL", (default_id,))
 
 
 # ------------------------------------------------------------------ passwords
@@ -157,9 +200,25 @@ def find_companies_by_name(query: str, limit: int = 8) -> list[dict]:
 def get_company(company_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT id, name FROM companies WHERE id = ?", (company_id,)
+            "SELECT id, name, plan_id FROM companies WHERE id = ?", (company_id,)
         ).fetchone()
     return dict(row) if row else None
+
+
+def set_company_plan(company_id: int, plan_id: int) -> dict:
+    """Move a company onto a different existing plan. Command Center only -
+    a company has no way to change its own plan. Doesn't touch its users:
+    if the new plan's limit is below the current headcount, nobody is
+    removed, they just can't approve anyone new until they're back under it
+    (or upgrade again) - same rule can_add_user already enforces everywhere
+    else."""
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    if not get_plan(plan_id):
+        raise AuthError("No such plan.")
+    with _cursor() as conn:
+        conn.execute("UPDATE companies SET plan_id = ? WHERE id = ?", (plan_id, company_id))
+    return get_company(company_id)
 
 
 def get_user_by_email(email: str) -> dict | None:
@@ -222,9 +281,12 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
     salt = _new_salt()
     now = time.time()
     with _cursor() as conn:
+        default_plan_id = conn.execute(
+            "SELECT id FROM plans WHERE is_default = 1 LIMIT 1"
+        ).fetchone()["id"]
         cur = conn.execute(
-            "INSERT INTO companies (name, created_at) VALUES (?, ?)",
-            (company_name, now),
+            "INSERT INTO companies (name, plan_id, created_at) VALUES (?, ?, ?)",
+            (company_name, default_plan_id, now),
         )
         company_id = cur.lastrowid
         cur = conn.execute(
@@ -236,6 +298,90 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         user_id = cur.lastrowid
 
     return get_user(user_id) | {"company": {"id": company_id, "name": company_name}}
+
+
+# ------------------------------------------------------------------ plans
+
+def list_plans() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute("SELECT * FROM plans ORDER BY sort_order").fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_plan(plan_id: int) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM plans WHERE id = ?", (plan_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def get_default_plan() -> dict:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM plans WHERE is_default = 1 LIMIT 1").fetchone()
+    return dict(row)
+
+
+def create_plan(name: str, price: float, currency: str, user_limit: int) -> dict:
+    name = name.strip()
+    currency = currency.strip().upper() or "GHS"
+    if len(name) < 2:
+        raise AuthError("Plan name is too short.")
+    if user_limit < 1:
+        raise AuthError("A plan needs to allow at least 1 user.")
+    if price < 0:
+        raise AuthError("Price can't be negative.")
+    with _cursor() as conn:
+        next_sort = conn.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM plans").fetchone()["n"]
+        cur = conn.execute(
+            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?)""",
+            (name, price, currency, user_limit, next_sort, time.time()),
+        )
+        plan_id = cur.lastrowid
+    return get_plan(plan_id)
+
+
+def update_plan(plan_id: int, name: str | None = None, price: float | None = None,
+                 currency: str | None = None, user_limit: int | None = None) -> dict:
+    plan = get_plan(plan_id)
+    if not plan:
+        raise AuthError("No such plan.")
+    if user_limit is not None and user_limit < 1:
+        raise AuthError("A plan needs to allow at least 1 user.")
+    if price is not None and price < 0:
+        raise AuthError("Price can't be negative.")
+    new_name = name.strip() if name is not None and name.strip() else plan["name"]
+    new_price = plan["price"] if price is None else price
+    new_currency = (currency.strip().upper() if currency and currency.strip() else plan["currency"])
+    new_limit = plan["user_limit"] if user_limit is None else user_limit
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE plans SET name = ?, price = ?, currency = ?, user_limit = ? WHERE id = ?",
+            (new_name, new_price, new_currency, new_limit, plan_id),
+        )
+    return get_plan(plan_id)
+
+
+def company_user_count(company_id: int) -> int:
+    with _cursor() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE company_id = ? AND status = 'approved'",
+            (company_id,),
+        ).fetchone()["n"]
+
+
+def plan_for_company(company_id: int) -> dict:
+    with _cursor() as conn:
+        row = conn.execute(
+            """SELECT p.* FROM plans p JOIN companies c ON c.plan_id = p.id
+               WHERE c.id = ?""",
+            (company_id,),
+        ).fetchone()
+    return dict(row) if row else get_default_plan()
+
+
+def can_add_user(company_id: int) -> bool:
+    plan = plan_for_company(company_id)
+    return company_user_count(company_id) < plan["user_limit"]
 
 
 def request_to_join(company_id: int, name: str, email: str, password: str, role: str) -> dict:
@@ -258,11 +404,19 @@ def request_to_join(company_id: int, name: str, email: str, password: str, role:
     if get_user_by_email(email):
         raise AuthError("An account with that email already exists.")
 
-    if role == "finance_supervisor" and has_approved_supervisor(company_id):
-        raise AuthError(
-            "This company already has a Finance Supervisor - ask them to add "
-            "you instead of joining as one yourself."
-        )
+    if role == "finance_supervisor":
+        if has_approved_supervisor(company_id):
+            raise AuthError(
+                "This company already has a Finance Supervisor - ask them to add "
+                "you instead of joining as one yourself."
+            )
+        if not can_add_user(company_id):
+            plan = plan_for_company(company_id)
+            raise AuthError(
+                f"This company is on the {plan['name']} plan ({plan['user_limit']} "
+                "users) and is already at that limit. Its plan needs to be "
+                "upgraded before anyone new can join."
+            )
     status = "approved" if role == "finance_supervisor" else "pending"
 
     salt = _new_salt()
@@ -359,6 +513,13 @@ def approve_user(company_id: int, user_id: int) -> None:
         ).fetchone()
         if not row:
             raise AuthError("No pending request with that id for your company.")
+        if not can_add_user(company_id):
+            plan = plan_for_company(company_id)
+            raise AuthError(
+                f"Your company is on the {plan['name']} plan ({plan['user_limit']} "
+                "users) and is already at that limit. Upgrade the plan before "
+                "approving anyone new."
+            )
         conn.execute("UPDATE users SET status = 'approved' WHERE id = ?", (user_id,))
 
 
@@ -509,7 +670,10 @@ def list_companies_with_stats() -> list[dict]:
     the command center shows all of this up front, no per-company click."""
     with _cursor() as conn:
         companies = conn.execute(
-            "SELECT id, name, created_at FROM companies ORDER BY created_at"
+            """SELECT c.id, c.name, c.created_at, p.id AS plan_id, p.name AS plan_name,
+                      p.user_limit AS plan_user_limit
+               FROM companies c JOIN plans p ON c.plan_id = p.id
+               ORDER BY c.created_at""",
         ).fetchall()
         out = []
         for c in companies:
@@ -533,6 +697,7 @@ def list_companies_with_stats() -> list[dict]:
                 "supervisor": {"name": supervisor["name"], "email": supervisor["email"]} if supervisor else None,
                 "team": [dict(u) for u in team],
                 "pending": [dict(u) for u in pending],
+                "plan": {"id": c["plan_id"], "name": c["plan_name"], "user_limit": c["plan_user_limit"]},
             })
     return out
 
