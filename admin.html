@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Command Center — Buinee</title>
 <meta name="description" content="Cross-company overview for Buinee's platform owner.">
 <style>
@@ -295,7 +296,7 @@
       { n: platform.companies, l: 'Companies registered' },
       { n: approved, l: 'Approved employees, platform-wide' },
       { n: pending, l: 'Pending approvals, platform-wide' },
-      { n: supervisors, l: 'Finance Supervisors' },
+      { n: supervisors, l: 'Supervisors' },
     ].map(t => `<div class="tile"><div class="n">${t.n}</div><div class="l">${t.l}</div></div>`).join('');
   }
 
@@ -316,7 +317,7 @@
           <span class="meta">Registered ${fmtDate(c.created_at)}</span>
           <span class="meta">${c.supervisor
               ? `Supervisor: ${escapeHtml(c.supervisor.name)}`
-              : '<span class="no-super">no Finance Supervisor yet</span>'}</span>
+              : '<span class="no-super">no Supervisor yet</span>'}</span>
         </div>
         <div class="counts">
           <span class="count-badge" title="${c.plan.name} plan — ${c.approved_count} of ${c.plan.user_limit} users">${c.approved_count}/${c.plan.user_limit}</span>

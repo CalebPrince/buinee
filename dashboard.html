@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Dashboard — Buinee</title>
 <meta name="description" content="Your Buinee workspace.">
 <style>
@@ -282,7 +283,7 @@
       </span>
       <div>
         <div class="brand-name">Buinee</div>
-        <div class="brand-sub">Finance workspace</div>
+        <div class="brand-sub">Approval workspace</div>
       </div>
     </div>
 
@@ -383,7 +384,7 @@
     <section class="view" data-view="vouchers" id="viewVouchers" hidden>
       <div class="hello">
         <h1>Vouchers</h1>
-        <p id="voucherBlurb">Prepare a payment voucher, submit it, and a senior accountant signs off before anything goes out.</p>
+        <p id="voucherBlurb">Prepare a voucher, submit it, and an approver signs off before anything goes out.</p>
       </div>
       <div style="margin-bottom:16px">
         <button class="btn primary" type="button" onclick="openVoucherForm()">+ New voucher</button>
@@ -532,7 +533,7 @@
         </div>
         <div class="settings-sec">
           <h3>Custom instructions</h3>
-          <p class="sub">Folded into every Chat conversation at your company — policies, terminology, tone. Written by your Finance Supervisor; doesn't override Chat's grounding rules.</p>
+          <p class="sub">Folded into every Chat conversation at your company — policies, terminology, tone. Written by your Supervisor; doesn't override Chat's grounding rules.</p>
           <div id="briefingReadonly" class="readonly-note" hidden></div>
           <form id="briefingForm" onsubmit="return saveBriefing(event)" hidden>
             <textarea id="briefingInput" placeholder="e.g. Always quote amounts in GHS to two decimals. Our fiscal year starts in July."></textarea>
@@ -580,18 +581,18 @@
 
   const ROLE_INFO = {
     account_assistant: {
-      label: 'Account Assistant',
-      blurb: 'You prepare payment vouchers and letters. Once approved, a senior accountant signs off before anything goes out.',
+      label: 'Preparer',
+      blurb: 'You prepare vouchers and letters. Once approved, an approver signs off before anything goes out.',
       sees: 'You see your own work only.',
     },
     senior_accountant: {
-      label: 'Senior Accountant',
+      label: 'Approver',
       blurb: 'You approve and sign the vouchers your team prepares.',
-      sees: 'You see your own work and the work of account assistants below you.',
+      sees: 'You see your own work and the work of preparers below you.',
     },
     finance_supervisor: {
-      label: 'Finance Supervisor',
-      blurb: 'You oversee the whole department — including who gets into it.',
+      label: 'Supervisor',
+      blurb: 'You oversee the whole workspace — including who gets into it.',
       sees: 'You see everything in your company.',
     },
   };
@@ -643,6 +644,7 @@
 
   const ICO_DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
   const ICO_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+  const ICO_MAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>';
 
   async function main() {
     let me;
@@ -672,7 +674,10 @@
     const kpis = [{ key: 'mine', n: 0, l: 'My vouchers' }];
     if (seesApprovals) kpis.push({ key: 'awaiting', n: 0, l: 'Awaiting my approval' });
     kpis.push({ key: 'flagged', n: 0, l: 'Flagged' });
-    kpis.push({ key: 'invoices', n: '—', l: 'Invoices found', sub: 'Waiting for mailbox connection' });
+    kpis.push({ key: 'triaged', n: '—', l: 'Emails triaged', sub: 'Waiting for first sync' });
+    kpis.push({ key: 'replies', n: '—', l: 'Replies drafted', sub: 'Waiting for first sync' });
+    kpis.push({ key: 'issues', n: '—', l: 'Issues flagged', sub: 'Waiting for first sync' });
+    kpis.push({ key: 'timesaved', n: '—', l: 'Est. time saved', sub: 'Waiting for first sync' });
     const kpiBox = document.getElementById('kpis');
 
     // ---- Vouchers (drives both the Vouchers tab and these overview cards) ----
@@ -689,11 +694,16 @@
     ));
     if (seesApprovals) {
       cards.appendChild(emptyCard(
-        'Awaiting your approval', 'From account assistants you can see', ICO_CHECK,
+        'Awaiting your approval', 'From preparers you can see', ICO_CHECK,
         voucherCounts.awaiting ? `${voucherCounts.awaiting} voucher${voucherCounts.awaiting === 1 ? '' : 's'} waiting` : 'Nothing waiting on you right now',
         voucherCounts.awaiting ? 'Review them in the Vouchers tab.' : ''
       ));
     }
+    cards.appendChild(emptyCard(
+      'Needs your reply first', 'Ranked once a mailbox is connected', ICO_MAIL,
+      'No mail yet',
+      'Once your mailbox is connected, the emails the assistant thinks need you personally will appear here, ranked.'
+    ));
 
     if (isSupervisor) {
       document.getElementById('teamNavItem').style.display = 'flex';
@@ -980,8 +990,8 @@
       provForm.hidden = true;
       provReadonly.hidden = false;
       provReadonly.textContent = options.current.provider
-        ? `Currently using ${PROVIDER_LABELS[options.current.provider] || options.current.provider}${options.current.model ? ` (${options.current.model})` : ''}. Only a Finance Supervisor can change this.`
-        : 'No AI provider is configured on this server yet. Only a Finance Supervisor can change this once one is.';
+        ? `Currently using ${PROVIDER_LABELS[options.current.provider] || options.current.provider}${options.current.model ? ` (${options.current.model})` : ''}. Only a Supervisor can change this.`
+        : 'No AI provider is configured on this server yet. Only a Supervisor can change this once one is.';
     }
 
     if (isSupervisor) {
@@ -993,7 +1003,7 @@
       briefReadonly.hidden = false;
       briefReadonly.textContent = me.company.briefing
         ? me.company.briefing
-        : 'No custom instructions set yet. Only a Finance Supervisor can add them.';
+        : 'No custom instructions set yet. Only a Supervisor can add them.';
     }
   }
 

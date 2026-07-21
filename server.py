@@ -306,9 +306,9 @@ def build_voucher_digest(vouchers: list[dict]) -> str:
 
 def build_chat_system(user: dict) -> str:
     label = {
-        "account_assistant": "an Account Assistant, who prepares vouchers",
-        "senior_accountant": "a Senior Accountant, who approves and signs vouchers",
-        "finance_supervisor": "the Finance Supervisor, who oversees the whole department",
+        "account_assistant": "a Preparer, who prepares vouchers",
+        "senior_accountant": "an Approver, who approves and signs vouchers",
+        "finance_supervisor": "the Supervisor, who oversees the whole workspace",
     }.get(user["role"], user["role"])
     return (
         providers.CHAT_SYSTEM
@@ -356,20 +356,22 @@ def maybe_compute(message: str) -> dict | None:
 
 
 SYSTEM = """You are the assistant on Buinee's landing page. Buinee is a \
-workspace for finance departments: prepare a payment voucher, get it approved, \
-issue the payment letter - with real roles, a real approval trail and a \
-signature recorded in the system rather than printed and scanned.
+back-office approval workspace: prepare a voucher, get it approved, issue \
+the payment letter - with real roles, a real approval trail and a signature \
+recorded in the system rather than printed and scanned. Vouchers are the \
+first thing built on it, not the only thing it's for - the roles and \
+approval-trail model apply to any back-office document, not just finance.
 
-Who you are talking to: someone who works in finance - an accountant, a senior \
-accountant, a finance supervisor - who has landed on the page and is deciding \
-whether this is worth their time.
+Who you are talking to: someone on a back-office or finance team - a \
+preparer, an approver, a supervisor - who has landed on the page and is \
+deciding whether this is worth their time.
 
 How the product works, so you can answer accurately:
-- Three roles. The account assistant prepares vouchers and letters. The senior
-  accountant approves and signs. The finance supervisor oversees everything.
+- Three roles. The preparer prepares vouchers and letters. The approver
+  approves and signs. The supervisor oversees everything.
 - Visibility runs downward only: you see your own work and the work of people
   below you, never above. A junior cannot see their supervisor's documents.
-- The department chats in the app and shares files there. Any file in the chat
+- The team chats in the app and shares files there. Any file in the chat
   can be handed to an assistant to read, without leaving the conversation.
 - Tax lines are computed, never estimated by a model. Ghana's rates are 5%
   NHIL/GETFL, 15% VAT and 7.5% withholding tax, applied to the vatable portion
@@ -471,7 +473,7 @@ class RouteHandlerMixin:
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
             if user["role"] != "finance_supervisor":
-                return self._json({"error": "Only a finance supervisor can see this."}, 403)
+                return self._json({"error": "Only a supervisor can see this."}, 403)
             return self._json({"pending": db.list_pending(user["company_id"])})
 
         if path == "/api/company/team":
@@ -673,7 +675,7 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
 
         if user["status"] == "approved":
-            # Only reachable by claiming Finance Supervisor on a company that
+            # Only reachable by claiming Supervisor on a company that
             # doesn't have one yet — same bootstrap case as registering.
             token = db.create_session(user["id"])
             return self._json(
@@ -708,7 +710,7 @@ class RouteHandlerMixin:
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
         if user["role"] != "finance_supervisor":
-            return self._json({"error": "Only a finance supervisor can approve requests."}, 403)
+            return self._json({"error": "Only a supervisor can approve requests."}, 403)
         try:
             req = self._body()
         except Exception:
@@ -734,7 +736,7 @@ class RouteHandlerMixin:
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
         if user["role"] != "finance_supervisor":
-            return self._json({"error": "Only a finance supervisor can change this."}, 403)
+            return self._json({"error": "Only a supervisor can change this."}, 403)
         try:
             req = self._body()
         except Exception:
@@ -754,7 +756,7 @@ class RouteHandlerMixin:
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
         if user["role"] != "finance_supervisor":
-            return self._json({"error": "Only a finance supervisor can change this."}, 403)
+            return self._json({"error": "Only a supervisor can change this."}, 403)
         try:
             req = self._body(max_len=8000)
         except Exception:
@@ -822,7 +824,7 @@ class RouteHandlerMixin:
             return self._json({"error": "Not signed in."}, 401)
         if user["role"] not in ("senior_accountant", "finance_supervisor"):
             return self._json(
-                {"error": "Only a senior accountant or finance supervisor can review vouchers."}, 403)
+                {"error": "Only an approver or supervisor can review vouchers."}, 403)
         try:
             req = self._body()
             voucher_id = int(req.get("voucher_id"))

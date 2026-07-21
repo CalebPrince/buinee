@@ -6,20 +6,18 @@ extra dependency). One file, gitignored, created on first run.
 
 Auth model:
   - Registering a company creates it. The registrant states their *actual*
-    role - Finance Supervisor is not assumed just because they're the one
-    setting the account up. Whatever role they pick, they're approved
-    immediately, since there's nobody else at a brand-new company who could
-    approve them.
+    role - Supervisor is not assumed just because they're the one setting
+    the account up. Whatever role they pick, they're approved immediately,
+    since there's nobody else at a brand-new company who could approve them.
   - Joining an existing company (by name) creates a *pending* user, unless
-    they're claiming Finance Supervisor and the company doesn't have one
-    yet - in that one case they're approved immediately too, for the same
-    bootstrap reason. See has_approved_supervisor(). Once a company has an
-    approved supervisor, that door closes: nobody else can walk in and
-    claim the role, only the existing supervisor can grant it.
-  - Every other join is pending until a Finance Supervisor at that specific
-    company approves it. This is deliberate: company name alone is public
-    knowledge, so it is not sufficient to grant access on its own. See
-    approve_user().
+    they're claiming Supervisor and the company doesn't have one yet - in
+    that one case they're approved immediately too, for the same bootstrap
+    reason. See has_approved_supervisor(). Once a company has an approved
+    supervisor, that door closes: nobody else can walk in and claim the
+    role, only the existing supervisor can grant it.
+  - Every other join is pending until a Supervisor at that specific company
+    approves it. This is deliberate: company name alone is public knowledge,
+    so it is not sufficient to grant access on its own. See approve_user().
   - Passwords are salted and stretched with PBKDF2 (stdlib hashlib, no
     bcrypt dependency). Sessions are random tokens in their own table so
     they can be revoked without touching the password.
@@ -300,7 +298,7 @@ def set_company_model(company_id: int, provider: str | None, model: str) -> dict
 
 def set_company_briefing(company_id: int, briefing: str) -> dict:
     """Custom instructions folded into every chat conversation at this
-    company - see providers.with_briefing. Finance Supervisor only."""
+    company - see providers.with_briefing. Supervisor only."""
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
@@ -344,7 +342,7 @@ def get_user(user_id: int) -> dict | None:
 # --------------------------------------------------------------- registration
 
 def has_approved_supervisor(company_id: int) -> bool:
-    """Whether this company already has someone holding Finance Supervisor.
+    """Whether this company already has someone holding Supervisor.
 
     Gates the one bootstrap exception: claiming the role is only open while
     nobody holds it yet. Once true, that door closes for everyone else.
@@ -361,7 +359,7 @@ def has_approved_supervisor(company_id: int) -> bool:
 def register_company(company_name: str, name: str, email: str, password: str, role: str) -> dict:
     """Create a company and its first user, in whatever role they actually hold.
 
-    Not assumed to be Finance Supervisor just because they're the one setting
+    Not assumed to be Supervisor just because they're the one setting
     the account up - a junior person can register the company on the boss's
     behalf and get only their own limited access. Whatever role is chosen,
     this account is approved immediately: there's nobody else at a brand-new
@@ -492,8 +490,8 @@ def can_add_user(company_id: int) -> bool:
 
 def request_to_join(company_id: int, name: str, email: str, password: str, role: str) -> dict:
     """Join an existing company. Pending until approved - except claiming
-    Finance Supervisor when the company doesn't have one yet, which is
-    approved immediately for the same bootstrap reason registration is."""
+    Supervisor when the company doesn't have one yet, which is approved
+    immediately for the same bootstrap reason registration is."""
     name = name.strip()
     email = email.strip().lower()
 
@@ -513,7 +511,7 @@ def request_to_join(company_id: int, name: str, email: str, password: str, role:
     if role == "finance_supervisor":
         if has_approved_supervisor(company_id):
             raise AuthError(
-                "This company already has a Finance Supervisor - ask them to add "
+                "This company already has a Supervisor - ask them to add "
                 "you instead of joining as one yourself."
             )
         if not can_add_user(company_id):
@@ -758,8 +756,8 @@ def change_admin_password(admin_id: int, current_password: str, new_password: st
 
 def delete_company(company_id: int) -> None:
     """Permanently remove a company and everyone in it. Irreversible - no
-    undo, no soft-delete. Command Center only; a company's own Finance
-    Supervisor has no way to do this to their own company."""
+    undo, no soft-delete. Command Center only; a company's own Supervisor
+    has no way to do this to their own company."""
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
@@ -893,10 +891,10 @@ def get_voucher(voucher_id: int) -> dict | None:
 
 
 def list_vouchers(company_id: int, viewer_id: int, viewer_role: str) -> list[dict]:
-    """Same downward-only visibility as everywhere else in this app: an
-    account assistant sees only their own vouchers, a senior accountant sees
-    their own plus every account assistant's, and a finance supervisor sees
-    the company's entire voucher book."""
+    """Same downward-only visibility as everywhere else in this app: a
+    preparer sees only their own vouchers, an approver sees their own plus
+    every preparer's, and a supervisor sees the company's entire voucher
+    book."""
     with _cursor() as conn:
         if viewer_role == "finance_supervisor":
             rows = conn.execute(

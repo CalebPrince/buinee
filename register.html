@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Register — Buinee</title>
 <meta name="description" content="Register your company on Buinee, or join one that's already registered.">
 <style>
@@ -227,19 +228,19 @@
       <div class="mock-card team">
         <div class="mock-head">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-          Finance · 3 members
+          Team · 3 members
         </div>
         <div class="mock-row">
           <span class="mock-av" style="background:#c0611c">AB</span>
-          <div><b>A. Boateng</b><span>Account Assistant</span></div>
+          <div><b>A. Boateng</b><span>Preparer</span></div>
         </div>
         <div class="mock-row">
           <span class="mock-av" style="background:#0e5d57">SO</span>
-          <div><b>S. Owusu</b><span>Senior Accountant</span></div>
+          <div><b>S. Owusu</b><span>Approver</span></div>
         </div>
         <div class="mock-row">
           <span class="mock-av" style="background:#3c4750">KA</span>
-          <div><b>K. Asante</b><span>Finance Supervisor</span></div>
+          <div><b>K. Asante</b><span>Supervisor</span></div>
         </div>
       </div>
       <div class="mock-card trail">
@@ -264,7 +265,7 @@
     <div id="pendingScreen" class="pending-screen">
       <div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
       <h2>Request sent</h2>
-      <p id="pendingText">Your request to join has been sent. A finance supervisor at your company needs to approve it before you can sign in.</p>
+      <p id="pendingText">Your request to join has been sent. A supervisor at your company needs to approve it before you can sign in.</p>
     </div>
 
     <div id="formArea">
@@ -290,9 +291,9 @@
         </label>
         <label>Your role
           <select id="regRole" required>
-            <option value="finance_supervisor" selected>Finance Supervisor — I oversee the department</option>
-            <option value="senior_accountant">Senior Accountant — approves and signs</option>
-            <option value="account_assistant">Account Assistant — prepares vouchers and letters</option>
+            <option value="finance_supervisor" selected>Supervisor — I oversee the workspace</option>
+            <option value="senior_accountant">Approver — approves and signs</option>
+            <option value="account_assistant">Preparer — prepares vouchers and letters</option>
           </select>
         </label>
         <label>Work email
@@ -302,7 +303,7 @@
           <input type="password" id="regPassword" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
         </label>
         <button class="btn primary" type="submit" id="regSubmit">Register company</button>
-        <p class="note">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Finance Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
+        <p class="note">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
       </form>
 
       <!-- ---------------- join ---------------- -->
@@ -330,13 +331,13 @@
         <label>Your role
           <select id="joinRole" required>
             <option value="">Choose one</option>
-            <option value="account_assistant">Account Assistant — prepares vouchers and letters</option>
-            <option value="senior_accountant">Senior Accountant — approves and signs</option>
-            <option value="finance_supervisor">Finance Supervisor — only if nobody holds this role yet</option>
+            <option value="account_assistant">Preparer — prepares vouchers and letters</option>
+            <option value="senior_accountant">Approver — approves and signs</option>
+            <option value="finance_supervisor">Supervisor — only if nobody holds this role yet</option>
           </select>
         </label>
         <button class="btn primary" type="submit" id="joinSubmit">Request to join</button>
-        <p class="note">A finance supervisor at that company approves every join request before it's active — company name alone doesn't grant access. The one exception: claiming Finance Supervisor when the company doesn't have one yet gets you in immediately, since there'd be no one to approve it.</p>
+        <p class="note">A supervisor at that company approves every join request before it's active — company name alone doesn't grant access. The one exception: claiming Supervisor when the company doesn't have one yet gets you in immediately, since there'd be no one to approve it.</p>
       </form>
 
       <div class="foot-link">Already registered? <a href="/login.html">Sign in</a></div>
@@ -479,7 +480,7 @@
         return false;
       }
       document.getElementById('pendingText').textContent =
-        `Your request to join ${data.company.name} has been sent. A finance supervisor there needs to approve it before you can sign in.`;
+        `Your request to join ${data.company.name} has been sent. A supervisor there needs to approve it before you can sign in.`;
       document.getElementById('formArea').style.display = 'none';
       document.getElementById('pendingScreen').classList.add('show');
     } catch {

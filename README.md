@@ -1,9 +1,12 @@
 # Buinee
 
-A multi-tenant workspace for finance/back-office teams: prepare a payment
-voucher from an invoice, get it approved, issue the letter — with real
-roles, a real approval trail, and a signature recorded in the system rather
-than printed and scanned.
+A multi-tenant back-office approval workspace: prepare a voucher from an
+invoice, get it approved, issue the letter — with real roles, a real
+approval trail, and a signature recorded in the system rather than printed
+and scanned. Vouchers are the first document type built on this, not the
+only thing it's for — the role/approval-trail model (Preparer → Approver →
+Supervisor, visibility running downward only) is deliberately generic, not
+finance-specific.
 
 This is the product pivot from two earlier bespoke, single-client builds —
 see [Where this came from](#where-this-came-from) below. Nothing here talks
@@ -104,7 +107,7 @@ Software section before assuming this applies):
 | `login.html` | Sign in |
 | `dashboard.html` | Post-login workspace — sidebar app shell, role-scoped views, see below |
 | `admin.html` | Command Center: Overview — platform stat tiles, the 5 newest signups, system status |
-| `admin-companies.html` | Command Center: Companies — every company in full, Finance Supervisor + complete team/pending |
+| `admin-companies.html` | Command Center: Companies — every company in full, Supervisor + complete team/pending |
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
 | `admin-settings.html` | Command Center: Settings — change the platform owner's own password |
 | `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes — routing logic is transport-agnostic, see Deployment above |
@@ -132,14 +135,14 @@ as a correctness check; it's never served over HTTP.
 
 Three roles, visibility running downward only:
 
-- **Finance Supervisor** — oversees the company. Sees everyone's work.
+- **Supervisor** — oversees the company. Sees everyone's work.
   Approves join requests.
-- **Senior Accountant** — approves and signs vouchers. Sees their own work
-  and account assistants' work.
-- **Account Assistant** — prepares vouchers and letters. Sees only their own.
+- **Approver** — approves and signs vouchers. Sees their own work
+  and preparers' work.
+- **Preparer** — prepares vouchers and letters. Sees only their own.
 
-**Registering** a company asks the registrant their *actual* role — Finance
-Supervisor is not assumed just because they're the one filling in the form.
+**Registering** a company asks the registrant their *actual* role — Supervisor
+is not assumed just because they're the one filling in the form.
 A junior person can register the company on the boss's behalf and pick their
 own real (lower) role; whatever they pick, that account is approved
 immediately, since there's nobody else at a brand-new company who could
@@ -151,13 +154,13 @@ matching). This is a deliberate decision, made explicitly with the project
 owner: *company name alone is public knowledge and is never sufficient to
 grant access.* Every join request lands as `status='pending'` and cannot log
 in (`db.authenticate` raises `AuthError` for pending accounts) until a
-Finance Supervisor at that specific company approves it from their
-dashboard — **with one bootstrap exception**: claiming Finance Supervisor
+Supervisor at that specific company approves it from their
+dashboard — **with one bootstrap exception**: claiming Supervisor
 when the company doesn't have one yet (`db.has_approved_supervisor`) is
 approved immediately too, same reasoning as registration — there'd be no one
 to approve it either way. The moment a company has an approved supervisor,
 that exception closes for everyone else: `request_to_join` rejects further
-Finance Supervisor claims for that company from then on. (Known gap: this
+Supervisor claims for that company from then on. (Known gap: this
 check-then-insert isn't wrapped in a transaction/lock, so two people
 claiming the role for the same still-supervisor-less company at the exact
 same instant could theoretically both get approved — a real risk only in
@@ -195,7 +198,7 @@ from the company `ledgerline_session` cookie), and its own login page,
 (fixed dark/violet theme, doesn't follow the site's light/dark toggle,
 deliberately reads as "a different system"). A platform admin doesn't need
 a company account at all, and a company account confers zero platform
-access no matter its role — verified directly: a Finance Supervisor logged
+access no matter its role — verified directly: a Supervisor logged
 into their own company (Rufus, via `ledgerline_session`) gets a 401 from
 `/api/admin/overview`, and having a separate valid `ledgerline_admin_session`
 cookie in the same browser continues working independently of whatever the
@@ -237,15 +240,15 @@ weight in a security-sensitive area of the code.
 
 - **Overview** (`admin.html`) — the four stat tiles (companies, approved/
   pending users platform-wide, supervisor count), the 5 most-recently
-  registered companies as compact cards in a grid (name, date, Finance
-  Supervisor or "no Finance Supervisor yet", approved/pending counts —
+  registered companies as compact cards in a grid (name, date, Supervisor
+  or "no Supervisor yet", approved/pending counts —
   several fit per row, more wrap to new rows as companies are added), and
   the system panel (is the demo agent configured, are FX rates loaded, the
   sqlite path). A "View all companies" link goes to the full list.
 - **Companies** (`admin-companies.html`) — every company, newest first, as
   the same kind of compact grid card. Click one (or Enter/Space — it's a
   real `role="button"`) to expand it in place: it spans the full grid width
-  and reveals the Finance Supervisor's email plus the complete team and
+  and reveals the Supervisor's email plus the complete team and
   pending list. Click again to collapse. Nothing is truncated once
   expanded; collapsed cards stay small so many companies fit on screen.
   Expanded, there's also a **Delete company** button (`db.delete_company`,
@@ -282,14 +285,19 @@ tokens instead of their slate/amber or emerald/iris ones. Eight views,
 switched client-side with no page reload:
 
 - **Overview** — greeting, KPI tiles, and card(s) for "My vouchers" (and
-  "Awaiting your approval" for Senior Accountant/Finance Supervisor). Every
+  "Awaiting your approval" for Approver/Supervisor). Every
   number shown is real, drawn from `/api/vouchers`, never an invented demo
   stat — the reference dashboards are sales prototypes and use fabricated
   activity/metrics; this is a real product, so nothing here is illustrative.
-  One deliberate exception, styled identically to how the reference
-  dashboards handle a not-yet-connected source: "Invoices found" shows "—"
-  with "Waiting for mailbox connection", since that number genuinely can't
-  exist yet — honest about being blocked, not fabricated to look alive.
+  Deliberate exceptions, styled identically to how `outlook-agent` handles
+  its own not-yet-connected mailbox: "Emails triaged", "Replies drafted",
+  "Issues flagged" and "Est. time saved" all show "—" with "Waiting for
+  first sync", plus a "Needs your reply first" card with the same honest
+  empty state (and, unlike the reference dashboard, no "Connect Outlook"
+  button that would click through to nothing real). These numbers genuinely
+  can't exist yet — honest about being blocked, not fabricated to look
+  alive, and not wired to anything until [real email connection](#whats-genuinely-missing-dont-assume-it-exists)
+  is actually built.
 - **Vouchers** — prepare, submit, approve/reject. See
   [Vouchers](#vouchers) below.
 - **Flagged** — every voucher visible to this person where `voucher.py`'s
@@ -329,7 +337,7 @@ switched client-side with no page reload:
   a voucher and when. `list_activity`/`/api/activity`. Existing vouchers
   created before this table existed have no history, honestly - nothing was
   backfilled or invented for them.
-- **Instructions** (visible to everyone, editable by Finance Supervisor only,
+- **Instructions** (visible to everyone, editable by Supervisor only,
   read-only for other roles) — two real settings that change Chat's actual
   behaviour for the whole company:
   - **AI provider** - a per-company preference among whichever providers
@@ -347,7 +355,7 @@ switched client-side with no page reload:
     at the company via `providers.with_briefing` (`db.set_company_briefing`,
     `/api/company/briefing`) - policies, terminology, tone. Cannot switch off
     Chat's grounding/safety rules, only add context on top of them.
-- **Team** (Finance Supervisor only, nav item hidden otherwise) — the full
+- **Team** (Supervisor only, nav item hidden otherwise) — the full
   roster and the real pending-approval queue with working Approve/Reject,
   moved off Overview into its own page. The nav item carries a live count
   badge for pending requests, hidden entirely at zero.
@@ -385,7 +393,7 @@ having `loadTeam`/`loadPending` both return their counts directly, used to
 build the KPI list up front — verified live (logged in as Rufus: "Team
 members" correctly showed 2, approving a pending request correctly moved
 them into the roster and cleared the nav badge; logged in as Doreen, an
-Account Assistant: Team nav item and its KPIs correctly don't appear).
+Preparer: Team nav item and its KPIs correctly don't appear).
 
 ---
 
@@ -416,9 +424,9 @@ already there, then any `NULL` plan_id gets set to the default).
 
 **Enforcement** (`db.can_add_user`, count of `status='approved'` users
 against the company's plan `user_limit`) sits at both places a user can
-become approved: `db.approve_user` (the normal path — a Finance Supervisor
+become approved: `db.approve_user` (the normal path — a Supervisor
 approving a pending request) and the bootstrap-supervisor branch of
-`db.request_to_join` (claiming Finance Supervisor when a company has none
+`db.request_to_join` (claiming Supervisor when a company has none
 yet). Both raise a plain-English `AuthError` rather than a generic
 rejection. **Downgrading never removes anyone already in** — the check is
 only ever "can one more be *added*," so a company that's over its new,
@@ -438,7 +446,7 @@ Where this is surfaced:
   `used/limit`, with an "— at limit" note once it's reached.
 - **`admin.html` Overview** — the condensed recent-signups cards show
   `used/limit` in place of a bare count.
-- **`dashboard.html` Team view** — a Finance Supervisor sees a plan banner
+- **`dashboard.html` Team view** — a Supervisor sees a plan banner
   above their team/pending panels (`renderPlanBanner`), which switches to a
   warning style once at the limit. The Approve button now surfaces the
   limit error via a plain alert instead of failing silently, since hitting
@@ -483,29 +491,29 @@ arithmetic). This means a future tax-rate change re-derives every existing
 voucher instead of leaving stale numbers behind.
 
 **Visibility** (`db.list_vouchers`) follows the same downward-only rule as
-everywhere else in this app: an Account Assistant sees only their own
-vouchers, a Senior Accountant sees their own plus every Account Assistant's,
-a Finance Supervisor sees the company's entire voucher book.
+everywhere else in this app: an Preparer sees only their own
+vouchers, a Approver sees their own plus every Preparer's,
+a Supervisor sees the company's entire voucher book.
 
 **Segregation of duties**: `db.approve_voucher`/`reject_voucher` refuse if
 the reviewer is also the preparer (`created_by == approver_id`), regardless
-of role — a Senior Accountant or Finance Supervisor can prepare a voucher
+of role — a Approver or Supervisor can prepare a voucher
 like anyone else, but can't be the one to sign off on their own. Only a
 `submitted` voucher can be approved/rejected; only the preparer can submit
 their own `draft` or `rejected` voucher (rejecting clears the reason and
-puts it back in the queue on resubmission). Role gating (Senior Accountant/
-Finance Supervisor only) for the review endpoint lives in `server.py`,
-consistent with how `/api/company/approve` gates Finance Supervisor.
+puts it back in the queue on resubmission). Role gating (Approver/
+Supervisor only) for the review endpoint lives in `server.py`,
+consistent with how `/api/company/approve` gates Supervisor.
 
 Verified end to end in the browser: created a voucher reproducing the real
 BDDG sample invoice through the actual creation form — every computed
 figure (NHIL 89.23, VAT 267.69, WHT 133.84, net payable 12,477.11, BOG FX
 conversion) matched `voucher.py`'s own self-test exactly. Then: submit →
-approve as a different Senior Accountant (succeeds); a second voucher
+approve as a different Approver (succeeds); a second voucher
 submit → reject with a reason → preparer sees the reason → resubmit clears
-it; a Senior Accountant's own submitted voucher correctly refused
-self-approval (400) but was approved fine by the Finance Supervisor;
-an Account Assistant calling the review endpoint directly got a 403; each
+it; a Approver's own submitted voucher correctly refused
+self-approval (400) but was approved fine by the Supervisor;
+an Preparer calling the review endpoint directly got a 403; each
 role's visible voucher list matched the downward-only rule exactly.
 
 **Not built**: invoice upload, AI extraction into the form fields, the

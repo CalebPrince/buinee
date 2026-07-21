@@ -1,5 +1,6 @@
+<meta charset="utf-8">
 <title>Companies — Command Center — Buinee</title>
-<meta name="description" content="Every company registered on Buinee, with its Finance Supervisor and full team.">
+<meta name="description" content="Every company registered on Buinee, with its Supervisor and full team.">
 <style>
   :root {
     --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5;
@@ -236,7 +237,7 @@
           <div class="hero-line">
             <span class="eyebrow">Every company, in full</span>
             <h1>Companies</h1>
-            <p>Every company registered on Buinee. Click one to see its Finance Supervisor's full details, team and pending list.</p>
+            <p>Every company registered on Buinee. Click one to see its Supervisor's full details, team and pending list.</p>
           </div>
 
           <div class="panel">
@@ -272,9 +273,9 @@
   }
 
   const ROLE_LABELS = {
-    account_assistant: 'Account Assistant',
-    senior_accountant: 'Senior Accountant',
-    finance_supervisor: 'Finance Supervisor',
+    account_assistant: 'Preparer',
+    senior_accountant: 'Approver',
+    finance_supervisor: 'Supervisor',
   };
 
   let allPlans = [];
@@ -324,7 +325,7 @@
             <span class="meta">Registered ${fmtDate(c.created_at)}</span>
             <span class="meta">${c.supervisor
               ? `Supervisor: ${escapeHtml(c.supervisor.name)}`
-              : '<span class="no-super">no Finance Supervisor yet</span>'}</span>
+              : '<span class="no-super">no Supervisor yet</span>'}</span>
             <span class="meta">Plan: <b>${escapeHtml(c.plan.name)}</b> (${c.approved_count}/${c.plan.user_limit} users)${c.approved_count >= c.plan.user_limit ? ' <span class="no-super">— at limit</span>' : ''}</span>
           </div>
           <div class="counts">
@@ -335,8 +336,8 @@
         </div>
         <div class="card-detail">
           ${c.supervisor
-            ? `<div class="supervisor-line">Finance Supervisor: <b>${escapeHtml(c.supervisor.name)}</b> · ${escapeHtml(c.supervisor.email)}</div>`
-            : '<div class="supervisor-line"><span class="no-super">No Finance Supervisor yet</span></div>'}
+            ? `<div class="supervisor-line">Supervisor: <b>${escapeHtml(c.supervisor.name)}</b> · ${escapeHtml(c.supervisor.email)}</div>`
+            : '<div class="supervisor-line"><span class="no-super">No Supervisor yet</span></div>'}
           ${renderTeamAndPending(c)}
           <div class="plan-change" onclick="event.stopPropagation()">
             <label for="planSelect-${c.id}">Change plan</label>
