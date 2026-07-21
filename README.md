@@ -11,9 +11,10 @@ to those projects; it's a fresh codebase that reuses their proven logic
 (`voucher.py`, `providers.py`) and lessons.
 
 **Status as of 2026-07-21: landing page + full auth (register/join/approve/
-login) are built and browser-tested. The actual voucher workspace — invoice
-upload, AI extraction, approval, the letter — is not built yet. Dashboards
-are correct, role-scoped *shells* with empty states, not working tools.**
+login) are built and browser-tested. The voucher preparation and approval
+loop (manual entry, not AI extraction yet) is built and browser-tested —
+see [Vouchers](#vouchers) below. Invoice upload/AI extraction and the
+payment letter are still not built.**
 
 ---
 
@@ -277,14 +278,16 @@ are fully separate front doors.
 Rebuilt to match the sidebar-rail + topbar layout used across the other
 Prince Caleb agent dashboards (`outlook-agent`/`excel-agent`'s
 Clerk/Gridwise consoles) — same skeleton, Buinee's own teal/ochre
-tokens instead of their slate/amber or emerald/iris ones. Two views,
+tokens instead of their slate/amber or emerald/iris ones. Three views,
 switched client-side with no page reload:
 
 - **Overview** — greeting, KPI tiles, and card(s) for "My vouchers" (and
   "Awaiting your approval" for Senior Accountant/Finance Supervisor). Every
-  number shown is real and currently zero, never an invented demo stat —
-  the reference dashboards are sales prototypes and use fabricated
+  number shown is real, drawn from `/api/vouchers`, never an invented demo
+  stat — the reference dashboards are sales prototypes and use fabricated
   activity/metrics; this is a real product, so nothing here is illustrative.
+- **Vouchers** — prepare, submit, approve/reject. See
+  [Vouchers](#vouchers) below.
 - **Team** (Finance Supervisor only, nav item hidden otherwise) — the full
   roster and the real pending-approval queue with working Approve/Reject,
   moved off Overview into its own page. The nav item carries a live count
@@ -378,15 +381,63 @@ the part where a company would actually pay to get moved there themselves.
 
 ---
 
+## Vouchers
+
+The prepare → submit → approve/reject loop, wired into `dashboard.html`'s
+Vouchers view. Data entry is manual (typed by a preparer) — AI invoice
+extraction is not built; see [What's genuinely missing](#whats-genuinely-missing-dont-assume-it-exists).
+
+**`vouchers`** (`db.py`): everything a preparer types (supplier, invoice
+number/dates, credit terms, line items as JSON, vatable amount, NHIL/VAT/
+VRPO flags, non-taxable/overpayment deductions) plus `status` (`draft` →
+`submitted` → `approved`/`rejected`), `created_by`, `approved_by`,
+`rejection_reason`. It never stores a computed figure — `server.py`'s
+`compute_voucher()` runs every voucher's raw inputs through `voucher.py`'s
+`compute()`/`review()` fresh on every read, the same principle as the
+landing page's demo (the model/preparer supplies inputs, code does the
+arithmetic). This means a future tax-rate change re-derives every existing
+voucher instead of leaving stale numbers behind.
+
+**Visibility** (`db.list_vouchers`) follows the same downward-only rule as
+everywhere else in this app: an Account Assistant sees only their own
+vouchers, a Senior Accountant sees their own plus every Account Assistant's,
+a Finance Supervisor sees the company's entire voucher book.
+
+**Segregation of duties**: `db.approve_voucher`/`reject_voucher` refuse if
+the reviewer is also the preparer (`created_by == approver_id`), regardless
+of role — a Senior Accountant or Finance Supervisor can prepare a voucher
+like anyone else, but can't be the one to sign off on their own. Only a
+`submitted` voucher can be approved/rejected; only the preparer can submit
+their own `draft` or `rejected` voucher (rejecting clears the reason and
+puts it back in the queue on resubmission). Role gating (Senior Accountant/
+Finance Supervisor only) for the review endpoint lives in `server.py`,
+consistent with how `/api/company/approve` gates Finance Supervisor.
+
+Verified end to end in the browser: created a voucher reproducing the real
+BDDG sample invoice through the actual creation form — every computed
+figure (NHIL 89.23, VAT 267.69, WHT 133.84, net payable 12,477.11, BOG FX
+conversion) matched `voucher.py`'s own self-test exactly. Then: submit →
+approve as a different Senior Accountant (succeeds); a second voucher
+submit → reject with a reason → preparer sees the reason → resubmit clears
+it; a Senior Accountant's own submitted voucher correctly refused
+self-approval (400) but was approved fine by the Finance Supervisor;
+an Account Assistant calling the review endpoint directly got a 403; each
+role's visible voucher list matched the downward-only rule exactly.
+
+**Not built**: invoice upload, AI extraction into the form fields, the
+payment letter, editing/deleting a voucher.
+
+---
+
 ## What's genuinely missing (don't assume it exists)
 
-- **The actual voucher workspace.** Uploading an invoice, having an agent
-  extract the fields, running it through `voucher.py`, the approve/return/
-  re-submit loop, issuing the letter — none of it is wired into
-  `dashboard.html` yet. The dashboard's "My vouchers" panel is a real,
-  honest empty state, not a stub hiding broken functionality.
-- The payment **letter** template itself (the invoice → voucher → letter
-  chain's last step) — was never sent, still needed from Rufus.
+- **Invoice upload and AI extraction.** The prepare/submit/approve/reject
+  loop is built (see [Vouchers](#vouchers)), but every voucher is typed by
+  hand — nothing reads an invoice file and fills the form yet.
+- The payment **letter** itself doesn't exist — a voucher can be approved,
+  but nothing generates the letter that would actually go out (the invoice
+  → voucher → letter chain's last step). The template was never sent,
+  still needed from Rufus.
 - No password reset, no email verification, no "edit a teammate's role"
   UI, no removing/deactivating a user. The platform admin can change their
   *own* password in `admin-settings.html`, but if it's lost entirely the

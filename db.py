@@ -31,6 +31,7 @@ Auth model:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import secrets
 import sqlite3
@@ -133,9 +134,47 @@ def init_db() -> None:
                 created_at REAL NOT NULL
             );
 
+            -- Payment vouchers. Figures (vatable_amount, deductions, etc.) are
+            -- inputs a preparer typed or an AI read off an invoice - never
+            -- something this table computes itself. voucher.py derives the
+            -- actual tax/net figures from these on read, so changing a tax
+            -- rate later re-derives every existing voucher instead of leaving
+            -- stale numbers behind. See list_vouchers for who can see what.
+            CREATE TABLE IF NOT EXISTS vouchers (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id        INTEGER NOT NULL REFERENCES companies(id),
+                created_by        INTEGER NOT NULL REFERENCES users(id),
+                status            TEXT NOT NULL DEFAULT 'draft',
+
+                supplier_name     TEXT NOT NULL,
+                supplier_address  TEXT NOT NULL DEFAULT '',
+                supplier_tel      TEXT NOT NULL DEFAULT '',
+                supplier_email    TEXT NOT NULL DEFAULT '',
+                invoice_number    TEXT NOT NULL,
+                invoice_date      TEXT NOT NULL,
+                received_date     TEXT NOT NULL,
+                credit_terms_days INTEGER NOT NULL DEFAULT 0,
+
+                lines_json        TEXT NOT NULL,
+                vatable_amount    REAL NOT NULL DEFAULT 0,
+                apply_nhil        INTEGER NOT NULL DEFAULT 1,
+                apply_vat         INTEGER NOT NULL DEFAULT 1,
+                vrpo              INTEGER NOT NULL DEFAULT 0,
+                vrpo_deduction    REAL NOT NULL DEFAULT 0,
+                non_taxable       REAL NOT NULL DEFAULT 0,
+                overpayment       REAL NOT NULL DEFAULT 0,
+
+                rejection_reason  TEXT,
+                submitted_at      REAL,
+                approved_by       INTEGER REFERENCES users(id),
+                approved_at       REAL,
+                created_at        REAL NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
+            CREATE INDEX IF NOT EXISTS idx_vouchers_company ON vouchers(company_id);
             """
         )
         _seed_default_plans(conn)
@@ -700,6 +739,165 @@ def list_companies_with_stats() -> list[dict]:
                 "plan": {"id": c["plan_id"], "name": c["plan_name"], "user_limit": c["plan_user_limit"]},
             })
     return out
+
+
+def _voucher_row(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["lines"] = json.loads(d.pop("lines_json"))
+    d["apply_nhil"] = bool(d["apply_nhil"])
+    d["apply_vat"] = bool(d["apply_vat"])
+    d["vrpo"] = bool(d["vrpo"])
+    return d
+
+
+def create_voucher(
+    company_id: int, created_by: int, *, supplier_name: str, invoice_number: str,
+    invoice_date: str, received_date: str, credit_terms_days: int, lines: list[dict],
+    vatable_amount: float = 0.0, apply_nhil: bool = True, apply_vat: bool = True,
+    vrpo: bool = False, vrpo_deduction: float = 0.0, non_taxable: float = 0.0,
+    overpayment: float = 0.0, supplier_address: str = "", supplier_tel: str = "",
+    supplier_email: str = "",
+) -> dict:
+    """A voucher a preparer is still working on - always starts as a draft,
+    never visible to a reviewer until submit_voucher moves it along."""
+    supplier_name = supplier_name.strip()
+    invoice_number = invoice_number.strip()
+    if len(supplier_name) < 2:
+        raise AuthError("Supplier name is too short.")
+    if not invoice_number:
+        raise AuthError("Invoice number is required.")
+    if not invoice_date or not received_date:
+        raise AuthError("Invoice date and received date are required.")
+
+    clean_lines = []
+    for line in lines or []:
+        desc = str(line.get("description") or "").strip()
+        try:
+            amount = float(line.get("amount"))
+        except (TypeError, ValueError):
+            amount = None
+        if not desc or amount is None or amount <= 0:
+            continue
+        clean_lines.append({
+            "description": desc,
+            "amount": round(amount, 2),
+            "supplier_type": str(line.get("supplier_type") or "").strip(),
+            "cost_centre": str(line.get("cost_centre") or "").strip(),
+        })
+    if not clean_lines:
+        raise AuthError("Add at least one line item with a description and a positive amount.")
+
+    now = time.time()
+    with _cursor() as conn:
+        cur = conn.execute(
+            """INSERT INTO vouchers
+               (company_id, created_by, status, supplier_name, supplier_address,
+                supplier_tel, supplier_email, invoice_number, invoice_date,
+                received_date, credit_terms_days, lines_json, vatable_amount,
+                apply_nhil, apply_vat, vrpo, vrpo_deduction, non_taxable,
+                overpayment, created_at)
+               VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (company_id, created_by, supplier_name, supplier_address.strip(),
+             supplier_tel.strip(), supplier_email.strip(), invoice_number,
+             invoice_date, received_date, int(credit_terms_days),
+             json.dumps(clean_lines), round(vatable_amount, 2),
+             int(bool(apply_nhil)), int(bool(apply_vat)), int(bool(vrpo)),
+             round(vrpo_deduction, 2), round(non_taxable, 2),
+             round(overpayment, 2), now),
+        )
+        voucher_id = cur.lastrowid
+    return get_voucher(voucher_id)
+
+
+def get_voucher(voucher_id: int) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM vouchers WHERE id = ?", (voucher_id,)).fetchone()
+    return _voucher_row(row) if row else None
+
+
+def list_vouchers(company_id: int, viewer_id: int, viewer_role: str) -> list[dict]:
+    """Same downward-only visibility as everywhere else in this app: an
+    account assistant sees only their own vouchers, a senior accountant sees
+    their own plus every account assistant's, and a finance supervisor sees
+    the company's entire voucher book."""
+    with _cursor() as conn:
+        if viewer_role == "finance_supervisor":
+            rows = conn.execute(
+                "SELECT * FROM vouchers WHERE company_id = ? ORDER BY created_at DESC",
+                (company_id,),
+            ).fetchall()
+        elif viewer_role == "senior_accountant":
+            rows = conn.execute(
+                """SELECT v.* FROM vouchers v JOIN users u ON u.id = v.created_by
+                   WHERE v.company_id = ? AND (v.created_by = ? OR u.role = 'account_assistant')
+                   ORDER BY v.created_at DESC""",
+                (company_id, viewer_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM vouchers WHERE company_id = ? AND created_by = ? ORDER BY created_at DESC",
+                (company_id, viewer_id),
+            ).fetchall()
+    return [_voucher_row(r) for r in rows]
+
+
+def submit_voucher(company_id: int, user_id: int, voucher_id: int) -> dict:
+    """Only the preparer can submit their own voucher, and only from draft or
+    rejected - approved vouchers are done, and nobody submits someone else's
+    work out from under them."""
+    v = get_voucher(voucher_id)
+    if not v or v["company_id"] != company_id:
+        raise AuthError("No such voucher.")
+    if v["created_by"] != user_id:
+        raise AuthError("You can only submit a voucher you prepared.")
+    if v["status"] not in ("draft", "rejected"):
+        raise AuthError("Only a draft or a rejected voucher can be submitted.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE vouchers SET status = 'submitted', submitted_at = ?, rejection_reason = NULL "
+            "WHERE id = ?",
+            (time.time(), voucher_id),
+        )
+    return get_voucher(voucher_id)
+
+
+def approve_voucher(company_id: int, approver_id: int, voucher_id: int) -> dict:
+    """Segregation of duties: the person who prepared a voucher can never be
+    the one who signs off on it, even if their role would otherwise allow
+    approving - see the same rule in reject_voucher."""
+    v = get_voucher(voucher_id)
+    if not v or v["company_id"] != company_id:
+        raise AuthError("No such voucher.")
+    if v["status"] != "submitted":
+        raise AuthError("Only a submitted voucher can be approved.")
+    if v["created_by"] == approver_id:
+        raise AuthError("You can't approve a voucher you prepared yourself.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE vouchers SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?",
+            (approver_id, time.time(), voucher_id),
+        )
+    return get_voucher(voucher_id)
+
+
+def reject_voucher(company_id: int, approver_id: int, voucher_id: int, reason: str) -> dict:
+    v = get_voucher(voucher_id)
+    if not v or v["company_id"] != company_id:
+        raise AuthError("No such voucher.")
+    if v["status"] != "submitted":
+        raise AuthError("Only a submitted voucher can be rejected.")
+    if v["created_by"] == approver_id:
+        raise AuthError("You can't reject a voucher you prepared yourself.")
+    reason = reason.strip()
+    if not reason:
+        raise AuthError("Give a reason so the preparer knows what to fix.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE vouchers SET status = 'rejected', rejection_reason = ?, "
+            "approved_by = NULL, approved_at = NULL WHERE id = ?",
+            (reason, voucher_id),
+        )
+    return get_voucher(voucher_id)
 
 
 def platform_stats() -> dict:

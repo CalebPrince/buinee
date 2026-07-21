@@ -167,6 +167,28 @@
     font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     padding: 3px 8px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep); white-space: nowrap;
   }
+  .role-badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .role-badge.good { background: var(--good-soft); color: var(--good); }
+  .role-badge.bad { background: var(--bad-soft); color: var(--bad); }
+
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .vgrid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+  input[type=text], input[type=number], input[type=date], input[type=email], input:not([type]) {
+    padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--surface); color: var(--ink); font-size: 13.5px; font-family: inherit;
+  }
+  input:focus { border-color: var(--teal); }
+  .vline { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+  .vline input { flex: 1; min-width: 0; }
+  .vline label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--ink-3); flex: 1; min-width: 0; }
+  .check-row { display: flex; gap: 18px; margin: 4px 0 14px; flex-wrap: wrap; }
+  .check-row label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+  .msg-error { color: var(--bad); background: var(--bad-soft); border-radius: 8px; padding: 9px 12px; font-size: 13px; margin-bottom: 12px; }
+  .voucher-row { cursor: pointer; }
+  .voucher-detail { padding: 14px 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .voucher-detail .drow { display: flex; justify-content: space-between; padding: 5px 0; }
+  .voucher-detail .note { color: var(--warn); font-size: 12.5px; margin-top: 8px; }
+  .voucher-detail .rejection { color: var(--bad); font-size: 12.5px; margin-top: 8px; }
 
   .btn {
     display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 9px;
@@ -205,6 +227,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         Overview
       </button>
+      <button class="nav-item" data-view="vouchers" onclick="go('vouchers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        Vouchers
+        <span class="count" id="voucherNavCount" style="display:none"></span>
+      </button>
       <button class="nav-item" id="teamNavItem" data-view="team" onclick="go('team')" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Team
@@ -242,6 +269,64 @@
       </div>
       <div class="kpis" id="kpis"></div>
       <div class="grid2" id="overviewCards"></div>
+    </section>
+
+    <!-- ===== VOUCHERS ===== -->
+    <section class="view" data-view="vouchers" id="viewVouchers" hidden>
+      <div class="hello">
+        <h1>Vouchers</h1>
+        <p id="voucherBlurb">Prepare a payment voucher, submit it, and a senior accountant signs off before anything goes out.</p>
+      </div>
+      <div style="margin-bottom:16px">
+        <button class="btn primary" type="button" onclick="openVoucherForm()">+ New voucher</button>
+      </div>
+      <div class="card" id="voucherFormCard" style="display:none; margin-bottom:18px">
+        <div class="card-h">
+          <h3>New voucher</h3>
+          <div class="sub">What the AI will eventually read off the invoice — typed by hand for now</div>
+        </div>
+        <div class="card-b">
+          <form id="voucherForm" onsubmit="return submitVoucherForm(event)">
+            <div class="vgrid">
+              <label>Supplier name<input id="vSupplierName" required></label>
+              <label>Supplier address<input id="vSupplierAddress"></label>
+              <label>Supplier phone<input id="vSupplierTel"></label>
+              <label>Supplier email<input type="email" id="vSupplierEmail"></label>
+              <label>Invoice number<input id="vInvoiceNumber" required></label>
+              <label>Invoice date<input type="date" id="vInvoiceDate" required></label>
+              <label>Received date<input type="date" id="vReceivedDate" required></label>
+              <label>Credit terms (days)<input type="number" id="vCreditDays" value="0" min="0"></label>
+              <label>Vatable amount<input type="number" step="0.01" id="vVatable" value="0"></label>
+            </div>
+
+            <div class="eyebrow" style="margin-bottom:8px">Line items</div>
+            <div id="vLines"></div>
+            <button type="button" class="btn sm" onclick="addVoucherLine()" style="margin-bottom:14px">+ Add line</button>
+
+            <div class="vgrid">
+              <label>Non-taxable / allowance<input type="number" step="0.01" id="vNonTaxable" value="0"></label>
+              <label>Overpayment / deposit held<input type="number" step="0.01" id="vOverpayment" value="0"></label>
+              <label>VRPO deduction<input type="number" step="0.01" id="vVrpoDeduction" value="0"></label>
+            </div>
+
+            <div class="check-row">
+              <label><input type="checkbox" id="vApplyNhil" checked> Apply NHIL / GETFL / TL / CST</label>
+              <label><input type="checkbox" id="vApplyVat" checked> Apply VAT</label>
+              <label><input type="checkbox" id="vVrpo"> VAT Relief Purchase Order</label>
+            </div>
+
+            <div class="msg-error" id="voucherFormErr" style="display:none"></div>
+            <div style="display:flex; gap:10px">
+              <button class="btn primary" type="submit">Save as draft</button>
+              <button class="btn" type="button" onclick="closeVoucherForm()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="card full">
+        <div class="card-h"><h3>All vouchers</h3><div class="sub" id="voucherListSub"></div></div>
+        <div class="card-b" id="voucherRows"></div>
+      </div>
     </section>
 
     <!-- ===== TEAM ===== -->
@@ -296,7 +381,14 @@
     },
   };
 
-  const CRUMB_NAMES = { overview: 'Overview', team: 'Team' };
+  const CRUMB_NAMES = { overview: 'Overview', team: 'Team', vouchers: 'Vouchers' };
+  const STATUS_INFO = {
+    draft: { label: 'Draft', cls: '' },
+    submitted: { label: 'Awaiting approval', cls: 'warn' },
+    approved: { label: 'Approved', cls: 'good' },
+    rejected: { label: 'Rejected', cls: 'bad' },
+  };
+  let myId = null, myRole = null, allVouchers = [];
 
   function go(view) {
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
@@ -346,6 +438,8 @@
     const info = ROLE_INFO[me.role] || { label: me.role, blurb: '', sees: '' };
     const isSupervisor = me.role === 'finance_supervisor';
     const seesApprovals = me.role === 'senior_accountant' || me.role === 'finance_supervisor';
+    myId = me.id;
+    myRole = me.role;
 
     document.getElementById('crumbCompany').textContent = me.company.name;
     document.getElementById('rolePill').textContent = info.label;
@@ -360,17 +454,22 @@
     if (seesApprovals) kpis.push({ n: 0, l: 'Awaiting my approval' });
     const kpiBox = document.getElementById('kpis');
 
-    // ---- Overview cards ----
+    // ---- Vouchers (drives both the Vouchers tab and these overview cards) ----
+    const voucherCounts = await loadVouchers();
+    kpis[0].n = voucherCounts.mine;
+    if (seesApprovals) kpis[1].n = voucherCounts.awaiting;
+
     const cards = document.getElementById('overviewCards');
     cards.appendChild(emptyCard(
       'My vouchers', 'Prepared by you', ICO_DOC,
-      'Nothing here yet',
-      'Preparing a voucher from an invoice is coming next — this is where it will show up.'
+      voucherCounts.mine ? `${voucherCounts.mine} voucher${voucherCounts.mine === 1 ? '' : 's'}` : 'Nothing here yet',
+      voucherCounts.mine ? 'See them all in the Vouchers tab.' : 'Create your first voucher from the Vouchers tab.'
     ));
     if (seesApprovals) {
       cards.appendChild(emptyCard(
         'Awaiting your approval', 'From account assistants you can see', ICO_CHECK,
-        'Nothing waiting on you right now', ''
+        voucherCounts.awaiting ? `${voucherCounts.awaiting} voucher${voucherCounts.awaiting === 1 ? '' : 's'} waiting` : 'Nothing waiting on you right now',
+        voucherCounts.awaiting ? 'Review them in the Vouchers tab.' : ''
       ));
     }
 
@@ -477,6 +576,206 @@
       const badge = document.getElementById('teamNavCount');
       if (remaining) { badge.style.display = 'inline-block'; badge.textContent = remaining; }
       else { badge.style.display = 'none'; }
+    } catch {
+      alert('Could not reach the server.');
+    }
+  }
+
+  // ---------------------------------------------------------------- vouchers
+
+  async function loadVouchers() {
+    const box = document.getElementById('voucherRows');
+    try {
+      const res = await fetch('/api/vouchers', { credentials: 'same-origin' });
+      const data = await res.json();
+      allVouchers = data.vouchers || [];
+    } catch {
+      box.innerHTML = '<div class="empty"><h4>Could not load vouchers.</h4></div>';
+      return { mine: 0, awaiting: 0 };
+    }
+
+    document.getElementById('voucherListSub').textContent =
+      allVouchers.length ? `${allVouchers.length} voucher${allVouchers.length === 1 ? '' : 's'}` : '';
+    box.innerHTML = allVouchers.length
+      ? allVouchers.map(renderVoucherRow).join('')
+      : '<div class="empty"><h4>No vouchers yet</h4><p>Create one above to get started.</p></div>';
+
+    const mine = allVouchers.filter(v => v.created_by === myId).length;
+    const awaiting = allVouchers.filter(v => v.status === 'submitted' && v.created_by !== myId).length;
+    const badge = document.getElementById('voucherNavCount');
+    if (awaiting) { badge.style.display = 'inline-block'; badge.textContent = awaiting; }
+    else { badge.style.display = 'none'; }
+    return { mine, awaiting };
+  }
+
+  async function refreshVouchers() {
+    const counts = await loadVouchers();
+    const mineKpi = document.querySelector('.kpi:nth-child(1) .val');
+    if (mineKpi) mineKpi.textContent = counts.mine;
+    const awaitKpi = document.querySelector('.kpi:nth-child(2) .val');
+    if (awaitKpi && (myRole === 'senior_accountant' || myRole === 'finance_supervisor')) {
+      awaitKpi.textContent = counts.awaiting;
+    }
+  }
+
+  function renderVoucherRow(v) {
+    const c = v.computed;
+    const st = STATUS_INFO[v.status] || { label: v.status, cls: '' };
+    const canSubmit = v.created_by === myId && (v.status === 'draft' || v.status === 'rejected');
+    const canReview = (myRole === 'senior_accountant' || myRole === 'finance_supervisor')
+      && v.status === 'submitted' && v.created_by !== myId;
+    let actions = `<span class="role-badge ${st.cls}">${st.label}</span>`;
+    if (canSubmit) actions += ` <button class="btn sm primary" onclick="event.stopPropagation(); submitVoucher(${v.id})">Submit</button>`;
+    if (canReview) {
+      actions += ` <button class="btn sm primary" onclick="event.stopPropagation(); reviewVoucher(${v.id}, 'approve')">Approve</button>`;
+      actions += ` <button class="btn sm bad" onclick="event.stopPropagation(); reviewVoucher(${v.id}, 'reject')">Reject</button>`;
+    }
+    return `
+      <div class="row voucher-row" onclick="toggleVoucherDetail(${v.id})">
+        <div class="who2">
+          <b>${escapeHtml(v.supplier_name)} — ${escapeHtml(v.invoice_number)}</b>
+          <span>${escapeHtml(c.currency)} ${c.net_payable.toFixed(2)} net payable</span>
+        </div>
+        <div class="actions">${actions}</div>
+      </div>
+      <div class="voucher-detail" id="vdetail-${v.id}" hidden>${renderVoucherDetail(v)}</div>
+    `;
+  }
+
+  function renderVoucherDetail(v) {
+    const c = v.computed;
+    const figures = [
+      ['Total invoice', c.total_invoice], ['Vatable amount', c.vatable_amount],
+      ['NHIL / GETFL / TL / CST', c.nhil_getfl], ['VAT', c.vat], ['Withholding tax', c.wht],
+      ['Net payable', c.net_payable],
+    ];
+    const lineRows = v.lines.map(l => `
+      <div class="drow"><span>${escapeHtml(l.description)}${l.supplier_type || l.cost_centre ? ` <span style="color:var(--ink-3)">(${escapeHtml(l.supplier_type)} ${escapeHtml(l.cost_centre)})</span>` : ''}</span>
+      <span class="num">${escapeHtml(c.currency)} ${l.amount.toFixed(2)}</span></div>
+    `).join('');
+    const notes = (c.review_notes || []).map(n => `<div class="note">⚠ ${escapeHtml(n)}</div>`).join('');
+    const rejection = v.status === 'rejected' && v.rejection_reason
+      ? `<div class="rejection"><b>Rejected:</b> ${escapeHtml(v.rejection_reason)}</div>` : '';
+    return `
+      <div style="color:var(--ink-3); margin-bottom:8px">
+        Invoice ${escapeHtml(v.invoice_date)} · received ${escapeHtml(v.received_date)} · due ${escapeHtml(c.due_date)}
+      </div>
+      ${lineRows}
+      ${figures.map(([l, n]) => `<div class="drow"><span>${l}</span><span class="num">${escapeHtml(c.currency)} ${n.toFixed(2)}</span></div>`).join('')}
+      ${notes}
+      ${rejection}
+    `;
+  }
+
+  function toggleVoucherDetail(id) {
+    const el = document.getElementById(`vdetail-${id}`);
+    if (el) el.hidden = !el.hidden;
+  }
+
+  function openVoucherForm() {
+    document.getElementById('voucherFormCard').style.display = 'block';
+    if (!document.querySelectorAll('#vLines .vline').length) addVoucherLine();
+  }
+
+  function closeVoucherForm() {
+    document.getElementById('voucherFormCard').style.display = 'none';
+    document.getElementById('voucherForm').reset();
+    document.getElementById('vLines').innerHTML = '';
+    document.getElementById('voucherFormErr').style.display = 'none';
+  }
+
+  function addVoucherLine() {
+    const div = document.createElement('div');
+    div.className = 'vline';
+    div.innerHTML = `
+      <label>Description<input class="vl-desc"></label>
+      <label>Amount<input type="number" step="0.01" class="vl-amount"></label>
+      <label>Supplier type<input class="vl-type"></label>
+      <label>Cost centre<input class="vl-cc"></label>
+      <button type="button" class="btn sm bad" onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.getElementById('vLines').appendChild(div);
+  }
+
+  async function submitVoucherForm(ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById('voucherFormErr');
+    errEl.style.display = 'none';
+    const lines = [...document.querySelectorAll('#vLines .vline')].map(row => ({
+      description: row.querySelector('.vl-desc').value,
+      amount: parseFloat(row.querySelector('.vl-amount').value) || 0,
+      supplier_type: row.querySelector('.vl-type').value,
+      cost_centre: row.querySelector('.vl-cc').value,
+    }));
+    const body = {
+      supplier_name: document.getElementById('vSupplierName').value,
+      supplier_address: document.getElementById('vSupplierAddress').value,
+      supplier_tel: document.getElementById('vSupplierTel').value,
+      supplier_email: document.getElementById('vSupplierEmail').value,
+      invoice_number: document.getElementById('vInvoiceNumber').value,
+      invoice_date: document.getElementById('vInvoiceDate').value,
+      received_date: document.getElementById('vReceivedDate').value,
+      credit_terms_days: parseInt(document.getElementById('vCreditDays').value) || 0,
+      vatable_amount: parseFloat(document.getElementById('vVatable').value) || 0,
+      non_taxable: parseFloat(document.getElementById('vNonTaxable').value) || 0,
+      overpayment: parseFloat(document.getElementById('vOverpayment').value) || 0,
+      vrpo_deduction: parseFloat(document.getElementById('vVrpoDeduction').value) || 0,
+      apply_nhil: document.getElementById('vApplyNhil').checked,
+      apply_vat: document.getElementById('vApplyVat').checked,
+      vrpo: document.getElementById('vVrpo').checked,
+      lines,
+    };
+    try {
+      const res = await fetch('/api/vouchers/create', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Could not create voucher.';
+        errEl.style.display = 'block';
+        return false;
+      }
+      closeVoucherForm();
+      await refreshVouchers();
+    } catch {
+      errEl.textContent = 'Could not reach the server.';
+      errEl.style.display = 'block';
+    }
+    return false;
+  }
+
+  async function submitVoucher(id) {
+    try {
+      const res = await fetch('/api/vouchers/submit', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voucher_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not submit.'); return; }
+      await refreshVouchers();
+    } catch {
+      alert('Could not reach the server.');
+    }
+  }
+
+  async function reviewVoucher(id, action) {
+    let reason = '';
+    if (action === 'reject') {
+      reason = prompt('Reason for rejecting this voucher:') || '';
+      if (!reason.trim()) return;
+    }
+    try {
+      const res = await fetch('/api/vouchers/review', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voucher_id: id, action, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not do that.'); return; }
+      await refreshVouchers();
     } catch {
       alert('Could not reach the server.');
     }

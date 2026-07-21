@@ -201,6 +201,45 @@ def fx() -> voucher.FxRates | None:
     return _fx
 
 
+def compute_voucher(v: dict) -> dict:
+    """Derive a stored voucher's figures for display. db.py only ever stores
+    what a preparer typed - the tax/net numbers are always computed fresh
+    here, same principle as the landing page's demo (voucher.py, never the
+    model, does the arithmetic)."""
+    lines = [
+        voucher.LineItem(l["description"], l["amount"], l.get("supplier_type", ""), l.get("cost_centre", ""))
+        for l in v["lines"]
+    ]
+    inp = voucher.VoucherInput(
+        supplier_name=v["supplier_name"],
+        supplier_address=v["supplier_address"],
+        supplier_tel=v["supplier_tel"],
+        supplier_email=v["supplier_email"],
+        invoice_number=v["invoice_number"],
+        invoice_date=date.fromisoformat(v["invoice_date"]),
+        received_date=date.fromisoformat(v["received_date"]),
+        credit_terms_days=v["credit_terms_days"],
+        lines=lines,
+        vatable_amount=v["vatable_amount"],
+        apply_nhil=v["apply_nhil"],
+        apply_vat=v["apply_vat"],
+        vrpo=v["vrpo"],
+        vrpo_deduction=v["vrpo_deduction"],
+        non_taxable=v["non_taxable"],
+        overpayment=v["overpayment"],
+    )
+    try:
+        result = voucher.compute(inp, fx())
+    except ValueError:
+        result = voucher.compute(inp, None)
+    result["review_notes"] = voucher.review(result)
+    result.pop("lines", None)
+    for key in ("invoice_date", "received_date", "due_date", "exchange_rate_date"):
+        if hasattr(result.get(key), "isoformat"):
+            result[key] = result[key].isoformat()
+    return result
+
+
 # ----------------------------------------------------------- the demo itself
 
 _AMOUNT = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?![\w])")
@@ -362,6 +401,15 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"team": db.list_team(user["company_id"])})
 
+        if path == "/api/vouchers":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            vouchers = db.list_vouchers(user["company_id"], user["id"], user["role"])
+            for v in vouchers:
+                v["computed"] = compute_voucher(v)
+            return self._json({"vouchers": vouchers})
+
         if path == "/api/join/search":
             q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
             return self._json({"companies": db.find_companies_by_name(q)})
@@ -412,6 +460,9 @@ class RouteHandlerMixin:
             "/api/login": self._handle_login,
             "/api/logout": self._handle_logout,
             "/api/company/approve": self._handle_approve,
+            "/api/vouchers/create": self._handle_voucher_create,
+            "/api/vouchers/submit": self._handle_voucher_submit,
+            "/api/vouchers/review": self._handle_voucher_review,
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
@@ -574,6 +625,83 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
+
+    # ------------------------------------------------------------ vouchers
+
+    def _handle_voucher_create(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            v = db.create_voucher(
+                user["company_id"], user["id"],
+                supplier_name=str(req.get("supplier_name") or ""),
+                supplier_address=str(req.get("supplier_address") or ""),
+                supplier_tel=str(req.get("supplier_tel") or ""),
+                supplier_email=str(req.get("supplier_email") or ""),
+                invoice_number=str(req.get("invoice_number") or ""),
+                invoice_date=str(req.get("invoice_date") or ""),
+                received_date=str(req.get("received_date") or ""),
+                credit_terms_days=int(req.get("credit_terms_days") or 0),
+                lines=req.get("lines") or [],
+                vatable_amount=float(req.get("vatable_amount") or 0),
+                apply_nhil=bool(req.get("apply_nhil", True)),
+                apply_vat=bool(req.get("apply_vat", True)),
+                vrpo=bool(req.get("vrpo", False)),
+                vrpo_deduction=float(req.get("vrpo_deduction") or 0),
+                non_taxable=float(req.get("non_taxable") or 0),
+                overpayment=float(req.get("overpayment") or 0),
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        v["computed"] = compute_voucher(v)
+        return self._json({"ok": True, "voucher": v})
+
+    def _handle_voucher_submit(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            voucher_id = int(req.get("voucher_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            v = db.submit_voucher(user["company_id"], user["id"], voucher_id)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        v["computed"] = compute_voucher(v)
+        return self._json({"ok": True, "voucher": v})
+
+    def _handle_voucher_review(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if user["role"] not in ("senior_accountant", "finance_supervisor"):
+            return self._json(
+                {"error": "Only a senior accountant or finance supervisor can review vouchers."}, 403)
+        try:
+            req = self._body()
+            voucher_id = int(req.get("voucher_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        action = str(req.get("action") or "")
+        try:
+            if action == "approve":
+                v = db.approve_voucher(user["company_id"], user["id"], voucher_id)
+            elif action == "reject":
+                v = db.reject_voucher(
+                    user["company_id"], user["id"], voucher_id, str(req.get("reason") or ""))
+            else:
+                return self._json({"error": "action must be approve or reject."}, 400)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        v["computed"] = compute_voucher(v)
+        return self._json({"ok": True, "voucher": v})
 
     # ------------------------------------------------------- platform admin
 
