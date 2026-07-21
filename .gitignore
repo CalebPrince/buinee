@@ -1,0 +1,19 @@
+# Secrets
+.env
+*.key
+
+# Data
+storage/
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+.venv/
+
+# Local server logs
+srv.out
+srv.err
+
+# Claude Code local permissions (machine-specific, not shared)
+.claude/settings.local.json

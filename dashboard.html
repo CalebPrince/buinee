@@ -1,0 +1,354 @@
+<title>Dashboard — Ledgerline</title>
+<meta name="description" content="Your Ledgerline workspace.">
+<style>
+  :root {
+    --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5;
+    --line: #dedad0; --line-strong: #c9c4b7;
+    --ink: #101619; --ink-2: #3c4750; --ink-3: #6a747c; --ink-4: #949ba1;
+    --teal: #0e5d57; --teal-deep: #0a4340; --teal-soft: #dfece9;
+    --ochre: #c0611c; --ochre-soft: #f8ead9;
+    --good: #2c7a51; --good-soft: #dff0e6; --warn: #b07d1b; --warn-soft: #f8eed6;
+    --bad: #b0301f; --bad-soft: #fbe6e2;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(16,22,25,.05), 0 14px 34px rgba(16,22,25,.07);
+    --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1315; --surface: #151b1e; --surface-2: #1c2427; --line: #262f33;
+      --line-strong: #354046; --ink: #eef1f0; --ink-2: #bcc5c7; --ink-3: #8b9599; --ink-4: #6b7478;
+      --teal: #4fb3a6; --teal-deep: #6fcbbd; --teal-soft: #10312e;
+      --ochre: #e0913f; --ochre-soft: #2e2113;
+      --good: #4bb37c; --good-soft: #12291d; --warn: #d09b3c; --warn-soft: #2a2113;
+      --bad: #e07a68; --bad-soft: #341714;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0e1315; --surface: #151b1e; --surface-2: #1c2427; --line: #262f33;
+    --line-strong: #354046; --ink: #eef1f0; --ink-2: #bcc5c7; --ink-3: #8b9599; --ink-4: #6b7478;
+    --teal: #4fb3a6; --teal-deep: #6fcbbd; --teal-soft: #10312e;
+    --ochre: #e0913f; --ochre-soft: #2e2113;
+    --good: #4bb37c; --good-soft: #12291d; --warn: #d09b3c; --warn-soft: #2a2113;
+    --bad: #e07a68; --bad-soft: #341714;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.4);
+  }
+  :root[data-theme="light"] {
+    --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5; --line: #dedad0;
+    --line-strong: #c9c4b7; --ink: #101619; --ink-2: #3c4750; --ink-3: #6a747c; --ink-4: #949ba1;
+    --teal: #0e5d57; --teal-deep: #0a4340; --teal-soft: #dfece9;
+    --ochre: #c0611c; --ochre-soft: #f8ead9;
+    --good: #2c7a51; --good-soft: #dff0e6; --warn: #b07d1b; --warn-soft: #f8eed6;
+    --bad: #b0301f; --bad-soft: #fbe6e2;
+    --shadow: 0 1px 2px rgba(16,22,25,.05), 0 14px 34px rgba(16,22,25,.07);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  h1,h2,h3 { margin: 0; font-weight: 600; letter-spacing: -.02em; }
+  p { margin: 0; }
+  button { font-family: inherit; font-size: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  .nav {
+    position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  }
+  .nav .wrap { display: flex; align-items: center; gap: 14px; height: 66px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(140deg, var(--teal), var(--teal-deep)); color: #fff;
+  }
+  .brand-mark svg { width: 16px; height: 16px; }
+  .brand-name { font-family: var(--serif); font-size: 19px; font-weight: 600; letter-spacing: -.02em; }
+  .company-tag {
+    font-size: 12.5px; color: var(--ink-3); padding: 4px 10px; border-radius: 20px;
+    border: 1px solid var(--line); margin-left: 4px;
+  }
+  .nav .spacer { flex: 1; }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .av {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--teal); color: #fff;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none;
+  }
+  .who .n { font-size: 13.5px; font-weight: 600; }
+  .who .r { font-size: 11px; color: var(--ink-3); }
+  .icobtn {
+    width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--surface); display: grid; place-items: center; color: var(--ink-2); cursor: pointer;
+  }
+  .icobtn:hover { color: var(--teal); border-color: var(--teal); }
+  .icobtn svg { width: 17px; height: 17px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 8px 15px; border-radius: 9px; font-size: 13.5px; font-weight: 600;
+    text-decoration: none; border: 1px solid var(--line-strong); cursor: pointer;
+    background: var(--surface); color: var(--ink);
+  }
+  .btn:hover { border-color: var(--teal); color: var(--teal); }
+  .btn.primary { background: var(--teal); color: #fff; border-color: transparent; }
+  .btn.primary:hover { background: var(--teal-deep); color: #fff; }
+  .btn.sm { padding: 6px 11px; font-size: 12.5px; }
+  .btn.bad { color: var(--bad); }
+  .btn.bad:hover { border-color: var(--bad); color: var(--bad); }
+
+  main { padding: 36px 0 70px; }
+  .hero-line { margin-bottom: 30px; }
+  .hero-line .eyebrow { font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; font-weight: 700; color: var(--teal); }
+  .hero-line h1 { font-family: var(--serif); font-size: 28px; margin: 8px 0 6px; }
+  .hero-line p { font-size: 15px; color: var(--ink-2); max-width: 56ch; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 20px;
+  }
+  .panel h3 { font-size: 15.5px; margin-bottom: 4px; }
+  .panel .sub { font-size: 12.5px; color: var(--ink-3); margin-bottom: 16px; }
+  .empty {
+    padding: 26px 14px; text-align: center; border: 1px dashed var(--line-strong); border-radius: 10px;
+    color: var(--ink-3); font-size: 13.5px;
+  }
+  .empty b { display: block; color: var(--ink-2); font-size: 14px; margin-bottom: 4px; }
+
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13.5px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .who2 { display: flex; flex-direction: column; }
+  .row .who2 b { font-size: 13.5px; }
+  .row .who2 span { font-size: 12px; color: var(--ink-3); }
+  .row .actions { display: flex; gap: 8px; }
+  .role-badge {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: 3px 8px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep);
+  }
+
+  .full-width { grid-column: 1 / -1; }
+
+  #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
+</style>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/dashboard.html">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg>
+      </span>
+      <span class="brand-name">Ledgerline</span>
+    </a>
+    <span class="company-tag" id="companyTag"></span>
+    <span class="spacer"></span>
+    <button class="icobtn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <div class="who" id="who" style="display:none">
+      <span class="av" id="whoAv"></span>
+      <div>
+        <div class="n" id="whoName"></div>
+        <div class="r" id="whoRole"></div>
+      </div>
+    </div>
+    <button class="btn sm" onclick="logout()">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div id="loading">Loading your workspace…</div>
+    <div id="content" style="display:none">
+      <div class="hero-line">
+        <span class="eyebrow" id="roleEyebrow"></span>
+        <h1 id="greeting"></h1>
+        <p id="roleBlurb"></p>
+      </div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme') ||
+      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  }
+
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+    location.href = '/login.html';
+  }
+
+  const ROLE_INFO = {
+    account_assistant: {
+      label: 'Account Assistant',
+      blurb: 'You prepare payment vouchers and letters. Once approved, a senior accountant signs off before anything goes out.',
+      sees: 'You see your own work only.',
+    },
+    senior_accountant: {
+      label: 'Senior Accountant',
+      blurb: 'You approve and sign the vouchers your team prepares.',
+      sees: 'You see your own work and the work of account assistants below you.',
+    },
+    finance_supervisor: {
+      label: 'Finance Supervisor',
+      blurb: 'You oversee the whole department — including who gets into it.',
+      sees: 'You see everything in your company.',
+    },
+  };
+
+  function initials(name) {
+    return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  }
+
+  function emptyPanel(title, sub, message, hint) {
+    const div = document.createElement('div');
+    div.className = 'panel';
+    div.innerHTML = `
+      <h3>${title}</h3>
+      <div class="sub">${sub}</div>
+      <div class="empty"><b>${message}</b>${hint}</div>
+    `;
+    return div;
+  }
+
+  async function main() {
+    let me;
+    try {
+      const res = await fetch('/api/me', { credentials: 'same-origin' });
+      if (!res.ok) { location.href = '/login.html'; return; }
+      me = (await res.json()).user;
+    } catch {
+      location.href = '/login.html'; return;
+    }
+
+    const info = ROLE_INFO[me.role] || { label: me.role, blurb: '', sees: '' };
+
+    document.getElementById('companyTag').textContent = me.company.name;
+    document.getElementById('whoAv').textContent = initials(me.name);
+    document.getElementById('whoName').textContent = me.name;
+    document.getElementById('whoRole').textContent = info.label;
+    document.getElementById('who').style.display = 'flex';
+
+    document.getElementById('roleEyebrow').textContent = info.label;
+    document.getElementById('greeting').textContent = `Welcome, ${me.name.split(' ')[0]}.`;
+    document.getElementById('roleBlurb').textContent = `${info.blurb} ${info.sees}`;
+
+    const grid = document.getElementById('grid');
+
+    // Everyone: their own work area (stub — the voucher workspace itself is the next build)
+    grid.appendChild(emptyPanel(
+      'My vouchers', 'Prepared by you',
+      'Nothing here yet',
+      '<br>Preparing a voucher from an invoice is coming next — this is where it will show up.'
+    ));
+
+    if (me.role === 'senior_accountant' || me.role === 'finance_supervisor') {
+      grid.appendChild(emptyPanel(
+        'Awaiting approval', "From account assistants you can see",
+        'Nothing waiting on you right now',
+        ''
+      ));
+    }
+
+    if (me.role === 'finance_supervisor') {
+      const teamPanel = document.createElement('div');
+      teamPanel.className = 'panel';
+      teamPanel.innerHTML = `<h3>Team</h3><div class="sub">Everyone approved at ${me.company.name}</div><div id="teamRows"></div>`;
+      grid.appendChild(teamPanel);
+
+      const pendingPanel = document.createElement('div');
+      pendingPanel.className = 'panel full-width';
+      pendingPanel.innerHTML = `<h3>Pending join requests</h3><div class="sub">People who typed in your company's name and are waiting on you</div><div id="pendingRows"></div>`;
+      grid.appendChild(pendingPanel);
+
+      await loadTeam();
+      await loadPending();
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  }
+
+  async function loadTeam() {
+    const box = document.getElementById('teamRows');
+    try {
+      const res = await fetch('/api/company/team', { credentials: 'same-origin' });
+      const data = await res.json();
+      const team = data.team || [];
+      if (!team.length) {
+        box.innerHTML = '<div class="empty"><b>Just you so far</b></div>';
+        return;
+      }
+      box.innerHTML = team.map(u => `
+        <div class="row">
+          <div class="who2"><b>${escapeHtml(u.name)}</b><span>${escapeHtml(u.email)}</span></div>
+          <span class="role-badge">${(ROLE_INFO[u.role] || {}).label || u.role}</span>
+        </div>
+      `).join('');
+    } catch {
+      box.innerHTML = '<div class="empty"><b>Could not load the team.</b></div>';
+    }
+  }
+
+  async function loadPending() {
+    const box = document.getElementById('pendingRows');
+    try {
+      const res = await fetch('/api/company/pending', { credentials: 'same-origin' });
+      const data = await res.json();
+      const pending = data.pending || [];
+      if (!pending.length) {
+        box.innerHTML = '<div class="empty"><b>No one waiting</b><br>Requests to join show up here.</div>';
+        return;
+      }
+      box.innerHTML = pending.map(u => `
+        <div class="row" id="pending-${u.id}">
+          <div class="who2">
+            <b>${escapeHtml(u.name)}</b>
+            <span>${escapeHtml(u.email)} · requested ${(ROLE_INFO[u.role] || {}).label || u.role}</span>
+          </div>
+          <div class="actions">
+            <button class="btn sm primary" onclick="actOnPending(${u.id}, 'approve')">Approve</button>
+            <button class="btn sm bad" onclick="actOnPending(${u.id}, 'reject')">Reject</button>
+          </div>
+        </div>
+      `).join('');
+    } catch {
+      box.innerHTML = '<div class="empty"><b>Could not load pending requests.</b></div>';
+    }
+  }
+
+  async function actOnPending(userId, action) {
+    const row = document.getElementById(`pending-${userId}`);
+    try {
+      const res = await fetch('/api/company/approve', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, action }),
+      });
+      if (res.ok) {
+        row.remove();
+        await loadTeam();
+      }
+    } catch { /* leave the row, they can retry */ }
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  main();
+</script>
