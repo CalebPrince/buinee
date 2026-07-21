@@ -45,7 +45,7 @@ runs `python server.py` on port 8080.
 | `index.html` | Public landing page, with a rate-limited public demo agent |
 | `register.html` | Register a new company, or request to join one that exists |
 | `login.html` | Sign in |
-| `dashboard.html` | Post-login workspace — role-scoped shells, see below |
+| `dashboard.html` | Post-login workspace — sidebar app shell, role-scoped views, see below |
 | `admin.html` | Command Center: Overview — platform stat tiles, the 5 newest signups, system status |
 | `admin-companies.html` | Command Center: Companies — every company in full, Finance Supervisor + complete team/pending |
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
@@ -211,6 +211,36 @@ the old password stops working immediately after).
 `admin-login.html` — the only place it's surfaced publicly. Nothing in
 `dashboard.html` references the Command Center at all anymore; the two
 are fully separate front doors.
+
+---
+
+## `dashboard.html`'s app shell
+
+Rebuilt to match the sidebar-rail + topbar layout used across the other
+Prince Caleb agent dashboards (`outlook-agent`/`excel-agent`'s
+Clerk/Gridwise consoles) — same skeleton, Ledgerline's own teal/ochre
+tokens instead of their slate/amber or emerald/iris ones. Two views,
+switched client-side with no page reload:
+
+- **Overview** — greeting, KPI tiles, and card(s) for "My vouchers" (and
+  "Awaiting your approval" for Senior Accountant/Finance Supervisor). Every
+  number shown is real and currently zero, never an invented demo stat —
+  the reference dashboards are sales prototypes and use fabricated
+  activity/metrics; this is a real product, so nothing here is illustrative.
+- **Team** (Finance Supervisor only, nav item hidden otherwise) — the full
+  roster and the real pending-approval queue with working Approve/Reject,
+  moved off Overview into its own page. The nav item carries a live count
+  badge for pending requests, hidden entirely at zero.
+
+Caught one bug while verifying the KPI tiles: the original draft tried to
+update a `#kpiTeam` span's `textContent` from inside `loadTeam()` before
+that span had even been inserted into the DOM (the KPI HTML was built
+afterward), so the team-member count silently stayed blank. Fixed by
+having `loadTeam`/`loadPending` both return their counts directly, used to
+build the KPI list up front — verified live (logged in as Rufus: "Team
+members" correctly showed 2, approving a pending request correctly moved
+them into the roster and cleared the nav badge; logged in as Doreen, an
+Account Assistant: Team nav item and its KPIs correctly don't appear).
 
 ---
 
