@@ -583,8 +583,29 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"ok": True})
 
 
+def maybe_bootstrap_admin() -> None:
+    """One-time platform-admin creation for hosts with no shell access (e.g.
+    Render's free tier). No-op the moment any admin exists, so it's safe to
+    leave the env vars set indefinitely - this never runs a second time and
+    is never reachable over HTTP, only at process startup."""
+    if db.count_platform_admins() > 0:
+        return
+    email = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "").strip()
+    password = os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "").strip()
+    if not email or not password:
+        return
+    name = os.environ.get("BOOTSTRAP_ADMIN_NAME", "").strip() or "Admin"
+    try:
+        db.create_platform_admin(name, email, password)
+        print(f"  bootstrapped platform admin: {email}")
+        print("  (you can remove BOOTSTRAP_ADMIN_* env vars now - this won't run again)")
+    except db.AuthError as exc:
+        print(f"  ! could not bootstrap platform admin: {exc}")
+
+
 def main() -> int:
     db.init_db()
+    maybe_bootstrap_admin()
     cfg = load_env()
     provider = active_provider(cfg)
     print("\n  Ledgerline — landing page")

@@ -143,20 +143,29 @@ cookie in the same browser continues working independently of whatever the
 company cookie is doing — the two never interact.
 
 **There is no HTTP route that creates a `platform_admins` row, on purpose.**
-The only account creation path is `db.create_platform_admin`, called
-directly by a script run against the database by whoever operates this
-deployment — never exposed over the network. The current account was
-created this way:
+There are two ways to create one, both offline/startup-only, never over
+the network:
 
-```
-python -c "
-import secrets, db
-db.init_db()
-password = secrets.token_urlsafe(12)
-db.create_platform_admin('Your Name', 'you@example.com', password)
-print(password)
-"
-```
+- **Shell access** (local dev, or any host with a shell/SSH tab):
+  ```
+  python -c "
+  import secrets, db
+  db.init_db()
+  password = secrets.token_urlsafe(12)
+  db.create_platform_admin('Your Name', 'you@example.com', password)
+  print(password)
+  "
+  ```
+- **No shell access** (e.g. Render's free tier, which doesn't offer one):
+  `server.maybe_bootstrap_admin()` runs once at process startup. Set
+  `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` (and optionally
+  `BOOTSTRAP_ADMIN_NAME`) as environment variables and redeploy/restart the
+  service. It's a no-op the instant `db.count_platform_admins() > 0` — so
+  it only ever fires once, and it's safe to leave the env vars in place
+  afterward (verified directly: calling it twice in a row with the vars
+  still set only creates the account the first time). Worth removing
+  `BOOTSTRAP_ADMIN_PASSWORD` afterward anyway, just so a real password
+  isn't sitting in a dashboard longer than it needs to.
 
 The Command Center is a persistent left sidebar (Overview, Companies,
 Settings, then Toggle theme / Sign out) shared identically across

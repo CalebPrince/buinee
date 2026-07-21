@@ -378,8 +378,14 @@ def reject_user(company_id: int, user_id: int) -> None:
 # A completely separate identity from companies/users - its own table, own
 # sessions, own login page (admin-login.html). Not a company role, and there
 # is deliberately no HTTP route that creates one: the only way a row lands in
-# platform_admins is a script run directly against the database by whoever
-# operates this deployment. See README's Command Center section.
+# platform_admins is either a script run directly against the database, or
+# server.maybe_bootstrap_admin() at process startup on hosts with no shell
+# access (e.g. Render's free tier) - see README's Command Center section.
+
+def count_platform_admins() -> int:
+    with _cursor() as conn:
+        return conn.execute("SELECT COUNT(*) AS n FROM platform_admins").fetchone()["n"]
+
 
 def _get_admin(admin_id: int) -> dict | None:
     with _cursor() as conn:
