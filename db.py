@@ -489,6 +489,21 @@ def change_admin_password(admin_id: int, current_password: str, new_password: st
         )
 
 
+def delete_company(company_id: int) -> None:
+    """Permanently remove a company and everyone in it. Irreversible - no
+    undo, no soft-delete. Command Center only; a company's own Finance
+    Supervisor has no way to do this to their own company."""
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    with _cursor() as conn:
+        conn.execute(
+            "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE company_id = ?)",
+            (company_id,),
+        )
+        conn.execute("DELETE FROM users WHERE company_id = ?", (company_id,))
+        conn.execute("DELETE FROM companies WHERE id = ?", (company_id,))
+
+
 def list_companies_with_stats() -> list[dict]:
     """Every company, with its supervisor and full team/pending lists inline -
     the command center shows all of this up front, no per-company click."""

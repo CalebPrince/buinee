@@ -394,6 +394,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
+            "/api/admin/company/delete": self._handle_admin_delete_company,
         }
         handler = handlers.get(path)
         if not handler:
@@ -589,6 +590,24 @@ class Handler(BaseHTTPRequestHandler):
                 str(req.get("current_password") or ""),
                 str(req.get("new_password") or ""),
             )
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True})
+
+    def _handle_admin_delete_company(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            company_id = int(req.get("company_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            db.delete_company(company_id)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})

@@ -189,6 +189,18 @@ weight in a security-sensitive area of the code.
   and reveals the Finance Supervisor's email plus the complete team and
   pending list. Click again to collapse. Nothing is truncated once
   expanded; collapsed cards stay small so many companies fit on screen.
+  Expanded, there's also a **Delete company** button (`db.delete_company`,
+  `/api/admin/company/delete`) — permanently removes the company and every
+  user in it (and their sessions), with a native confirm dialog first.
+  There's no undo and no soft-delete. The confirm message and the button's
+  click handler both look the company's name up from the already-fetched
+  list rather than round-tripping it through an HTML attribute — an
+  earlier version embedded the name directly in `onclick="..."`, which
+  silently broke (truncated the whole handler, no error, no console
+  warning) the moment a company name contained a literal `"`, since the
+  attribute's own quoting collided with `JSON.stringify`'s. Caught by
+  deliberately testing a delete against a company named
+  `ZZTEST Delete Me Again "Ltd"`.
 
 `admin-settings.html` lets the signed-in admin change their own password
 (`/api/admin/change-password`, requires the current password — verified

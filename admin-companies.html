@@ -7,6 +7,7 @@
     --ink: #101619; --ink-2: #3c4750; --ink-3: #6a747c; --ink-4: #949ba1;
     --teal: #0e5d57; --teal-deep: #0a4340; --teal-soft: #dfece9;
     --warn: #b07d1b; --warn-soft: #f8eed6;
+    --bad: #b0301f; --bad-soft: #fbe6e2;
     --violet: #6b5be6; --violet-soft: #ecebfc;
     --radius: 14px;
     --shadow: 0 1px 2px rgba(16,22,25,.05), 0 14px 34px rgba(16,22,25,.07);
@@ -20,6 +21,7 @@
       --line-strong: #354046; --ink: #eef1f0; --ink-2: #bcc5c7; --ink-3: #8b9599; --ink-4: #6b7478;
       --teal: #4fb3a6; --teal-deep: #6fcbbd; --teal-soft: #10312e;
       --warn: #d09b3c; --warn-soft: #2a2113;
+      --bad: #e07a68; --bad-soft: #341714;
       --violet: #9b8ff2; --violet-soft: #201c3d;
       --shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.4);
     }
@@ -29,6 +31,7 @@
     --line-strong: #354046; --ink: #eef1f0; --ink-2: #bcc5c7; --ink-3: #8b9599; --ink-4: #6b7478;
     --teal: #4fb3a6; --teal-deep: #6fcbbd; --teal-soft: #10312e;
     --warn: #d09b3c; --warn-soft: #2a2113;
+    --bad: #e07a68; --bad-soft: #341714;
     --violet: #9b8ff2; --violet-soft: #201c3d;
     --shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.4);
   }
@@ -37,6 +40,7 @@
     --line-strong: #c9c4b7; --ink: #101619; --ink-2: #3c4750; --ink-3: #6a747c; --ink-4: #949ba1;
     --teal: #0e5d57; --teal-deep: #0a4340; --teal-soft: #dfece9;
     --warn: #b07d1b; --warn-soft: #f8eed6;
+    --bad: #b0301f; --bad-soft: #fbe6e2;
     --violet: #6b5be6; --violet-soft: #ecebfc;
     --shadow: 0 1px 2px rgba(16,22,25,.05), 0 14px 34px rgba(16,22,25,.07);
   }
@@ -135,6 +139,16 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     padding: 3px 7px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep); white-space: nowrap;
   }
+  .danger-zone {
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .btn-delete {
+    padding: 7px 14px; border-radius: 9px; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--bad); background: var(--bad-soft); color: var(--bad); cursor: pointer;
+  }
+  .btn-delete:hover { background: var(--bad); color: #fff; }
+  .danger-note { font-size: 11.5px; color: var(--ink-3); }
   .empty-mini { font-size: 12.5px; color: var(--ink-3); padding: 6px 0; }
   .count-badge {
     display: inline-flex; align-items: center; justify-content: center; min-width: 22px; padding: 2px 7px;
@@ -262,7 +276,10 @@
     document.getElementById('content').style.display = 'block';
   }
 
+  let lastCompanies = [];
+
   function renderCompanies(companies) {
+    lastCompanies = companies;
     const box = document.getElementById('companyCards');
     if (!companies.length) {
       box.innerHTML = '<div class="empty-mini">No companies registered yet.</div>';
@@ -291,6 +308,12 @@
             ? `<div class="supervisor-line">Finance Supervisor: <b>${escapeHtml(c.supervisor.name)}</b> · ${escapeHtml(c.supervisor.email)}</div>`
             : '<div class="supervisor-line"><span class="no-super">No Finance Supervisor yet</span></div>'}
           ${renderTeamAndPending(c)}
+          <div class="danger-zone">
+            <button class="btn-delete" onclick="event.stopPropagation(); deleteCompany(${c.id})">
+              Delete company
+            </button>
+            <span class="danger-note">Permanently removes this company and everyone in it. Cannot be undone.</span>
+          </div>
         </div>
       </div>
     `).join('');
@@ -300,6 +323,24 @@
     const card = document.getElementById(`card-${id}`);
     const expanded = card.classList.toggle('expanded');
     card.setAttribute('aria-expanded', String(expanded));
+  }
+
+  async function deleteCompany(id) {
+    const company = lastCompanies.find(c => c.id === id);
+    const name = company ? company.name : 'this company';
+    if (!confirm(`Delete "${name}" and everyone in it? This cannot be undone.`)) return;
+    try {
+      const res = await fetch('/api/admin/company/delete', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not delete company.'); return; }
+      document.getElementById(`card-${id}`).remove();
+    } catch {
+      alert('Could not reach the server.');
+    }
   }
 
   function renderTeamAndPending(c) {
