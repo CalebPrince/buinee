@@ -1,7 +1,20 @@
 """
 Ledgerline — landing page server with a public demo agent.
 
-    python server.py     ->  http://127.0.0.1:8080
+Two ways to run this, same routing logic underneath either way:
+
+    python server.py         ->  http://127.0.0.1:8080   (local dev)
+    passenger_wsgi.py        ->  cPanel's Python Selector / Passenger
+
+RouteHandlerMixin holds every route and never touches a socket directly -
+it just fills in self._status / self._resp_headers / self._resp_body.
+Two thin transports read those afterward:
+  - Handler(RouteHandlerMixin, BaseHTTPRequestHandler) - a real socket
+    server for local dev, via ThreadingHTTPServer.
+  - application(environ, start_response) - a WSGI callable for Passenger,
+    via the WSGIRequest adapter below, which fakes just enough of
+    BaseHTTPRequestHandler's interface (self.path, self.headers, self.rfile,
+    self.client_address) for the mixin to run unmodified.
 
 The agent on the landing page is deliberately narrow. It is an unauthenticated
 endpoint on a public page, which means it is somebody else's free LLM if it is
@@ -27,6 +40,7 @@ import sys
 import time
 import webbrowser
 from datetime import date
+from http.client import responses as HTTP_REASONS
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -41,6 +55,7 @@ import voucher  # noqa: E402
 
 # Render (and most PaaS hosts) assign the port via $PORT and expect a bind on
 # 0.0.0.0, not 127.0.0.1. Local dev still gets the old localhost-only default.
+# Irrelevant under Passenger, which owns the socket itself.
 PORT = int(os.environ.get("PORT", 8080))
 HOST = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
 ENV_FILE = ROOT / ".env"
@@ -109,7 +124,7 @@ def rate_limited(key: str, max_hits: int = MAX_TURNS, window: int = WINDOW_SECON
     return len(seen) >= max_hits
 
 
-def client_ip(handler: BaseHTTPRequestHandler) -> str:
+def client_ip(handler) -> str:
     return handler.headers.get("X-Forwarded-For", handler.client_address[0]).split(",")[0].strip()
 
 
@@ -119,7 +134,7 @@ def _cookie_header(name: str, token: str, max_age: int) -> str:
     return f"{name}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}"
 
 
-def _cookie(handler: BaseHTTPRequestHandler, name: str) -> str | None:
+def _cookie(handler, name: str) -> str | None:
     raw = handler.headers.get("Cookie")
     if not raw:
         return None
@@ -129,11 +144,11 @@ def _cookie(handler: BaseHTTPRequestHandler, name: str) -> str | None:
     return morsel.value if morsel else None
 
 
-def session_token(handler: BaseHTTPRequestHandler) -> str | None:
+def session_token(handler) -> str | None:
     return _cookie(handler, COOKIE_NAME)
 
 
-def current_user(handler: BaseHTTPRequestHandler) -> dict | None:
+def current_user(handler) -> dict | None:
     return db.get_user_by_session(session_token(handler))
 
 
@@ -153,11 +168,11 @@ def public_user(user: dict) -> dict:
 # A separate identity and a separate cookie from the company auth above -
 # see db.py's "platform admin" section for why.
 
-def admin_session_token(handler: BaseHTTPRequestHandler) -> str | None:
+def admin_session_token(handler) -> str | None:
     return _cookie(handler, ADMIN_COOKIE_NAME)
 
 
-def current_admin(handler: BaseHTTPRequestHandler) -> dict | None:
+def current_admin(handler) -> dict | None:
     return db.get_admin_by_session(admin_session_token(handler))
 
 
@@ -279,35 +294,24 @@ def build_system(computed: dict | None) -> str:
     return "\n".join(lines)
 
 
-# ------------------------------------------------------------------- server
+# --------------------------------------------------------------- route logic
+#
+# Every route lives here, transport-agnostic. A caller just needs to provide
+# self.path, self.headers (an object with .get(name)), self.rfile (readable),
+# and self.client_address (a tuple, [0] used). _send() never touches a socket
+# - it only sets attributes; each transport reads them afterward.
 
-class Handler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
-
-    def log_message(self, fmt, *args):
-        sys.stderr.write("  %s\n" % (fmt % args))
-
+class RouteHandlerMixin:
     def _send(self, code, body: bytes, ctype: str, extra_headers=None):
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        for k, v in (extra_headers or []):
-            self.send_header(k, v)
-        self.end_headers()
-        if not getattr(self, "_head_only", False):
-            self.wfile.write(body)
-
-    def do_HEAD(self):
-        # Same response as GET, minus the body - needed because Render's (and
-        # most platforms') health checks probe with HEAD, and stdlib's
-        # BaseHTTPRequestHandler 501s on any method without a handler.
-        self._head_only = True
-        try:
-            self.do_GET()
-        finally:
-            self._head_only = False
+        self._status = code
+        self._resp_headers = [
+            ("Content-Type", ctype),
+            ("Content-Length", str(len(body))),
+            ("Cache-Control", "no-store"),
+            ("X-Content-Type-Options", "nosniff"),
+            *list(extra_headers or []),
+        ]
+        self._resp_body = b"" if getattr(self, "_head_only", False) else body
 
     def _json(self, obj, code=200, extra_headers=None):
         self._send(code, json.dumps(obj).encode(), "application/json", extra_headers)
@@ -320,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---------------------------------------------------------------- GET
 
-    def do_GET(self):
+    def _route_get(self):
         path = self.path.split("?")[0]
 
         if path == "/api/demo/status":
@@ -382,7 +386,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # --------------------------------------------------------------- POST
 
-    def do_POST(self):
+    def _route_post(self):
         path = self.path.split("?")[0]
         handlers = {
             "/api/demo": self._handle_demo,
@@ -633,6 +637,44 @@ def maybe_bootstrap_admin() -> None:
         print(f"  ! could not bootstrap platform admin: {exc}")
 
 
+# ------------------------------------------------------- transport: sockets
+#
+# Local dev only: python server.py starts a real ThreadingHTTPServer. Not
+# used under Passenger, which calls application() directly instead.
+
+class Handler(RouteHandlerMixin, BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, fmt, *args):
+        sys.stderr.write("  %s\n" % (fmt % args))
+
+    def _emit(self):
+        self.send_response(self._status)
+        for k, v in self._resp_headers:
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(self._resp_body)
+
+    def do_GET(self):
+        self._route_get()
+        self._emit()
+
+    def do_POST(self):
+        self._route_post()
+        self._emit()
+
+    def do_HEAD(self):
+        # Same response as GET, minus the body - needed because Render's (and
+        # most platforms') health checks probe with HEAD, and stdlib's
+        # BaseHTTPRequestHandler 501s on any method without a handler.
+        self._head_only = True
+        try:
+            self._route_get()
+        finally:
+            self._head_only = False
+        self._emit()
+
+
 def main() -> int:
     db.init_db()
     maybe_bootstrap_admin()
@@ -659,6 +701,56 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\n  stopped.")
     return 0
+
+
+# ---------------------------------------------------------- transport: WSGI
+#
+# Used by passenger_wsgi.py under cPanel's Python Selector. Not used by
+# local dev (python server.py uses the socket transport above instead).
+
+class _WSGIHeaders:
+    """Just enough of BaseHTTPRequestHandler's self.headers (a .get(name)
+    interface) for the route logic above, backed by a WSGI environ."""
+
+    def __init__(self, environ: dict):
+        self._environ = environ
+
+    def get(self, name: str, default=None):
+        key = name.upper().replace("-", "_")
+        if key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+            return self._environ.get(key, default)
+        return self._environ.get("HTTP_" + key, default)
+
+
+class WSGIRequest(RouteHandlerMixin):
+    def __init__(self, environ: dict):
+        query = environ.get("QUERY_STRING", "")
+        self.path = environ.get("PATH_INFO", "/") + (f"?{query}" if query else "")
+        self.rfile = environ["wsgi.input"]
+        self.headers = _WSGIHeaders(environ)
+        self.client_address = (environ.get("REMOTE_ADDR", ""),)
+
+
+def application(environ, start_response):
+    req = WSGIRequest(environ)
+    method = environ.get("REQUEST_METHOD", "GET").upper()
+
+    if method == "GET":
+        req._route_get()
+    elif method == "HEAD":
+        req._head_only = True
+        try:
+            req._route_get()
+        finally:
+            req._head_only = False
+    elif method == "POST":
+        req._route_post()
+    else:
+        req._json({"error": "method not allowed"}, 405)
+
+    reason = HTTP_REASONS.get(req._status, "")
+    start_response(f"{req._status} {reason}", req._resp_headers)
+    return [req._resp_body]
 
 
 if __name__ == "__main__":

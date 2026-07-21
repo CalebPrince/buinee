@@ -38,6 +38,62 @@ runs `python server.py` on port 8080.
 
 ---
 
+## Deployment — two transports, one route table
+
+`server.py` splits into a transport-agnostic `RouteHandlerMixin` (every
+route lives here, and it never touches a socket — it just sets
+`self._status`/`self._resp_headers`/`self._resp_body`) plus two thin
+transports that read those attributes afterward:
+
+- **`Handler(RouteHandlerMixin, BaseHTTPRequestHandler)`** — a real
+  `ThreadingHTTPServer`, used only by `python server.py` for local dev.
+- **`application(environ, start_response)`** — a WSGI callable, used by
+  `passenger_wsgi.py` under cPanel's Python Selector (Phusion Passenger).
+  `WSGIRequest` fakes just enough of `BaseHTTPRequestHandler`'s interface
+  (`self.path`, `self.headers.get(name)`, `self.rfile`, `self.client_address`)
+  for the exact same route code to run unmodified under either transport.
+
+Both were verified independently: the socket transport via the usual
+browser flow (login, dashboard, Command Center all still work after the
+refactor); the WSGI transport via `wsgiref.simple_server` serving
+`server.application` directly on a throwaway port and hitting it with curl
+— GET/HEAD/404s, a full login with cookie-jar persistence, `/api/me`
+correctly 401ing with no cookie, and the admin/company endpoints all
+checked, with zero code differences from what Passenger will actually run.
+
+**Currently deployed on Render** (`https://ledgerline-qzx5.onrender.com`,
+free tier, manual deploys only, socket transport via `python server.py`) —
+being moved off Render specifically to stop paying for two hosts (Render
+would need the same real cost, monthly, that Namecheap's already-paid
+Stellar Plus plan makes free) once the cPanel/Passenger path below is live.
+
+**Moving to Namecheap Stellar Plus** (or any cPanel host with CloudLinux's
+Python Selector — check for a "Setup Python App" tool under cPanel's
+Software section before assuming this applies):
+
+1. cPanel → Setup Python App → Create Application. Pick the app root (where
+   the code lives on the account), the Python version, and the
+   domain/subdomain/path it answers on.
+2. Get the code onto the server — cPanel's Git Version Control feature if
+   available (pulls straight from
+   [github.com/CalebPrince/ledgerline](https://github.com/CalebPrince/ledgerline)),
+   otherwise File Manager/FTP.
+3. Install `openpyxl` into the app's virtualenv — the Python Selector page
+   gives you the exact pip command once the app exists.
+4. Make sure `passenger_wsgi.py` is at the app root and exposes
+   `application` — it already does; nothing to edit unless the app root
+   differs from this repo's layout.
+5. Storage: `storage/ledgerline.db` lives on the hosting account's normal,
+   permanent disk — not a container that gets torn down on deploy, so the
+   Render ephemeral-filesystem problem (the whole reason a Persistent Disk
+   upgrade was being considered) doesn't exist here at all, at no extra
+   cost past the plan you already pay for.
+6. Point the actual domain at this app directly in cPanel — no separate
+   Namecheap-DNS-pointed-at-Render dance needed once everything's on one
+   host.
+
+---
+
 ## What's here
 
 | Path | What it is |
@@ -50,7 +106,9 @@ runs `python server.py` on port 8080.
 | `admin-companies.html` | Command Center: Companies — every company in full, Finance Supervisor + complete team/pending |
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
 | `admin-settings.html` | Command Center: Settings — change the platform owner's own password |
-| `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes |
+| `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes — routing logic is transport-agnostic, see Deployment above |
+| `passenger_wsgi.py` | WSGI entry point for cPanel's Python Selector — not used by local dev |
+| `requirements.txt` | Just `openpyxl` — everything else is stdlib or raw `urllib` (`providers.py`) |
 | `db.py` | SQLite schema + all auth logic (passwords, sessions, approvals) |
 | `providers.py` | LLM calls (Anthropic / Google / OpenRouter), shared with the demo agent |
 | `voucher.py` | Deterministic voucher math — NHIL/GETFL, VAT, WHT, BOG FX lookup. AI reads an invoice; this computes the voucher. Verified against a real BDDG voucher in its own self-test (`python voucher.py`) |
