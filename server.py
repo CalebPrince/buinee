@@ -296,7 +296,18 @@ class Handler(BaseHTTPRequestHandler):
         for k, v in (extra_headers or []):
             self.send_header(k, v)
         self.end_headers()
-        self.wfile.write(body)
+        if not getattr(self, "_head_only", False):
+            self.wfile.write(body)
+
+    def do_HEAD(self):
+        # Same response as GET, minus the body - needed because Render's (and
+        # most platforms') health checks probe with HEAD, and stdlib's
+        # BaseHTTPRequestHandler 501s on any method without a handler.
+        self._head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
 
     def _json(self, obj, code=200, extra_headers=None):
         self._send(code, json.dumps(obj).encode(), "application/json", extra_headers)
