@@ -1,4 +1,4 @@
-# Ledgerline
+# Buinee
 
 A multi-tenant workspace for finance/back-office teams: prepare a payment
 voucher from an invoice, get it approved, issue the letter — with real
@@ -181,8 +181,8 @@ that before this is ever deployed over the open internet.**
 ## Command Center (`admin.html`) — the platform owner's view
 
 Everything above is scoped to one company. The Command Center is the one
-place in Ledgerline that isn't — it's a cross-company view for whoever
-actually runs Ledgerline itself.
+place in Buinee that isn't — it's a cross-company view for whoever
+actually runs Buinee itself.
 
 **A completely separate identity, not a layer on top of a company account.**
 Earlier this was an email allowlist checked against an ordinary company
@@ -276,7 +276,7 @@ are fully separate front doors.
 
 Rebuilt to match the sidebar-rail + topbar layout used across the other
 Prince Caleb agent dashboards (`outlook-agent`/`excel-agent`'s
-Clerk/Gridwise consoles) — same skeleton, Ledgerline's own teal/ochre
+Clerk/Gridwise consoles) — same skeleton, Buinee's own teal/ochre
 tokens instead of their slate/amber or emerald/iris ones. Two views,
 switched client-side with no page reload:
 
@@ -406,7 +406,7 @@ the part where a company would actually pay to get moved there themselves.
 
 ## Where this came from
 
-Ledgerline replaces two earlier single-client, single-tenant builds at
+Buinee replaces two earlier single-client, single-tenant builds at
 `D:/Websites/outlook-agent` and `D:/Websites/excel-agent`. Both are separate
 projects, not touched by anything here:
 
@@ -421,7 +421,7 @@ projects, not touched by anything here:
   built there.
 
 Both are real people at real (and different) companies — the first
-practical test of whether Ledgerline's company isolation actually holds
+practical test of whether Buinee's company isolation actually holds
 once both of them can register for real.
 
 ---

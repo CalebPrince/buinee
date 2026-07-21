@@ -1,5 +1,5 @@
 """
-Ledgerline — landing page server with a public demo agent.
+Buinee — landing page server with a public demo agent.
 
 Two ways to run this, same routing logic underneath either way:
 
@@ -237,7 +237,7 @@ def maybe_compute(message: str) -> dict | None:
         return None
 
 
-SYSTEM = """You are the assistant on Ledgerline's landing page. Ledgerline is a \
+SYSTEM = """You are the assistant on Buinee's landing page. Buinee is a \
 workspace for finance departments: prepare a payment voucher, get it approved, \
 issue the payment letter - with real roles, a real approval trail and a \
 signature recorded in the system rather than printed and scanned.
@@ -266,7 +266,7 @@ How the product works, so you can answer accurately:
 Rules for you:
 - Be brief. Two or three sentences unless they asked for detail. You are on a
   landing page, not in a meeting.
-- Never invent a feature, a price or a date. Ledgerline is early - if you do not
+- Never invent a feature, a price or a date. Buinee is early - if you do not
   know, say so and offer to pass the question on at registration.
 - You have no access to anyone's real records, and you cannot read uploaded
   documents here. That is available once their company is registered. Say so
@@ -762,7 +762,7 @@ def main() -> int:
     maybe_bootstrap_admin()
     cfg = load_env()
     provider = active_provider(cfg)
-    print("\n  Ledgerline — landing page")
+    print("\n  Buinee — landing page")
     print(f"  {'-' * 40}")
     print(f"  demo agent : {provider or 'NOT CONFIGURED (add a key to .env)'}")
     print(f"  FX rates   : {'loaded' if fx() else 'not found'}")

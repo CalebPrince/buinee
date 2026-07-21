@@ -1,5 +1,5 @@
 """
-Ledgerline's storage: companies, the people in them, and their sessions.
+Buinee's storage: companies, the people in them, and their sessions.
 
 SQLite, stdlib only - consistent with the rest of this project (no ORM, no
 extra dependency). One file, gitignored, created on first run.
@@ -99,7 +99,7 @@ def init_db() -> None:
             );
 
             -- Platform owner identity. Deliberately unconnected to companies/
-            -- users - this is not a company role, it's whoever runs Ledgerline
+            -- users - this is not a company role, it's whoever runs Buinee
             -- itself. There is no HTTP route that creates a row here; see
             -- db.create_platform_admin and the README.
             CREATE TABLE IF NOT EXISTS platform_admins (
