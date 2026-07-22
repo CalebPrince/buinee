@@ -898,7 +898,7 @@ def reject_user(company_id: int, user_id: int) -> None:
 # is deliberately no HTTP route that creates one: the only way a row lands in
 # platform_admins is either a script run directly against the database, or
 # server.maybe_bootstrap_admin() at process startup on hosts with no shell
-# access (e.g. Render's free tier) - see README's Command Center section.
+# access - see README's Command Center section.
 
 def count_platform_admins() -> int:
     with _cursor() as conn:

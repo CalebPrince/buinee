@@ -53,9 +53,10 @@ import db  # noqa: E402
 import providers  # noqa: E402
 import voucher  # noqa: E402
 
-# Render (and most PaaS hosts) assign the port via $PORT and expect a bind on
-# 0.0.0.0, not 127.0.0.1. Local dev still gets the old localhost-only default.
-# Irrelevant under Passenger, which owns the socket itself.
+# Only the local dev transport reads these - production runs under Passenger,
+# which owns the socket itself. Kept because a host that hands you a port via
+# $PORT also expects a bind on 0.0.0.0 rather than 127.0.0.1; local dev keeps
+# the localhost-only default.
 PORT = int(os.environ.get("PORT", 8080))
 HOST = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
 ENV_FILE = ROOT / ".env"
@@ -1089,10 +1090,11 @@ class RouteHandlerMixin:
 
 
 def maybe_bootstrap_admin() -> None:
-    """One-time platform-admin creation for hosts with no shell access (e.g.
-    Render's free tier). No-op the moment any admin exists, so it's safe to
-    leave the env vars set indefinitely - this never runs a second time and
-    is never reachable over HTTP, only at process startup."""
+    """One-time platform-admin creation for hosts with no shell access (a
+    shared-hosting plan without SSH, say). No-op the moment any admin
+    exists, so it's safe to leave the env vars set indefinitely - this never
+    runs a second time and is never reachable over HTTP, only at process
+    startup."""
     if db.count_platform_admins() > 0:
         return
     email = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "").strip()
@@ -1135,8 +1137,8 @@ class Handler(RouteHandlerMixin, BaseHTTPRequestHandler):
         self._emit()
 
     def do_HEAD(self):
-        # Same response as GET, minus the body - needed because Render's (and
-        # most platforms') health checks probe with HEAD, and stdlib's
+        # Same response as GET, minus the body - needed because uptime and
+        # health checks commonly probe with HEAD, and stdlib's
         # BaseHTTPRequestHandler 501s on any method without a handler.
         self._head_only = True
         try:

@@ -65,36 +65,44 @@ refactor); the WSGI transport via `wsgiref.simple_server` serving
 correctly 401ing with no cookie, and the admin/company endpoints all
 checked, with zero code differences from what Passenger will actually run.
 
-**Currently deployed on Render** (`https://ledgerline-qzx5.onrender.com`,
-free tier, manual deploys only, socket transport via `python server.py`) —
-being moved off Render specifically to stop paying for two hosts (Render
-would need the same real cost, monthly, that Namecheap's already-paid
-Stellar Plus plan makes free) once the cPanel/Passenger path below is live.
+**Deployed on Namecheap Stellar Plus** — cPanel's Python Selector
+(CloudLinux) running `passenger_wsgi.py` under Phusion Passenger, i.e. the
+WSGI transport above. The socket transport is local dev only and doesn't run
+in production at all.
 
-**Moving to Namecheap Stellar Plus** (or any cPanel host with CloudLinux's
-Python Selector — check for a "Setup Python App" tool under cPanel's
-Software section before assuming this applies):
+Two things follow from being on ordinary cPanel hosting rather than a
+container PaaS, and both are load-bearing:
+
+- **`storage/ledgerline.db` sits on the account's normal, permanent disk.**
+  Nothing is torn down between deploys, so there is no ephemeral-filesystem
+  problem to design around and no separate persistent-volume add-on to pay
+  for — it's included in the plan already being paid for. This is why the
+  whole app can be SQLite-on-disk and stay that way.
+- **Passenger owns the socket.** `PORT`/`HOST` in `server.py` are for local
+  dev only; nothing in production reads them.
+
+Setting it up again from scratch (or on any other cPanel host with the
+Python Selector — look for "Setup Python App" under cPanel's Software
+section before assuming this applies):
 
 1. cPanel → Setup Python App → Create Application. Pick the app root (where
    the code lives on the account), the Python version, and the
    domain/subdomain/path it answers on.
 2. Get the code onto the server — cPanel's Git Version Control feature if
    available (pulls straight from
-   [github.com/CalebPrince/ledgerline](https://github.com/CalebPrince/ledgerline)),
+   [github.com/CalebPrince/buinee](https://github.com/CalebPrince/buinee)),
    otherwise File Manager/FTP.
 3. Install `openpyxl` into the app's virtualenv — the Python Selector page
    gives you the exact pip command once the app exists.
 4. Make sure `passenger_wsgi.py` is at the app root and exposes
    `application` — it already does; nothing to edit unless the app root
    differs from this repo's layout.
-5. Storage: `storage/ledgerline.db` lives on the hosting account's normal,
-   permanent disk — not a container that gets torn down on deploy, so the
-   Render ephemeral-filesystem problem (the whole reason a Persistent Disk
-   upgrade was being considered) doesn't exist here at all, at no extra
-   cost past the plan you already pay for.
-6. Point the actual domain at this app directly in cPanel — no separate
-   Namecheap-DNS-pointed-at-Render dance needed once everything's on one
-   host.
+5. Set the environment variables the app needs (`.env` at the app root, or
+   cPanel's own env var fields): the AI provider key, and
+   `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` on a fresh database —
+   see [Command Center](#command-center-adminhtml--the-platform-owners-view).
+6. Restart the app from the Python Selector page after any code change —
+   Passenger doesn't pick up edited files on its own.
 
 ---
 
@@ -218,11 +226,13 @@ the network:
   print(password)
   "
   ```
-- **No shell access** (e.g. Render's free tier, which doesn't offer one):
+- **No shell access** (some shared-hosting plans don't offer SSH, and
+  cPanel's Terminal isn't always enabled):
   `server.maybe_bootstrap_admin()` runs once at process startup. Set
   `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` (and optionally
-  `BOOTSTRAP_ADMIN_NAME`) as environment variables and redeploy/restart the
-  service. It's a no-op the instant `db.count_platform_admins() > 0` — so
+  `BOOTSTRAP_ADMIN_NAME`) as environment variables and restart the app from
+  cPanel's Python Selector. It's a no-op the instant
+  `db.count_platform_admins() > 0` — so
   it only ever fires once, and it's safe to leave the env vars in place
   afterward (verified directly: calling it twice in a row with the vars
   still set only creates the account the first time). Worth removing
@@ -591,8 +601,9 @@ which the picker deliberately never does — so this is left as-is.
 `_seed_default_plans` inserts `chat_enabled`/`chat_monthly_limit`, but those
 columns are only added by `_migrate_plan_chat_gating`, which ran *after* it.
 Existing deployments survived only because their database predated the
-migration; a fresh Render disk would not have booted. The migrations now run
-before the seed.
+migration; any brand-new database — a fresh install, a wiped
+`storage/ledgerline.db`, a second environment — would not have booted. The
+migrations now run before the seed.
 
 **Not built**: any actual Paystack integration — no checkout flow, no
 webhooks, no subscription lifecycle (trial, renewal, failed payment,
