@@ -1172,8 +1172,35 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message_id: String(message.id) }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      let data = await res.json();
+      if (res.status === 404 && message.body) {
+        const fallback = await fetch('/api/chat', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Summarize the attached email. Explain its priority, what I should do next, and whether it needs a reply. If it needs a reply, draft one.',
+            history: [],
+            docs: [{ name: message.subject || 'Email', text: message.body }],
+          }),
+        });
+        data = await fallback.json();
+        if (fallback.ok) {
+          data = {
+            item: {
+              summary: data.reply,
+              action: 'Review Ada’s notes and decide the next action.',
+              priority: 'normal',
+              category: 'other',
+              issues: [],
+              needs_reply: false,
+              suggested_reply: '',
+            },
+          };
+        } else {
+          data._fallbackStatus = fallback.status;
+        }
+      }
+      if (!data.item) {
         box.innerHTML = `<div class="triage-ada-body"><div class="msg-error">${escapeHtml(data.error || 'Ada could not summarize this email.')}</div><button class="btn" type="button" onclick="summarizeTriage()">Try again</button></div>`;
         return;
       }

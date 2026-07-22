@@ -430,7 +430,7 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
             creds["access_token"],
             "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages",
             {"$top": limit,
-             "$select": "subject,from,receivedDateTime,isRead" + (",body" if include_body else ""),
+             "$select": "subject,from,receivedDateTime,isRead" + (",body,bodyPreview" if include_body else ""),
              "$orderby": "receivedDateTime desc"},
             {"Prefer": 'outlook.body-content-type="text"'} if include_body else None,
         )
@@ -446,7 +446,10 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
             }
             if include_body:
                 body = m.get("body") or {}
-                item["body"] = _plain_body(body.get("content") or "", body.get("contentType") or "")
+                item["body"] = (
+                    _plain_body(body.get("content") or "", body.get("contentType") or "")
+                    or _plain_body(m.get("bodyPreview") or "")
+                )
             out.append(item)
         return out
 
