@@ -1054,9 +1054,8 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             query = parse_qs(urlparse(self.path).query)
             message_id = str(query.get("message_id", [""])[0])
-            try:
-                part = int(query.get("part", ["-1"])[0])
-            except (TypeError, ValueError):
+            part = str(query.get("part", [""])[0])
+            if not message_id or not part or len(message_id) > 1000 or len(part) > 2000:
                 return self._json({"error": "Bad attachment reference."}, 400)
             try:
                 connection, creds = live_mailbox(user["id"], load_env())

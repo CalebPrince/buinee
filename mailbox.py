@@ -413,10 +413,62 @@ def _mime_attachments(msg) -> list[dict]:
 
 
 def get_attachment(connection: dict, creds: dict, message_id: str,
-                   part_index: int) -> dict:
-    """Fetch one attachment from the signed-in user's IMAP inbox on demand."""
-    if connection["provider"] != "imap":
-        raise MailboxError("Attachment downloads are currently available for Webmail / IMAP.")
+                   attachment_id: str) -> dict:
+    """Fetch one attachment using the locator issued by its mail provider."""
+    provider = connection["provider"]
+    if provider == "microsoft":
+        item = _api_get(
+            creds["access_token"],
+            "https://graph.microsoft.com/v1.0/me/messages/"
+            + urllib.parse.quote(message_id, safe="") + "/attachments/"
+            + urllib.parse.quote(attachment_id, safe=""),
+        )
+        try:
+            raw = base64.b64decode(item.get("contentBytes") or "", validate=True)
+        except (ValueError, TypeError) as exc:
+            raise MailboxError("Microsoft returned a damaged attachment.") from exc
+        name = str(item.get("name") or "attachment")
+        media_type = str(item.get("contentType") or "application/octet-stream")
+    elif provider == "google":
+        message = _api_get(
+            creds["access_token"],
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/"
+            + urllib.parse.quote(message_id, safe=""),
+            {"format": "full"},
+        )
+        match = _gmail_attachment_part(message.get("payload") or {}, attachment_id)
+        if not match:
+            raise MailboxError("That attachment is no longer available.")
+        body = match.get("body") or {}
+        provider_id = body.get("attachmentId")
+        item = (_api_get(
+            creds["access_token"],
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/"
+            + urllib.parse.quote(message_id, safe="") + "/attachments/"
+            + urllib.parse.quote(str(provider_id), safe=""),
+        ) if provider_id else body)
+        data = str(item.get("data") or "")
+        try:
+            raw = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
+        except (ValueError, TypeError) as exc:
+            raise MailboxError("Gmail returned a damaged attachment.") from exc
+        name = str(match.get("filename") or "attachment")
+        media_type = str(match.get("mimeType") or "application/octet-stream")
+    else:
+        try:
+            part_index = int(attachment_id)
+        except (TypeError, ValueError):
+            raise MailboxError("That attachment reference is invalid.")
+        return _get_imap_attachment(connection, creds, message_id, part_index)
+    if not raw:
+        raise MailboxError("That attachment is empty.")
+    if len(raw) > MAX_ATTACHMENT_BYTES:
+        raise MailboxError("That attachment is larger than the 10 MB download limit.")
+    return {"name": name, "media_type": media_type, "data": raw}
+
+
+def _get_imap_attachment(connection: dict, creds: dict, message_id: str,
+                         part_index: int) -> dict:
     if not message_id.isdigit() or part_index < 0:
         raise MailboxError("That attachment reference is invalid.")
     conn = _imap_connect(connection["imap_host"], connection["imap_port"],
@@ -471,6 +523,42 @@ def _gmail_part_body(payload: dict) -> str:
     return _plain_body("\n\n".join(html), "text/html")
 
 
+def _gmail_attachments(payload: dict) -> list[dict]:
+    attachments = []
+
+    def visit(part: dict) -> None:
+        body = part.get("body") or {}
+        attachment_id = body.get("attachmentId")
+        filename = str(part.get("filename") or "")
+        locator = str(attachment_id or ("inline:" + str(part.get("partId") or "")))
+        if filename and (attachment_id or body.get("data")):
+            size = int(body.get("size") or 0)
+            attachments.append({
+                "part": locator, "name": filename,
+                "media_type": part.get("mimeType") or "application/octet-stream",
+                "size": size, "downloadable": 0 < size <= MAX_ATTACHMENT_BYTES,
+            })
+        for child in part.get("parts") or []:
+            visit(child)
+
+    visit(payload or {})
+    return attachments
+
+
+def _gmail_attachment_part(payload: dict, locator: str) -> dict | None:
+    body = payload.get("body") or {}
+    filename = str(payload.get("filename") or "")
+    own_locator = str(body.get("attachmentId") or
+                      ("inline:" + str(payload.get("partId") or "")))
+    if filename and own_locator == locator:
+        return payload
+    for child in payload.get("parts") or []:
+        found = _gmail_attachment_part(child, locator)
+        if found:
+            return found
+    return None
+
+
 # ------------------------------------------------------------------- reading
 
 
@@ -487,7 +575,7 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
             creds["access_token"],
             "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages",
             {"$top": limit,
-             "$select": "subject,from,receivedDateTime,isRead" + (",body,bodyPreview" if include_body else ""),
+             "$select": "subject,from,receivedDateTime,isRead,hasAttachments" + (",body,bodyPreview" if include_body else ""),
              "$orderby": "receivedDateTime desc"},
             {"Prefer": 'outlook.body-content-type="text"'} if include_body else None,
         )
@@ -507,6 +595,22 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
                     _plain_body(body.get("content") or "", body.get("contentType") or "")
                     or _plain_body(m.get("bodyPreview") or "")
                 )
+                item["attachments"] = []
+                if m.get("hasAttachments"):
+                    attached = _api_get(
+                        creds["access_token"],
+                        "https://graph.microsoft.com/v1.0/me/messages/"
+                        + urllib.parse.quote(str(m.get("id") or ""), safe="")
+                        + "/attachments",
+                        {"$select": "id,name,contentType,size,isInline"},
+                    )
+                    item["attachments"] = [{
+                        "part": str(file.get("id") or ""),
+                        "name": str(file.get("name") or "attachment"),
+                        "media_type": file.get("contentType") or "application/octet-stream",
+                        "size": int(file.get("size") or 0),
+                        "downloadable": bool(file.get("id")) and 0 < int(file.get("size") or 0) <= MAX_ATTACHMENT_BYTES,
+                    } for file in attached.get("value", []) if not file.get("isInline")]
             out.append(item)
         return out
 
@@ -535,6 +639,7 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
             }
             if include_body:
                 item["body"] = _gmail_part_body(m.get("payload") or {}) or _plain_body(m.get("snippet") or "")
+                item["attachments"] = _gmail_attachments(m.get("payload") or {})
             out.append(item)
         return out
 
