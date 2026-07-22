@@ -460,6 +460,7 @@
           <p>Ask anything about the business — grounded in your real vouchers where it can be, honest about the rest. Attach a document (invoice, letter, contract) for an assessment.</p>
         </div>
       </div>
+      <div class="plan-banner" id="chatUsageBanner" hidden></div>
       <div class="card full chat-card">
         <div class="chat-log" id="chatLog"></div>
         <div class="chat-attach" id="chatAttachChip" hidden></div>
@@ -724,6 +725,7 @@
 
     renderChatLog();
     checkChatAvailable();
+    checkChatUsage();
     renderActivity();
     loadInstructions();
 
@@ -751,6 +753,32 @@
       pill.className = 'pill off';
       pill.innerHTML = '<span class="dot off"></span> Assistant status unknown';
       // Leave chat enabled — the send attempt will surface the real error.
+    }
+  }
+
+  async function checkChatUsage() {
+    const banner = document.getElementById('chatUsageBanner');
+    if (!banner) return;
+    try {
+      const res = await fetch('/api/company/chat-usage', { credentials: 'same-origin' });
+      const gate = await res.json();
+      banner.hidden = false;
+      if (!gate.allowed) {
+        banner.classList.add('at-limit');
+        banner.innerHTML = gate.reason === 'not_included'
+          ? `<span>Chat isn't included in your company's <b>${escapeHtml(gate.plan)}</b> plan. Ask the platform to move your company to a plan that includes it.</span>`
+          : `<span>Your company has used all <b>${gate.limit}</b> Chat messages included in the <b>${escapeHtml(gate.plan)}</b> plan this month. More become available next month.</span>`;
+        document.getElementById('chatInput').disabled = true;
+        document.getElementById('chatInput').placeholder = "Chat isn't available on your current plan.";
+        document.querySelectorAll('.chat-form button').forEach(b => b.disabled = true);
+      } else {
+        banner.classList.remove('at-limit');
+        banner.innerHTML = gate.limit == null
+          ? `<span><b>${escapeHtml(gate.plan)} plan</b> — unlimited Chat messages.</span>`
+          : `<span><b>${escapeHtml(gate.plan)} plan</b> — ${gate.used} of ${gate.limit} Chat messages used this month.</span>`;
+      }
+    } catch {
+      banner.hidden = true;
     }
   }
 
@@ -1124,6 +1152,7 @@
       });
       const data = await res.json();
       chatHistory.push({ role: 'assistant', content: res.ok ? data.reply : (data.error || 'Could not reach the assistant.') });
+      if (res.ok || res.status === 402) checkChatUsage();
     } catch {
       chatHistory.push({ role: 'assistant', content: 'Could not reach the server.' });
     }

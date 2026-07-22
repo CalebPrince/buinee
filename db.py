@@ -185,6 +185,19 @@ def init_db() -> None:
                 created_at  REAL NOT NULL
             );
 
+            -- Chat messages cost real money on the platform owner's own AI
+            -- provider keys (see providers.py / server.py's resolve_provider_
+            -- model) - a company doesn't bring its own key, so usage has to
+            -- tie back to what its plan actually pays for. One row per
+            -- company per calendar month; the month simply not existing yet
+            -- is what "0 used this month" means, no reset job needed.
+            CREATE TABLE IF NOT EXISTS chat_usage (
+                company_id  INTEGER NOT NULL REFERENCES companies(id),
+                year_month  TEXT NOT NULL,
+                count       INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (company_id, year_month)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
@@ -195,6 +208,7 @@ def init_db() -> None:
         _seed_default_plans(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
+        _migrate_plan_chat_gating(conn)
 
 
 def _seed_default_plans(conn: sqlite3.Connection) -> None:
@@ -203,16 +217,34 @@ def _seed_default_plans(conn: sqlite3.Connection) -> None:
     now = time.time()
     # Demo pricing - deliberately placeholder numbers, meant to be edited from
     # the Command Center's Plans page before any real billing happens.
-    for name, price, user_limit, sort_order, is_default in (
-        ("Free", 0, 3, 0, 1),
-        ("Starter", 50, 10, 1, 0),
-        ("Growth", 150, 30, 2, 0),
+    # chat_monthly_limit is NULL for unlimited.
+    for name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit in (
+        ("Free", 0, 3, 0, 1, 0, None),
+        ("Starter", 50, 10, 1, 0, 1, 200),
+        ("Growth", 150, 30, 2, 0, 1, None),
     ):
         conn.execute(
-            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default, created_at)
-               VALUES (?, ?, 'GHS', ?, ?, ?, ?)""",
-            (name, price, user_limit, sort_order, is_default, now),
+            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
+                                   chat_enabled, chat_monthly_limit, created_at)
+               VALUES (?, ?, 'GHS', ?, ?, ?, ?, ?, ?)""",
+            (name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit, now),
         )
+
+
+def _migrate_plan_chat_gating(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(plans)").fetchall()]
+    if "chat_enabled" not in cols:
+        conn.execute("ALTER TABLE plans ADD COLUMN chat_enabled INTEGER NOT NULL DEFAULT 0")
+    if "chat_monthly_limit" not in cols:
+        conn.execute("ALTER TABLE plans ADD COLUMN chat_monthly_limit INTEGER")
+    if "chat_enabled" not in cols:
+        # Backfill only the exact seeded demo plan names from before this
+        # migration existed - anything else (a plan the owner already
+        # renamed or added) is left at the safe default (chat off,
+        # editable from the Command Center) rather than guessed at.
+        conn.execute("UPDATE plans SET chat_enabled = 0 WHERE name = 'Free'")
+        conn.execute("UPDATE plans SET chat_enabled = 1, chat_monthly_limit = 200 WHERE name = 'Starter'")
+        conn.execute("UPDATE plans SET chat_enabled = 1, chat_monthly_limit = NULL WHERE name = 'Growth'")
 
 
 def _migrate_company_plan_id(conn: sqlite3.Connection) -> None:
@@ -424,7 +456,8 @@ def get_default_plan() -> dict:
     return dict(row)
 
 
-def create_plan(name: str, price: float, currency: str, user_limit: int) -> dict:
+def create_plan(name: str, price: float, currency: str, user_limit: int,
+                 chat_enabled: bool = False, chat_monthly_limit: int | None = None) -> dict:
     name = name.strip()
     currency = currency.strip().upper() or "GHS"
     if len(name) < 2:
@@ -433,19 +466,24 @@ def create_plan(name: str, price: float, currency: str, user_limit: int) -> dict
         raise AuthError("A plan needs to allow at least 1 user.")
     if price < 0:
         raise AuthError("Price can't be negative.")
+    if chat_monthly_limit is not None and chat_monthly_limit < 0:
+        raise AuthError("Chat message limit can't be negative.")
     with _cursor() as conn:
         next_sort = conn.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM plans").fetchone()["n"]
         cur = conn.execute(
-            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default, created_at)
-               VALUES (?, ?, ?, ?, ?, 0, ?)""",
-            (name, price, currency, user_limit, next_sort, time.time()),
+            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
+                                   chat_enabled, chat_monthly_limit, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)""",
+            (name, price, currency, user_limit, next_sort,
+             int(bool(chat_enabled)), chat_monthly_limit, time.time()),
         )
         plan_id = cur.lastrowid
     return get_plan(plan_id)
 
 
 def update_plan(plan_id: int, name: str | None = None, price: float | None = None,
-                 currency: str | None = None, user_limit: int | None = None) -> dict:
+                 currency: str | None = None, user_limit: int | None = None,
+                 chat_enabled: bool | None = None, chat_monthly_limit: int | float | None = "unset") -> dict:
     plan = get_plan(plan_id)
     if not plan:
         raise AuthError("No such plan.")
@@ -457,10 +495,21 @@ def update_plan(plan_id: int, name: str | None = None, price: float | None = Non
     new_price = plan["price"] if price is None else price
     new_currency = (currency.strip().upper() if currency and currency.strip() else plan["currency"])
     new_limit = plan["user_limit"] if user_limit is None else user_limit
+    new_chat_enabled = plan["chat_enabled"] if chat_enabled is None else int(bool(chat_enabled))
+    # chat_monthly_limit needs three states (leave alone / set a number /
+    # explicitly clear to unlimited), so "unset" - not None - is the
+    # sentinel for "caller didn't pass this".
+    if chat_monthly_limit == "unset":
+        new_chat_limit = plan["chat_monthly_limit"]
+    else:
+        if chat_monthly_limit is not None and chat_monthly_limit < 0:
+            raise AuthError("Chat message limit can't be negative.")
+        new_chat_limit = chat_monthly_limit
     with _cursor() as conn:
         conn.execute(
-            "UPDATE plans SET name = ?, price = ?, currency = ?, user_limit = ? WHERE id = ?",
-            (new_name, new_price, new_currency, new_limit, plan_id),
+            "UPDATE plans SET name = ?, price = ?, currency = ?, user_limit = ?, "
+            "chat_enabled = ?, chat_monthly_limit = ? WHERE id = ?",
+            (new_name, new_price, new_currency, new_limit, new_chat_enabled, new_chat_limit, plan_id),
         )
     return get_plan(plan_id)
 
@@ -486,6 +535,51 @@ def plan_for_company(company_id: int) -> dict:
 def can_add_user(company_id: int) -> bool:
     plan = plan_for_company(company_id)
     return company_user_count(company_id) < plan["user_limit"]
+
+
+def _current_year_month() -> str:
+    return time.strftime("%Y-%m", time.gmtime())
+
+
+def get_chat_usage(company_id: int, year_month: str | None = None) -> int:
+    year_month = year_month or _current_year_month()
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT count FROM chat_usage WHERE company_id = ? AND year_month = ?",
+            (company_id, year_month),
+        ).fetchone()
+    return row["count"] if row else 0
+
+
+def increment_chat_usage(company_id: int) -> int:
+    """Call once per successful chat reply, never per attempt - a failed or
+    rejected call shouldn't count against what the company is paying for."""
+    year_month = _current_year_month()
+    with _cursor() as conn:
+        conn.execute(
+            "INSERT INTO chat_usage (company_id, year_month, count) VALUES (?, ?, 1) "
+            "ON CONFLICT(company_id, year_month) DO UPDATE SET count = count + 1",
+            (company_id, year_month),
+        )
+        row = conn.execute(
+            "SELECT count FROM chat_usage WHERE company_id = ? AND year_month = ?",
+            (company_id, year_month),
+        ).fetchone()
+    return row["count"]
+
+
+def can_use_chat(company_id: int) -> dict:
+    """Whether this company can send another chat message right now, under
+    its plan's gating - checked before every /api/chat call, alongside
+    whether any AI provider is configured on the server at all."""
+    plan = plan_for_company(company_id)
+    if not plan["chat_enabled"]:
+        return {"allowed": False, "reason": "not_included", "plan": plan["name"]}
+    limit = plan["chat_monthly_limit"]
+    used = get_chat_usage(company_id)
+    if limit is not None and used >= limit:
+        return {"allowed": False, "reason": "quota_exceeded", "used": used, "limit": limit, "plan": plan["name"]}
+    return {"allowed": True, "used": used, "limit": limit, "plan": plan["name"]}
 
 
 def request_to_join(company_id: int, name: str, email: str, password: str, role: str) -> dict:

@@ -246,6 +246,15 @@
                   <input type="text" id="newCurrency" value="GHS" maxlength="6" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
                 </label>
               </div>
+              <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;align-items:end">
+                <label style="display:flex;flex-direction:row;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink-2)">
+                  <input type="checkbox" id="newChatEnabled" style="width:auto">
+                  Chat included
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2)">Chat messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
+                  <input type="number" id="newChatLimit" min="0" placeholder="Unlimited" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
+                </label>
+              </div>
               <button class="btn primary" type="submit" id="createBtn" style="width:auto;padding:9px 18px">Add tier</button>
             </form>
           </div>
@@ -309,6 +318,9 @@
         </div>
         <div class="plan-price"><span class="cur">${escapeHtml(p.currency)}</span>${p.price}<span style="font-size:13px;color:var(--ink-3);font-weight:500"> /mo</span></div>
         <div class="plan-limit">Up to <b>${p.user_limit}</b> user${p.user_limit === 1 ? '' : 's'}</div>
+        <div class="plan-limit">${p.chat_enabled
+            ? `Chat: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
+            : 'Chat: <b>not included</b>'}</div>
         <div class="plan-actions">
           <button class="btn sm" onclick="toggleEdit(${p.id})">Edit</button>
         </div>
@@ -327,6 +339,13 @@
           </div>
           <label>User limit
             <input type="number" id="editLimit-${p.id}" value="${p.user_limit}" min="1">
+          </label>
+          <label style="flex-direction:row;align-items:center;gap:7px">
+            <input type="checkbox" id="editChatEnabled-${p.id}" ${p.chat_enabled ? 'checked' : ''} style="width:auto">
+            Chat included in this plan
+          </label>
+          <label>Chat messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
+            <input type="number" id="editChatLimit-${p.id}" value="${p.chat_monthly_limit == null ? '' : p.chat_monthly_limit}" min="0" placeholder="Unlimited">
           </label>
           <div class="btnrow">
             <button class="btn primary" onclick="saveEdit(${p.id})">Save</button>
@@ -354,6 +373,8 @@
           price: document.getElementById(`editPrice-${id}`).value,
           currency: document.getElementById(`editCurrency-${id}`).value,
           user_limit: document.getElementById(`editLimit-${id}`).value,
+          chat_enabled: document.getElementById(`editChatEnabled-${id}`).checked,
+          chat_monthly_limit: document.getElementById(`editChatLimit-${id}`).value || null,
         }),
       });
       const data = await res.json();
@@ -386,6 +407,8 @@
           price: document.getElementById('newPrice').value,
           currency: document.getElementById('newCurrency').value,
           user_limit: document.getElementById('newLimit').value,
+          chat_enabled: document.getElementById('newChatEnabled').checked,
+          chat_monthly_limit: document.getElementById('newChatLimit').value || null,
         }),
       });
       const data = await res.json();
@@ -396,6 +419,8 @@
       document.getElementById('newPrice').value = '';
       document.getElementById('newLimit').value = '';
       document.getElementById('newCurrency').value = 'GHS';
+      document.getElementById('newChatEnabled').checked = false;
+      document.getElementById('newChatLimit').value = '';
       await loadPlans();
     } catch {
       errBox.textContent = 'Could not reach the server.';

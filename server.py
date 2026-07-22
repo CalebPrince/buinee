@@ -495,6 +495,12 @@ class RouteHandlerMixin:
                 "saved": {"provider": company["model_provider"], "model": company["model_model"] or ""},
             })
 
+        if path == "/api/company/chat-usage":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json(db.can_use_chat(user["company_id"]))
+
         if path == "/api/vouchers":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -863,6 +869,19 @@ class RouteHandlerMixin:
         if not message:
             return self._json({"error": "Say something first."}, 400)
 
+        gate = db.can_use_chat(user["company_id"])
+        if not gate["allowed"]:
+            if gate["reason"] == "not_included":
+                return self._json({
+                    "error": f"Chat isn't included in your company's {gate['plan']} plan.",
+                    "reason": "not_included",
+                }, 402)
+            return self._json({
+                "error": f"Your company has used all {gate['limit']} Chat messages included "
+                         f"in the {gate['plan']} plan this month.",
+                "reason": "quota_exceeded", "used": gate["used"], "limit": gate["limit"],
+            }, 402)
+
         cfg = load_env()
         pub = public_user(user)
         provider, model = resolve_provider_model(cfg, pub["company"])
@@ -908,7 +927,8 @@ class RouteHandlerMixin:
             print(f"  ! chat failure: {exc}")
             return self._json({"error": "Something went wrong on our side."}, 500)
 
-        return self._json({"reply": reply})
+        used = db.increment_chat_usage(user["company_id"])
+        return self._json({"reply": reply, "usage": {"used": used, "limit": gate["limit"]}})
 
     # ------------------------------------------------------- platform admin
 
@@ -980,11 +1000,15 @@ class RouteHandlerMixin:
         except Exception:
             return self._json({"error": "Bad request."}, 400)
         try:
+            raw_limit = req.get("chat_monthly_limit")
+            chat_limit = int(raw_limit) if raw_limit is not None and str(raw_limit).strip() != "" else None
             plan = db.create_plan(
                 str(req.get("name") or ""),
                 float(req.get("price") or 0),
                 str(req.get("currency") or "GHS"),
                 int(req.get("user_limit") or 0),
+                chat_enabled=bool(req.get("chat_enabled")),
+                chat_monthly_limit=chat_limit,
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)
@@ -1003,12 +1027,19 @@ class RouteHandlerMixin:
         except (TypeError, ValueError):
             return self._json({"error": "Bad request."}, 400)
         try:
+            if "chat_monthly_limit" in req:
+                raw_limit = req["chat_monthly_limit"]
+                chat_limit = int(raw_limit) if raw_limit is not None and str(raw_limit).strip() != "" else None
+            else:
+                chat_limit = "unset"
             plan = db.update_plan(
                 plan_id,
                 name=req.get("name"),
                 price=(float(req["price"]) if req.get("price") is not None else None),
                 currency=req.get("currency"),
                 user_limit=(int(req["user_limit"]) if req.get("user_limit") is not None else None),
+                chat_enabled=(bool(req["chat_enabled"]) if "chat_enabled" in req else None),
+                chat_monthly_limit=chat_limit,
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)

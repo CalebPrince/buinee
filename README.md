@@ -471,6 +471,31 @@ cancellation). The tier/limit machinery and the Command Center's ability to
 move a company between tiers are both real and working; what's missing is
 the part where a company would actually pay to get moved there themselves.
 
+**Chat is gated by plan, because it isn't free to run.** Every company's Chat
+conversations run on the platform owner's own AI provider key (see
+[Vouchers](#vouchers)'s "AI provider" section under Instructions) - there's
+no bring-your-own-key option, so usage has to tie back to what a company's
+plan actually pays for, the same reasoning `user_limit` was always built on.
+Two new plan fields:
+
+- **`chat_enabled`** - whether Chat is available at all on this plan. Seeded
+  demo default: off on Free, on for Starter/Growth.
+- **`chat_monthly_limit`** - a message cap per company per calendar month,
+  `NULL` for unlimited. Seeded demo default: 200/mo on Starter, unlimited on
+  Growth.
+
+Usage is a genuine persisted counter (`chat_usage` table, one row per
+company per `YYYY-MM`), not the in-memory per-IP rate limiter the landing
+page's demo agent uses - that one resets on every server restart and isn't
+scoped to a calendar month, neither of which is acceptable for something a
+plan's price is supposed to cover. `db.can_use_chat` is checked before every
+`/api/chat` call; `db.increment_chat_usage` only runs after a reply actually
+succeeds, so a failed provider call never counts against what the company is
+paying for. Both gates fail closed with a `402` and a specific reason
+(`not_included` vs `quota_exceeded`) that the dashboard's Chat page surfaces
+as a banner and a disabled input, not a generic error. Editable per plan
+from `admin-plans.html`, same place `user_limit` already lives.
+
 ---
 
 ## Vouchers
