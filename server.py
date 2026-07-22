@@ -198,6 +198,7 @@ STATIC_PAGES = {
     "/admin-team.html": "admin-team.html",
     "/admin-activity.html": "admin-activity.html",
     "/admin-errors.html": "admin-errors.html",
+    "/admin-reports.html": "admin-reports.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -1101,6 +1102,30 @@ class RouteHandlerMixin:
             except ValueError: limit = 300
             return self._json({"errors": db.list_application_errors(limit,
                 query.get("severity", [""])[0], query.get("query", [""])[0])})
+
+        if path == "/api/admin/reports":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            companies, payments, opportunities = (db.list_companies_with_stats(),
+                                                   db.list_payments(), db.list_crm_opportunities())
+            revenue, forecast, plans, lifecycle = {}, {}, {}, {}
+            for payment in payments:
+                if payment["status"] == "success":
+                    key = payment["currency"]
+                    revenue[key] = revenue.get(key, 0) + payment["amount_subunit"]
+            for opportunity in opportunities:
+                if opportunity["stage"] not in ("lost",):
+                    key = opportunity["currency"]
+                    forecast[key] = forecast.get(key, 0) + round(float(opportunity["value"]) * 100)
+            for company in companies:
+                plans[company["plan"]["name"]] = plans.get(company["plan"]["name"], 0) + 1
+                status = company["crm"]["lifecycle_status"]
+                lifecycle[status] = lifecycle.get(status, 0) + 1
+            return self._json({"companies": len(companies), "members": sum(c["approved_count"] for c in companies),
+                               "revenue": revenue, "forecast": forecast, "plans": plans,
+                               "lifecycle": lifecycle, "payments": payments[:10],
+                               "opportunities": opportunities[:10]})
 
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
