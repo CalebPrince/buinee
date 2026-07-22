@@ -282,6 +282,13 @@ weight in a security-sensitive area of the code.
   below the directory. Contact mutations use the authenticated
   `/api/admin/company/contact/save` and `/api/admin/company/contact/delete`
   routes and are always company-scoped.
+  Lifecycle management is operational rather than a bare dropdown: the CRM
+  stores `lifecycle_changed_at`, resetting it only when the stage actually
+  changes. The Customer accounts page shows a six-stage portfolio board (Lead,
+  Trial, Customer, At risk, Paused, Churned), live counts, click-to-filter, and
+  each account's time in its current stage. Existing CRM rows are backfilled
+  from their last update; accounts without a CRM row use company registration
+  time until their first stage change.
   Expanded, there's also a **Delete company** button (`db.delete_company`,
   `/api/admin/company/delete`) — permanently removes the company and every
   user in it (and their sessions), with a native confirm dialog first.

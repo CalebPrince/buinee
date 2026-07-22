@@ -158,6 +158,7 @@ def init_db() -> None:
                 primary_contact_name TEXT NOT NULL DEFAULT '',
                 primary_contact_email TEXT NOT NULL DEFAULT '',
                 summary              TEXT NOT NULL DEFAULT '',
+                lifecycle_changed_at REAL NOT NULL DEFAULT 0,
                 updated_at           REAL NOT NULL
             );
 
@@ -515,6 +516,9 @@ def _migrate_crm_profile_fields(conn: sqlite3.Connection) -> None:
     for name in ("address", "registration_number", "tax_id"):
         if name not in cols:
             conn.execute(f"ALTER TABLE crm_accounts ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+    if "lifecycle_changed_at" not in cols:
+        conn.execute("ALTER TABLE crm_accounts ADD COLUMN lifecycle_changed_at REAL NOT NULL DEFAULT 0")
+        conn.execute("UPDATE crm_accounts SET lifecycle_changed_at = updated_at WHERE lifecycle_changed_at = 0")
 
 
 # ------------------------------------------------------------------ passwords
@@ -1330,7 +1334,8 @@ def list_companies_with_stats() -> list[dict]:
                       a.address, a.registration_number, a.tax_id,
                       COALESCE(a.lifecycle_status, 'customer') AS lifecycle_status,
                       a.relationship_owner, a.primary_contact_name,
-                      a.primary_contact_email, a.summary, a.updated_at AS crm_updated_at
+                      a.primary_contact_email, a.summary, a.updated_at AS crm_updated_at,
+                      COALESCE(NULLIF(a.lifecycle_changed_at, 0), c.created_at) AS lifecycle_changed_at
                FROM companies c JOIN plans p ON c.plan_id = p.id
                LEFT JOIN crm_accounts a ON a.company_id = c.id
                ORDER BY c.created_at""",
@@ -1379,6 +1384,7 @@ def list_companies_with_stats() -> list[dict]:
                     "primary_contact_email": c["primary_contact_email"] or "",
                     "summary": c["summary"] or "",
                     "updated_at": c["crm_updated_at"],
+                    "lifecycle_changed_at": c["lifecycle_changed_at"],
                 },
                 "plan": {
                     "id": c["plan_id"],
@@ -2039,7 +2045,8 @@ def delete_crm_contact(company_id: int, contact_id: int) -> bool:
 
 
 def update_crm_account(company_id: int, fields: dict) -> dict:
-    if not get_company(company_id):
+    company = get_company(company_id)
+    if not company:
         raise AuthError("No such company.")
     lifecycle = str(fields.get("lifecycle_status") or "customer").strip().lower()
     if lifecycle not in CRM_LIFECYCLE_STATUSES:
@@ -2062,13 +2069,21 @@ def update_crm_account(company_id: int, fields: dict) -> dict:
         raise AuthError("Enter a valid primary contact email.")
     now = time.time()
     with _cursor() as conn:
+        existing = conn.execute(
+            "SELECT lifecycle_status, lifecycle_changed_at FROM crm_accounts WHERE company_id = ?",
+            (company_id,),
+        ).fetchone()
+        lifecycle_changed_at = (
+            (existing["lifecycle_changed_at"] or company["created_at"])
+            if existing and existing["lifecycle_status"] == lifecycle else now
+        )
         conn.execute(
             """INSERT INTO crm_accounts
                    (company_id, legal_name, industry, website, phone, location,
                     address, registration_number, tax_id,
                     lifecycle_status, relationship_owner, primary_contact_name,
-                    primary_contact_email, summary, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    primary_contact_email, summary, lifecycle_changed_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(company_id) DO UPDATE SET
                  legal_name=excluded.legal_name, industry=excluded.industry,
                  website=excluded.website, phone=excluded.phone, location=excluded.location,
@@ -2078,14 +2093,16 @@ def update_crm_account(company_id: int, fields: dict) -> dict:
                  relationship_owner=excluded.relationship_owner,
                  primary_contact_name=excluded.primary_contact_name,
                  primary_contact_email=excluded.primary_contact_email,
-                 summary=excluded.summary, updated_at=excluded.updated_at""",
+                 summary=excluded.summary,
+                 lifecycle_changed_at=excluded.lifecycle_changed_at,
+                 updated_at=excluded.updated_at""",
             (company_id, values["legal_name"], values["industry"], values["website"],
              values["phone"], values["location"], values["address"],
              values["registration_number"], values["tax_id"], lifecycle,
              values["relationship_owner"], values["primary_contact_name"],
-             values["primary_contact_email"], values["summary"], now),
+             values["primary_contact_email"], values["summary"], lifecycle_changed_at, now),
         )
-    values.update({"lifecycle_status": lifecycle, "updated_at": now})
+    values.update({"lifecycle_status": lifecycle, "lifecycle_changed_at": lifecycle_changed_at, "updated_at": now})
     return values
 
 

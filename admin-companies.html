@@ -108,6 +108,15 @@
   .companies-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;
   }
+  .lifecycle-board { display: grid; grid-template-columns: repeat(6, minmax(120px,1fr)); gap: 7px; margin-bottom: 18px; overflow-x: auto; }
+  .lifecycle-stage { min-width: 120px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); text-align: left; }
+  .lifecycle-stage:hover, .lifecycle-stage.on { border-color: var(--violet); }
+  .lifecycle-stage.on { background: var(--violet-soft); }
+  .lifecycle-stage b, .lifecycle-stage span { display: block; }
+  .lifecycle-stage b { font: 700 19px var(--mono); }
+  .lifecycle-stage span { color: var(--ink-3); font-size: 10.5px; }
+  .lifecycle-all { display: flex; justify-content: flex-end; margin: -8px 0 10px; }
+  .stage-age { margin-top: 3px; color: var(--ink-4); font-size: 10px; }
   .company-card {
     border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer;
   }
@@ -267,6 +276,9 @@
             <p>Open a company to manage its customer profile, primary contact, relationship owner, plan, team, and access requests in one place.</p>
           </div>
 
+          <div class="lifecycle-board" id="lifecycleBoard" aria-label="Customer lifecycle stages"></div>
+          <div class="lifecycle-all"><button class="btn sm" id="showAllLifecycle" type="button" onclick="setLifecycleFilter('all')">Show all accounts</button></div>
+
           <div class="panel">
             <div id="companyCards" class="companies-grid"></div>
           </div>
@@ -332,12 +344,13 @@
     }
 
     renderCompanies(overview.companies);
+    renderLifecycleBoard();
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
   }
 
-  let lastCompanies = [];
+  let lastCompanies = [], lifecycleFilter = 'all';
 
   // A solo workspace is permanently "1/1 users". Flag either somebody
   // waiting to join or an Individual workspace that already has extra
@@ -354,15 +367,16 @@
     return `(${approved}${waiting}) <span class="no-super">— move to a Team tier</span>`;
   }
 
-  function renderCompanies(companies) {
-    lastCompanies = companies;
+  function renderCompanies(companies, updateSource = true) {
+    if (updateSource) lastCompanies = companies;
     const box = document.getElementById('companyCards');
-    if (!companies.length) {
-      box.innerHTML = '<div class="empty-mini">No companies registered yet.</div>';
+    const visible = lifecycleFilter === 'all' ? companies : companies.filter(c => c.crm.lifecycle_status === lifecycleFilter);
+    if (!visible.length) {
+      box.innerHTML = `<div class="empty-mini">${companies.length ? `No accounts are currently in ${CRM_STATUS_LABELS[lifecycleFilter] || 'this stage'}.` : 'No companies registered yet.'}</div>`;
       return;
     }
     // Newest first.
-    box.innerHTML = companies.slice().reverse().map(c => `
+    box.innerHTML = visible.slice().reverse().map(c => `
       <div class="company-card" id="card-${c.id}" tabindex="0" role="button" aria-expanded="false"
            onclick="toggleCard(${c.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCard(${c.id});}">
         <div class="card-summary">
@@ -374,6 +388,7 @@
               : '<span class="no-super">no Supervisor yet</span>'}</span>
             <span class="meta">Plan: <b>${escapeHtml(c.plan.name)}</b> ${planSummary(c)}</span>
             <span class="crm-status ${escapeHtml(c.crm.lifecycle_status)}">${escapeHtml(CRM_STATUS_LABELS[c.crm.lifecycle_status] || c.crm.lifecycle_status)}</span>
+            <span class="stage-age">${escapeHtml(lifecycleAge(c.crm.lifecycle_changed_at))}</span>
           </div>
           <div class="counts">
             <span class="count-badge" title="Approved employees">${c.approved_count}</span>
@@ -411,6 +426,26 @@
     lead: 'Lead', trial: 'Trial', customer: 'Customer', at_risk: 'At risk',
     paused: 'Paused', churned: 'Churned',
   };
+
+  function lifecycleAge(epoch) {
+    const days = Math.max(0, Math.floor((Date.now() / 1000 - Number(epoch || 0)) / 86400));
+    if (!epoch) return 'Stage date unavailable';
+    if (days === 0) return 'Entered this stage today';
+    return `${days} ${days === 1 ? 'day' : 'days'} in this stage`;
+  }
+
+  function renderLifecycleBoard() {
+    const counts = Object.fromEntries(Object.keys(CRM_STATUS_LABELS).map(key => [key, 0]));
+    lastCompanies.forEach(company => { counts[company.crm.lifecycle_status] = (counts[company.crm.lifecycle_status] || 0) + 1; });
+    document.getElementById('lifecycleBoard').innerHTML = Object.entries(CRM_STATUS_LABELS).map(([key, label]) => `<button class="lifecycle-stage${lifecycleFilter === key ? ' on' : ''}" type="button" onclick="setLifecycleFilter('${key}')"><b>${counts[key] || 0}</b><span>${label}</span></button>`).join('');
+    document.getElementById('showAllLifecycle').classList.toggle('primary', lifecycleFilter === 'all');
+  }
+
+  function setLifecycleFilter(stage) {
+    lifecycleFilter = Object.prototype.hasOwnProperty.call(CRM_STATUS_LABELS, stage) ? stage : 'all';
+    renderLifecycleBoard();
+    renderCompanies(lastCompanies, false);
+  }
 
   function renderCrmProfile(c) {
     const a = c.crm || {};
@@ -452,6 +487,12 @@
       const status = document.querySelector(`#card-${id} .crm-status`);
       status.className = `crm-status ${data.account.lifecycle_status}`;
       status.textContent = CRM_STATUS_LABELS[data.account.lifecycle_status] || data.account.lifecycle_status;
+      const age = document.querySelector(`#card-${id} .stage-age`);
+      if (age) age.textContent = lifecycleAge(data.account.lifecycle_changed_at);
+      renderLifecycleBoard();
+      if (lifecycleFilter !== 'all' && lifecycleFilter !== data.account.lifecycle_status) {
+        renderCompanies(lastCompanies, false);
+      }
       saved.textContent = 'Profile saved';
     } catch { error.textContent = 'Could not reach the server.'; }
     finally { button.disabled = false; button.textContent = 'Save profile'; }
