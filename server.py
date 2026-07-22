@@ -1032,6 +1032,8 @@ class RouteHandlerMixin:
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
             "/api/admin/company/interaction/save": self._handle_admin_save_crm_interaction,
             "/api/admin/company/interaction/delete": self._handle_admin_delete_crm_interaction,
+            "/api/admin/company/task/save": self._handle_admin_save_crm_task,
+            "/api/admin/company/task/delete": self._handle_admin_delete_crm_task,
             "/api/admin/opportunity/save": self._handle_admin_save_opportunity,
             "/api/admin/opportunity/delete": self._handle_admin_delete_opportunity,
             "/api/admin/plans/create": self._handle_admin_create_plan,
@@ -1869,6 +1871,31 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad interaction."}, 400)
         if not db.delete_crm_interaction(company_id, interaction_id):
             return self._json({"error": "Interaction not found."}, 404)
+        return self._json({"ok": True})
+
+    def _handle_admin_save_crm_task(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=8000)
+            task = db.save_crm_task(int(req.get("company_id")), req, admin["name"])
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad follow-up task."}, 400)
+        return self._json({"ok": True, "task": task})
+
+    def _handle_admin_delete_crm_task(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            company_id = int(req.get("company_id"))
+            task_id = int(req.get("task_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad follow-up task."}, 400)
+        if not db.delete_crm_task(company_id, task_id):
+            return self._json({"error": "Follow-up task not found."}, 404)
         return self._json({"ok": True})
 
     def _handle_admin_save_opportunity(self):

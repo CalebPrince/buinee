@@ -204,6 +204,21 @@ def init_db() -> None:
                 updated_at    REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS crm_tasks (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id    INTEGER NOT NULL REFERENCES companies(id),
+                title         TEXT NOT NULL,
+                details       TEXT NOT NULL DEFAULT '',
+                owner         TEXT NOT NULL DEFAULT '',
+                due_date      TEXT NOT NULL DEFAULT '',
+                priority      TEXT NOT NULL DEFAULT 'normal',
+                status        TEXT NOT NULL DEFAULT 'open',
+                completed_at  REAL,
+                created_by    TEXT NOT NULL DEFAULT '',
+                created_at    REAL NOT NULL,
+                updated_at    REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -419,6 +434,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_crm_contacts_company ON crm_contacts(company_id, is_primary, name);
             CREATE INDEX IF NOT EXISTS idx_crm_opportunities_stage ON crm_opportunities(stage, expected_close_date);
             CREATE INDEX IF NOT EXISTS idx_crm_interactions_company ON crm_interactions(company_id, occurred_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_crm_tasks_company ON crm_tasks(company_id, status, due_date);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1344,6 +1360,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM crm_tasks WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_interactions WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_opportunities WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_contacts WHERE company_id = ?", (company_id,))
@@ -1402,6 +1419,13 @@ def list_companies_with_stats() -> list[dict]:
                    ORDER BY i.occurred_at DESC, i.id DESC LIMIT 50""",
                 (c["id"],),
             ).fetchall()
+            tasks = conn.execute(
+                """SELECT * FROM crm_tasks WHERE company_id = ?
+                   ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END,
+                            CASE WHEN due_date = '' THEN 1 ELSE 0 END,
+                            due_date, id DESC LIMIT 100""",
+                (c["id"],),
+            ).fetchall()
             supervisor = next((u for u in team if u["role"] == "finance_supervisor"), None)
             out.append({
                 "id": c["id"],
@@ -1414,6 +1438,7 @@ def list_companies_with_stats() -> list[dict]:
                 "pending": [dict(u) for u in pending],
                 "contacts": [dict(contact) for contact in contacts],
                 "interactions": [dict(interaction) for interaction in interactions],
+                "tasks": [dict(task) for task in tasks],
                 "crm": {
                     "legal_name": c["legal_name"] or "",
                     "industry": c["industry"] or "",
@@ -2164,6 +2189,74 @@ def delete_crm_interaction(company_id: int, interaction_id: int) -> bool:
         cur = conn.execute(
             "DELETE FROM crm_interactions WHERE id = ? AND company_id = ?",
             (interaction_id, company_id),
+        )
+    return bool(cur.rowcount)
+
+
+CRM_TASK_PRIORITIES = {"low", "normal", "high", "urgent"}
+CRM_TASK_STATUSES = {"open", "completed"}
+
+
+def save_crm_task(company_id: int, fields: dict, admin_name: str) -> dict:
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    try:
+        task_id = int(fields.get("task_id") or 0)
+    except (TypeError, ValueError):
+        raise AuthError("Bad follow-up task.")
+    title = str(fields.get("title") or "").strip()[:180]
+    details = str(fields.get("details") or "").strip()[:4000]
+    owner = str(fields.get("owner") or "").strip()[:120]
+    due_date = str(fields.get("due_date") or "").strip()[:10]
+    priority = str(fields.get("priority") or "normal").strip().lower()
+    status = str(fields.get("status") or "open").strip().lower()
+    if not title:
+        raise AuthError("Task title is required.")
+    if due_date:
+        try:
+            time.strptime(due_date, "%Y-%m-%d")
+        except ValueError:
+            raise AuthError("Choose a valid due date.")
+    if priority not in CRM_TASK_PRIORITIES or status not in CRM_TASK_STATUSES:
+        raise AuthError("Choose a valid priority and status.")
+    now = time.time()
+    with _cursor() as conn:
+        if task_id:
+            existing = conn.execute(
+                "SELECT status, completed_at FROM crm_tasks WHERE id=? AND company_id=?",
+                (task_id, company_id),
+            ).fetchone()
+            if not existing:
+                raise AuthError("Follow-up task not found.")
+            completed_at = now if status == "completed" and existing["status"] != "completed" else existing["completed_at"]
+            if status == "open":
+                completed_at = None
+            conn.execute(
+                """UPDATE crm_tasks SET title=?, details=?, owner=?, due_date=?,
+                     priority=?, status=?, completed_at=?, updated_at=?
+                   WHERE id=? AND company_id=?""",
+                (title, details, owner, due_date, priority, status, completed_at,
+                 now, task_id, company_id),
+            )
+        else:
+            completed_at = now if status == "completed" else None
+            cur = conn.execute(
+                """INSERT INTO crm_tasks
+                     (company_id, title, details, owner, due_date, priority,
+                      status, completed_at, created_by, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (company_id, title, details, owner, due_date, priority, status,
+                 completed_at, str(admin_name or "Command Center")[:120], now, now),
+            )
+            task_id = cur.lastrowid
+        row = conn.execute("SELECT * FROM crm_tasks WHERE id = ?", (task_id,)).fetchone()
+    return dict(row)
+
+
+def delete_crm_task(company_id: int, task_id: int) -> bool:
+    with _cursor() as conn:
+        cur = conn.execute(
+            "DELETE FROM crm_tasks WHERE id=? AND company_id=?", (task_id, company_id)
         )
     return bool(cur.rowcount)
 

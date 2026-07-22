@@ -292,6 +292,13 @@ weight in a security-sensitive area of the code.
   company-scoped `/api/admin/company/interaction/save` and
   `/api/admin/company/interaction/delete` routes. This is manual CRM history,
   not an automatic mailbox sync.
+  A follow-up queue backed by `crm_tasks` sits beside that history. Tasks have
+  a free-text owner (with suggestions from the account owner and approved
+  team), due date, Low/Normal/High/Urgent priority, details, and Open/Completed
+  status. Overdue, due-today, upcoming, and completed work have distinct due
+  rails; admins can complete, reopen, edit, or remove tasks in place. All task
+  writes are authenticated and company-scoped through
+  `/api/admin/company/task/save` and `/api/admin/company/task/delete`.
   Lifecycle management is operational rather than a bare dropdown: the CRM
   stores `lifecycle_changed_at`, resetting it only when the stage actually
   changes. The Customer accounts page shows a six-stage portfolio board (Lead,

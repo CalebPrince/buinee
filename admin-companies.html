@@ -227,6 +227,19 @@
   .crm-event-body { color: var(--ink-2); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
   .crm-event-actions { display: flex; flex: none; gap: 5px; }
   .crm-history-form { margin-top: 13px; padding: 13px; border: 1px dashed var(--line-strong); border-radius: 9px; background: var(--surface-2); }
+  .crm-tasks { margin-bottom: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+  .crm-task-list { display: grid; gap: 8px; }
+  .crm-task { display: grid; grid-template-columns: 5px minmax(0,1fr) auto; gap: 11px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); }
+  .crm-task-rail { align-self: stretch; min-height: 42px; border-radius: 5px; background: var(--violet); }
+  .crm-task.overdue .crm-task-rail { background: var(--bad); }
+  .crm-task.today .crm-task-rail, .crm-task.urgent .crm-task-rail { background: var(--warn); }
+  .crm-task.completed { opacity: .62; }
+  .crm-task.completed .crm-task-rail { background: var(--teal); }
+  .crm-task-title { font-size: 12.5px; font-weight: 750; overflow-wrap: anywhere; }
+  .crm-task.completed .crm-task-title { text-decoration: line-through; }
+  .crm-task-meta { margin-top: 3px; color: var(--ink-3); font: 10.5px/1.45 var(--mono); }
+  .crm-task-details { margin-top: 5px; color: var(--ink-2); font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .crm-task-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
 
@@ -237,6 +250,8 @@
     .sidebar-brand .name, .sidebar-tag, .sidebar-link .label { display: none; }
     .sidebar-link { justify-content: center; padding: 10px; }
     .detail-grid, .crm-fields { grid-template-columns: 1fr; gap: 14px; }
+    .crm-task { grid-template-columns: 5px minmax(0,1fr); }
+    .crm-task-actions { grid-column: 2; justify-content: flex-start; }
   }
 </style>
 
@@ -422,6 +437,7 @@
           ${renderCrmProfile(c)}
           ${renderCrmContacts(c)}
           ${renderCrmHistory(c)}
+          ${renderCrmTasks(c)}
           ${renderTeamAndPending(c)}
           <div class="plan-change" onclick="event.stopPropagation()">
             <label for="planSelect-${c.id}">Change plan</label>
@@ -725,6 +741,75 @@
       rerenderExpandedCompany(companyId);
     } catch (error) { alert(error.message || 'Could not reach the server.'); }
   }
+
+  const TASK_PRIORITY_LABELS = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
+
+  function taskDueState(task) {
+    if (task.status === 'completed' || !task.due_date) return task.status === 'completed' ? 'completed' : '';
+    const today = new Date();
+    const key = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    if (task.due_date < key) return 'overdue';
+    if (task.due_date === key) return 'today';
+    return task.priority === 'urgent' ? 'urgent' : '';
+  }
+
+  function sortCrmTasks(tasks) {
+    return tasks.sort((a,b) => (a.status === 'completed') - (b.status === 'completed') || (!a.due_date) - (!b.due_date) || (a.due_date || '').localeCompare(b.due_date || '') || b.id - a.id);
+  }
+
+  function renderCrmTasks(c) {
+    const tasks = sortCrmTasks([...(c.tasks || [])]);
+    const openCount = tasks.filter(task => task.status === 'open').length;
+    const list = tasks.length ? `<div class="crm-task-list">${tasks.map(task => {
+      const dueState = taskDueState(task);
+      const dueText = task.due_date ? `${dueState === 'overdue' ? 'Overdue · ' : dueState === 'today' ? 'Due today · ' : 'Due · '}${task.due_date}` : 'No due date';
+      return `<article class="crm-task ${dueState}"><span class="crm-task-rail"></span><div><div class="crm-task-title">${escapeHtml(task.title)}</div><div class="crm-task-meta">${escapeHtml(TASK_PRIORITY_LABELS[task.priority] || task.priority)} · ${escapeHtml(dueText)}${task.owner ? ` · Owner: ${escapeHtml(task.owner)}` : ' · Unassigned'}</div>${task.details ? `<div class="crm-task-details">${escapeHtml(task.details)}</div>` : ''}</div><div class="crm-task-actions"><button class="btn sm" type="button" onclick="toggleCrmTask(${c.id},${task.id})">${task.status === 'completed' ? 'Reopen' : 'Complete'}</button><button class="btn sm" type="button" onclick="editCrmTask(${c.id},${task.id})">Edit</button><button class="btn sm" type="button" onclick="deleteCrmTask(${c.id},${task.id})">Remove</button></div></article>`;
+    }).join('')}</div>` : '<div class="empty-mini">No follow-ups yet. Add the next action so this account does not go quiet.</div>';
+    const suggestions = [...new Set([c.crm && c.crm.relationship_owner, ...(c.team || []).map(user => user.name)].filter(Boolean))];
+    return `<section class="crm-tasks" onclick="event.stopPropagation()"><div class="crm-history-head"><div><h4>Follow-ups (${openCount} open)</h4><p>Owners, priorities, and due dates for the next account actions</p></div><button class="btn sm" type="button" onclick="openCrmTaskForm(${c.id})">+ Add follow-up</button></div>${list}
+      <form class="crm-history-form" id="crmTaskForm-${c.id}" hidden onsubmit="return saveCrmTask(event,${c.id})"><input type="hidden" id="crmTaskId-${c.id}"><div class="crm-fields">
+        <label class="wide">Task<input id="crmTaskTitle-${c.id}" maxlength="180" required placeholder="e.g. Confirm renewal decision"></label>
+        <label>Owner<input id="crmTaskOwner-${c.id}" maxlength="120" list="crmTaskOwners-${c.id}" placeholder="Assign someone"><datalist id="crmTaskOwners-${c.id}">${suggestions.map(name => `<option value="${escapeAttr(name)}">`).join('')}</datalist></label>
+        <label>Due date<input id="crmTaskDue-${c.id}" type="date"></label>
+        <label>Priority<select id="crmTaskPriority-${c.id}">${Object.entries(TASK_PRIORITY_LABELS).map(([value,label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
+        <label class="wide">Details<textarea id="crmTaskDetails-${c.id}" maxlength="4000" placeholder="Context, expected outcome, or hand-off notes…"></textarea></label>
+      </div><div class="crm-actions"><button class="btn sm" type="submit">Save follow-up</button><button class="btn sm" type="button" onclick="closeCrmTaskForm(${c.id})">Cancel</button><span class="msg error" id="crmTaskError-${c.id}"></span></div></form></section>`;
+  }
+
+  function openCrmTaskForm(companyId, task = null) {
+    document.getElementById(`crmTaskForm-${companyId}`).hidden = false;
+    document.getElementById(`crmTaskId-${companyId}`).value = task ? task.id : '';
+    document.getElementById(`crmTaskTitle-${companyId}`).value = task ? task.title : '';
+    document.getElementById(`crmTaskOwner-${companyId}`).value = task ? task.owner : '';
+    document.getElementById(`crmTaskDue-${companyId}`).value = task ? task.due_date : '';
+    document.getElementById(`crmTaskPriority-${companyId}`).value = task ? task.priority : 'normal';
+    document.getElementById(`crmTaskDetails-${companyId}`).value = task ? task.details : '';
+    document.getElementById(`crmTaskError-${companyId}`).textContent = '';
+    document.getElementById(`crmTaskTitle-${companyId}`).focus();
+  }
+  function closeCrmTaskForm(companyId) { document.getElementById(`crmTaskForm-${companyId}`).hidden = true; }
+  function editCrmTask(companyId, taskId) { const company=lastCompanies.find(c=>c.id===companyId); const task=company&&(company.tasks||[]).find(t=>t.id===taskId); if(task) openCrmTaskForm(companyId,task); }
+
+  async function sendCrmTask(companyId, task, button = null) {
+    if (button) button.disabled = true;
+    const res = await fetch('/api/admin/company/task/save', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...task, company_id:companyId}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save follow-up.');
+    const company=lastCompanies.find(c=>c.id===companyId); const index=(company.tasks||[]).findIndex(t=>t.id===data.task.id);
+    if(index>=0) company.tasks[index]=data.task; else company.tasks.push(data.task);
+    rerenderExpandedCompany(companyId);
+  }
+
+  async function saveCrmTask(ev, companyId) {
+    ev.preventDefault(); const button=ev.submitter; button.textContent='Saving…';
+    const existingId=document.getElementById(`crmTaskId-${companyId}`).value;
+    const existing=(lastCompanies.find(c=>c.id===companyId).tasks||[]).find(t=>String(t.id)===existingId);
+    const task={task_id:existingId||null,title:document.getElementById(`crmTaskTitle-${companyId}`).value,owner:document.getElementById(`crmTaskOwner-${companyId}`).value,due_date:document.getElementById(`crmTaskDue-${companyId}`).value,priority:document.getElementById(`crmTaskPriority-${companyId}`).value,details:document.getElementById(`crmTaskDetails-${companyId}`).value,status:existing ? existing.status : 'open'};
+    try { await sendCrmTask(companyId,task,button); } catch(error) { document.getElementById(`crmTaskError-${companyId}`).textContent=error.message||'Could not reach the server.'; button.disabled=false; button.textContent='Save follow-up'; } return false;
+  }
+
+  async function toggleCrmTask(companyId, taskId) { const company=lastCompanies.find(c=>c.id===companyId); const task=(company.tasks||[]).find(t=>t.id===taskId); if(!task)return; try{await sendCrmTask(companyId,{...task,task_id:task.id,status:task.status==='completed'?'open':'completed'});}catch(error){alert(error.message||'Could not reach the server.');} }
+  async function deleteCrmTask(companyId, taskId) { if(!confirm('Remove this follow-up task? This cannot be undone.'))return; try{const res=await fetch('/api/admin/company/task/delete',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({company_id:companyId,task_id:taskId})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Could not remove follow-up.');const company=lastCompanies.find(c=>c.id===companyId);company.tasks=(company.tasks||[]).filter(t=>t.id!==taskId);rerenderExpandedCompany(companyId);}catch(error){alert(error.message||'Could not reach the server.');} }
 
   function toggleCard(id) {
     const card = document.getElementById(`card-${id}`);
