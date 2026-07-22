@@ -1321,6 +1321,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   let followUpTasks = [], followUpsLoaded = false;
   let teamChatRecipient = null, teamChatCompanyName = '';
   let onboardingSteps = [], onboardingIndex = 0;
+  let mailboxPreviewIds = null;
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
@@ -1331,7 +1332,9 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === view));
     document.getElementById('crumbView').textContent = CRUMB_NAMES[view] || 'Overview';
     if (view === 'teamchat' && teamChatAvailable) markTeamMessagesSeen();
-    if (view === 'triage' && !triageMessages.length) loadTriage();
+    if (view === 'triage' && (!triageMessages.length || notificationCounts.new_mail)) {
+      loadTriage(!!notificationCounts.new_mail);
+    }
     if (view === 'followups') loadFollowUps();
     if (syncUrl) {
       const url = new URL(location.href);
@@ -1615,6 +1618,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (n.awaiting_approval) items.push({ count: n.awaiting_approval, title: 'Vouchers waiting', copy: 'Review submissions awaiting your decision', view: 'vouchers' });
     if (n.rejected_vouchers) items.push({ count: n.rejected_vouchers, title: 'Returned vouchers', copy: 'Correct vouchers sent back to you', view: 'fix' });
     if (n.unread_email) items.push({ count: n.unread_email, title: 'Unread inbox messages', copy: 'Open your mailbox triage queue', view: 'triage' });
+    if (n.new_mail) items.push({ count: n.new_mail, title: 'New mailbox messages', copy: 'New mail arrived since your last inbox review', view: 'triage' });
     if (n.team_messages && teamChatAvailable) items.push({ count: n.team_messages, title: 'New team messages', copy: 'Read messages sent since your last visit', view: 'teamchat' });
     if (n.follow_up_attention) items.push({ count: n.follow_up_attention, title: 'Follow-ups need action', copy: `${n.follow_up_overdue || 0} overdue · ${n.follow_up_due_today || 0} due today · ${n.follow_up_new || 0} new`, view: 'followups' });
     const box = document.getElementById('attentionCenter');
@@ -2035,11 +2039,11 @@ Do not promise a payment date unless it has already been approved."></textarea>
     return (named ? named[1] : raw) || 'Unknown sender';
   }
 
-  async function loadMailboxPreview() {
+  async function loadMailboxPreview(silent = false) {
     const card = document.getElementById('mailPreviewCard');
     if (!card) return;
     const body = card.querySelector('.card-b');
-    body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Checking your inbox…</h4><p>Reading the latest message headers.</p></div>`;
+    if (!silent) body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Checking your inbox…</h4><p>Reading the latest message headers.</p></div>`;
     try {
       const res = await fetch('/api/mailbox/messages', { credentials: 'same-origin' });
       const data = await res.json();
@@ -2048,6 +2052,12 @@ Do not promise a payment date unless it has already been approved."></textarea>
         return;
       }
       const messages = Array.isArray(data.messages) ? data.messages : [];
+      const currentIds = new Set(messages.map(message => String(message.id || '')).filter(Boolean));
+      if (mailboxPreviewIds) {
+        const newlyArrived = [...currentIds].filter(id => !mailboxPreviewIds.has(id)).length;
+        if (newlyArrived) notificationCounts.new_mail = Number(notificationCounts.new_mail || 0) + newlyArrived;
+      }
+      mailboxPreviewIds = currentIds;
       if (!messages.length) {
         notificationCounts.unread_email = 0;
         renderAttentionCenter();
@@ -2077,6 +2087,10 @@ Do not promise a payment date unless it has already been approved."></textarea>
     }
   }
 
+  setInterval(() => {
+    if (!document.hidden) loadMailboxPreview(true);
+  }, 60000);
+
   async function loadTriage(force = false) {
     const list = document.getElementById('triageList');
     if (!list) return;
@@ -2094,6 +2108,11 @@ Do not promise a payment date unless it has already been approved."></textarea>
       }
       triageMessages = Array.isArray(data.messages) ? data.messages : [];
       selectedTriageId = triageMessages.some(m => m.id === selectedTriageId) ? selectedTriageId : null;
+      notificationCounts.new_mail = 0;
+      renderAttentionCenter();
+      fetch('/api/mailbox/notifications/seen', {
+        method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'
+      }).catch(() => {});
       renderTriage();
     } catch {
       list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Couldn’t reach your inbox</h4><p>Check the mailbox connection and try again.</p></div>`;

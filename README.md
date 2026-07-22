@@ -427,8 +427,12 @@ switched client-side with no page reload:
   moves, sends, deletes, or marks mail as read. Recipe definitions live in
   `AUTOMATION_RECIPES`, while `recipe_key` is open-ended in SQLite, so adding
   another recipe does not require redesigning the persistence or API.
-  `automation_runner.py` executes due recipes and is intended for a cPanel
-  Cron Job every five minutes using the application's virtualenv Python, for
+  `automation_runner.py` checks connected inboxes for new-message notifications
+  and executes due recipes. It is intended for a cPanel Cron Job every five
+  minutes using the application's virtualenv Python. Mailbox polling stores
+  message IDs and header metadata only—never bodies, attachments, or credentials.
+  The first poll establishes a baseline, so connecting an existing inbox does
+  not create alerts for old mail. For
   example: `/path/to/virtualenv/bin/python /path/to/app/automation_runner.py`.
   The page also offers Run now for testing. Auto-file and weekly-send remain
   visibly unavailable because they would change external state.

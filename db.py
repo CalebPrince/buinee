@@ -516,6 +516,7 @@ def init_db() -> None:
         _migrate_plan_chat_gating(conn)
         _migrate_plan_audience(conn)
         _migrate_multiple_mailboxes(conn)
+        _migrate_mailbox_polling(conn)
         _seed_default_plans(conn)
         _seed_individual_plans(conn)
         _migrate_plan_mailbox_limits(conn)
@@ -631,6 +632,34 @@ def _migrate_multiple_mailboxes(conn: sqlite3.Connection) -> None:
         SELECT user_id,company_id,provider,account_email,account_name,imap_host,imap_port,credentials_enc,scopes,connected_at
         FROM mailbox_connections_single""")
     conn.execute("DROP TABLE mailbox_connections_single")
+
+
+def _migrate_mailbox_polling(conn: sqlite3.Connection) -> None:
+    # Created only after the legacy single-mailbox table has been upgraded,
+    # so these foreign keys always target mailbox_connections.id.
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS mailbox_poll_state (
+            connection_id INTEGER PRIMARY KEY REFERENCES mailbox_connections(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            known_ids_json TEXT NOT NULL DEFAULT '[]',
+            last_polled_at REAL NOT NULL DEFAULT 0,
+            last_error TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS mailbox_arrivals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            connection_id INTEGER NOT NULL REFERENCES mailbox_connections(id) ON DELETE CASCADE,
+            message_key TEXT NOT NULL,
+            sender TEXT NOT NULL DEFAULT '',
+            subject TEXT NOT NULL DEFAULT '',
+            received TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            seen_at REAL,
+            UNIQUE(connection_id, message_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_mailbox_arrivals_user
+            ON mailbox_arrivals(user_id, seen_at, created_at);
+    """)
 
 
 def _migrate_company_plan_id(conn: sqlite3.Connection) -> None:
@@ -1015,6 +1044,79 @@ def list_mailbox_connections(user_id: int) -> list[dict]:
     with _cursor() as conn:
         rows = conn.execute("SELECT * FROM mailbox_connections WHERE user_id=? ORDER BY connected_at", (user_id,)).fetchall()
     return [dict(row) for row in rows]
+
+
+def list_all_mailbox_connections() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT m.* FROM mailbox_connections m JOIN users u ON u.id=m.user_id
+               WHERE u.status='approved' ORDER BY m.user_id, m.id"""
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def record_mailbox_poll(connection: dict, messages: list[dict]) -> int:
+    """Remember header-only arrival metadata; the first poll is a baseline."""
+    now = time.time()
+    current_ids = [str(message.get("id") or "") for message in messages if message.get("id")]
+    with _cursor() as conn:
+        state = conn.execute(
+            "SELECT known_ids_json FROM mailbox_poll_state WHERE connection_id=?",
+            (connection["id"],),
+        ).fetchone()
+        known = set(json.loads(state["known_ids_json"]) if state else [])
+        added = 0
+        if state:
+            for message in messages:
+                message_key = str(message.get("id") or "")
+                if not message_key or message_key in known:
+                    continue
+                cur = conn.execute(
+                    """INSERT OR IGNORE INTO mailbox_arrivals
+                       (user_id,connection_id,message_key,sender,subject,received,created_at)
+                       VALUES(?,?,?,?,?,?,?)""",
+                    (connection["user_id"], connection["id"], message_key,
+                     str(message.get("from") or "")[:300],
+                     str(message.get("subject") or "")[:500],
+                     str(message.get("received") or "")[:100], now),
+                )
+                added += cur.rowcount
+        remembered = list(dict.fromkeys(current_ids + list(known)))[:200]
+        conn.execute(
+            """INSERT INTO mailbox_poll_state
+               (connection_id,user_id,known_ids_json,last_polled_at,last_error)
+               VALUES(?,?,?,?, '') ON CONFLICT(connection_id) DO UPDATE SET
+               known_ids_json=excluded.known_ids_json,last_polled_at=excluded.last_polled_at,
+               last_error=''""",
+            (connection["id"], connection["user_id"], json.dumps(remembered), now),
+        )
+    return added
+
+
+def record_mailbox_poll_error(connection_id: int, user_id: int, message: str) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE mailbox_poll_state SET last_polled_at=?,last_error=?
+               WHERE connection_id=? AND user_id=?""",
+            (time.time(), message[:500], connection_id, user_id),
+        )
+
+
+def unread_mailbox_arrivals(user_id: int) -> int:
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM mailbox_arrivals WHERE user_id=? AND seen_at IS NULL",
+            (user_id,),
+        ).fetchone()
+    return row["n"]
+
+
+def mark_mailbox_arrivals_seen(user_id: int) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE mailbox_arrivals SET seen_at=? WHERE user_id=? AND seen_at IS NULL",
+            (time.time(), user_id),
+        )
 
 
 def get_mailbox_connection(user_id: int, connection_id: int | None = None) -> dict | None:
@@ -2255,12 +2357,16 @@ def notification_summary(user: dict) -> dict:
             1 for row in task_rows
             if (row["due_date"] and row["due_date"] <= today) or row["updated_at"] > task_seen_at
         )
+        new_mail = conn.execute(
+            "SELECT COUNT(*) AS n FROM mailbox_arrivals WHERE user_id=? AND seen_at IS NULL",
+            (user_id,),
+        ).fetchone()["n"]
     return {"team_messages": unread_team, "team_conversations": unread_conversations,
             "pending_users": pending,
             "awaiting_approval": awaiting, "rejected_vouchers": rejected,
             "follow_up_open": task_open, "follow_up_overdue": task_overdue,
             "follow_up_due_today": task_due_today, "follow_up_new": task_new,
-            "follow_up_attention": task_attention}
+            "follow_up_attention": task_attention, "new_mail": new_mail}
 
 
 def mark_team_messages_seen(user: dict, recipient_id: int | None = None) -> None:

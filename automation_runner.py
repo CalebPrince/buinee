@@ -12,6 +12,8 @@ import server
 
 def main() -> None:
     server.db.init_db()
+    mailbox_result = server.poll_connected_mailboxes()
+    print("mailboxes " + " ".join(f"{key}={value}" for key, value in mailbox_result.items()))
     due = server.db.due_automations()
     for job in due:
         key = job["recipe_key"]

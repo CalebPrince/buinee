@@ -821,6 +821,23 @@ def paystack_config(cfg: dict) -> dict:
     }
 
 
+def poll_connected_mailboxes() -> dict:
+    """Header-only polling used by the scheduled runner for arrival alerts."""
+    cfg = load_env()
+    checked = arrivals = failed = 0
+    for saved in db.list_all_mailbox_connections():
+        try:
+            connection, creds = live_mailbox(saved["user_id"], cfg, saved["id"])
+            messages = mailbox.list_recent(cfg, connection, creds, limit=25)
+            arrivals += db.record_mailbox_poll(connection, messages)
+            checked += 1
+        except Exception as exc:
+            failed += 1
+            db.record_mailbox_poll_error(saved["id"], saved["user_id"], str(exc))
+            print(f"mailbox poll failed connection={saved['id']}: {exc}")
+    return {"checked": checked, "arrivals": arrivals, "failed": failed}
+
+
 def _mail_received_timestamp(value: str) -> float:
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
@@ -1326,6 +1343,7 @@ class RouteHandlerMixin:
             "/api/demo": self._handle_demo,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
+            "/api/mailbox/notifications/seen": self._handle_mailbox_notifications_seen,
             "/api/mailbox/triage": self._handle_mailbox_triage,
             "/api/automations/update": self._handle_automation_update,
             "/api/automations/run": self._handle_automation_run,
@@ -1589,6 +1607,13 @@ class RouteHandlerMixin:
             return self._json({"error": "Choose a mailbox to disconnect."}, 400)
         db.delete_mailbox_connection(user["id"], connection_id)
         return self._json({"ok": True, "mailbox": public_mailbox(user["id"], load_env())})
+
+    def _handle_mailbox_notifications_seen(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        db.mark_mailbox_arrivals_seen(user["id"])
+        return self._json({"ok": True})
 
     def _handle_automation_update(self):
         user = current_user(self)
