@@ -1020,6 +1020,8 @@ class RouteHandlerMixin:
             "/api/admin/change-password": self._handle_admin_change_password,
             "/api/admin/company/delete": self._handle_admin_delete_company,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
+            "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
+            "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
             "/api/admin/plans/create": self._handle_admin_create_plan,
             "/api/admin/plans/update": self._handle_admin_update_plan,
             "/api/admin/company/set-plan": self._handle_admin_set_company_plan,
@@ -1804,6 +1806,31 @@ class RouteHandlerMixin:
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad account profile."}, 400)
         return self._json({"ok": True, "account": account})
+
+    def _handle_admin_save_crm_contact(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=6000)
+            contact = db.save_crm_contact(int(req.get("company_id")), req)
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad contact."}, 400)
+        return self._json({"ok": True, "contact": contact})
+
+    def _handle_admin_delete_crm_contact(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            company_id = int(req.get("company_id"))
+            contact_id = int(req.get("contact_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad contact."}, 400)
+        if not db.delete_crm_contact(company_id, contact_id):
+            return self._json({"error": "Contact not found."}, 404)
+        return self._json({"ok": True})
 
     def _handle_admin_create_plan(self):
         admin = current_admin(self)

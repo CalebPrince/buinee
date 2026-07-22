@@ -190,6 +190,19 @@
   .crm-fields textarea { min-height: 86px; resize: vertical; }
   .crm-actions { display: flex; align-items: center; gap: 10px; margin-top: 11px; }
   .crm-saved { color: var(--teal); font-size: 11.5px; }
+  .crm-contacts { margin-bottom: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; }
+  .crm-contact-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .crm-contact-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 8px; }
+  .crm-contact { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+  .crm-contact-top { display: flex; justify-content: space-between; gap: 8px; }
+  .crm-contact b, .crm-contact span { display: block; overflow-wrap: anywhere; }
+  .crm-contact b { font-size: 12.5px; }
+  .crm-contact span { color: var(--ink-3); font-size: 11px; }
+  .primary-tag { width: fit-content; margin-top: 5px; padding: 2px 7px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep) !important; font-size: 9px !important; font-weight: 800; text-transform: uppercase; }
+  .crm-contact-actions { display: flex; gap: 5px; margin-top: 8px; }
+  .crm-contact-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .crm-primary-check { flex-direction: row !important; align-items: center; }
+  .crm-primary-check input { width: auto; }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
 
@@ -373,6 +386,7 @@
             ? `<div class="supervisor-line">Supervisor: <b>${escapeHtml(c.supervisor.name)}</b> · ${escapeHtml(c.supervisor.email)}</div>`
             : '<div class="supervisor-line"><span class="no-super">No Supervisor yet</span></div>'}
           ${renderCrmProfile(c)}
+          ${renderCrmContacts(c)}
           ${renderTeamAndPending(c)}
           <div class="plan-change" onclick="event.stopPropagation()">
             <label for="planSelect-${c.id}">Change plan</label>
@@ -441,6 +455,109 @@
       saved.textContent = 'Profile saved';
     } catch { error.textContent = 'Could not reach the server.'; }
     finally { button.disabled = false; button.textContent = 'Save profile'; }
+  }
+
+  function renderCrmContacts(c) {
+    const contacts = c.contacts || [];
+    const list = contacts.length ? contacts.map(contact => `<article class="crm-contact">
+      <div class="crm-contact-top"><div><b>${escapeHtml(contact.name)}</b><span>${escapeHtml(contact.job_title || 'Contact')}</span></div>${contact.is_primary ? '<span class="primary-tag">Primary</span>' : ''}</div>
+      ${contact.email ? `<span>${escapeHtml(contact.email)}</span>` : ''}${contact.phone ? `<span>${escapeHtml(contact.phone)}</span>` : ''}
+      ${contact.notes ? `<span style="margin-top:5px">${escapeHtml(contact.notes)}</span>` : ''}
+      <div class="crm-contact-actions"><button class="btn sm" type="button" onclick="editCrmContact(${c.id},${contact.id})">Edit</button><button class="btn sm" type="button" onclick="deleteCrmContact(${c.id},${contact.id})">Remove</button></div>
+    </article>`).join('') : '<div class="empty-mini">No CRM contacts added yet. Workspace members remain listed below.</div>';
+    return `<section class="crm-contacts" onclick="event.stopPropagation()">
+      <div class="crm-contact-head"><div><h4>Contacts (${contacts.length})</h4><div class="empty-mini" style="padding:0">Decision-makers, billing contacts, and other people around this account.</div></div><button class="btn sm" type="button" onclick="openCrmContactForm(${c.id})">+ Add contact</button></div>
+      <div class="crm-contact-list">${list}</div>
+      <form class="crm-contact-form" id="crmContactForm-${c.id}" hidden onsubmit="return saveCrmContact(event,${c.id})">
+        <input type="hidden" id="crmContactId-${c.id}" value="">
+        <div class="crm-fields">
+          <label>Name<input id="crmContactName-${c.id}" required maxlength="120"></label>
+          <label>Role / title<input id="crmContactTitle-${c.id}" maxlength="120" placeholder="e.g. Finance Director"></label>
+          <label>Email<input id="crmContactEmail-${c.id}" type="email" maxlength="254"></label>
+          <label>Phone<input id="crmContactPhone-${c.id}" type="tel" maxlength="80"></label>
+          <label class="crm-primary-check"><input id="crmContactPrimary-${c.id}" type="checkbox"> Primary contact</label>
+          <label class="wide">Relationship notes<textarea id="crmContactNotes-${c.id}" maxlength="1000" placeholder="Influence, preferences, or context…"></textarea></label>
+        </div>
+        <div class="crm-actions"><button class="btn sm" type="submit">Save contact</button><button class="btn sm" type="button" onclick="closeCrmContactForm(${c.id})">Cancel</button><span class="msg error" id="crmContactError-${c.id}"></span></div>
+      </form>
+    </section>`;
+  }
+
+  function openCrmContactForm(companyId, contact = null) {
+    const form = document.getElementById(`crmContactForm-${companyId}`);
+    form.hidden = false;
+    document.getElementById(`crmContactId-${companyId}`).value = contact ? contact.id : '';
+    document.getElementById(`crmContactName-${companyId}`).value = contact ? contact.name : '';
+    document.getElementById(`crmContactTitle-${companyId}`).value = contact ? contact.job_title : '';
+    document.getElementById(`crmContactEmail-${companyId}`).value = contact ? contact.email : '';
+    document.getElementById(`crmContactPhone-${companyId}`).value = contact ? contact.phone : '';
+    document.getElementById(`crmContactPrimary-${companyId}`).checked = !!(contact && contact.is_primary);
+    document.getElementById(`crmContactNotes-${companyId}`).value = contact ? contact.notes : '';
+    document.getElementById(`crmContactError-${companyId}`).textContent = '';
+    document.getElementById(`crmContactName-${companyId}`).focus();
+  }
+
+  function closeCrmContactForm(companyId) { document.getElementById(`crmContactForm-${companyId}`).hidden = true; }
+
+  function editCrmContact(companyId, contactId) {
+    const company = lastCompanies.find(item => item.id === companyId);
+    const contact = company && (company.contacts || []).find(item => item.id === contactId);
+    if (contact) openCrmContactForm(companyId, contact);
+  }
+
+  function rerenderExpandedCompany(companyId) {
+    renderCompanies(lastCompanies);
+    const card = document.getElementById(`card-${companyId}`);
+    if (card) { card.classList.add('expanded'); card.setAttribute('aria-expanded', 'true'); }
+  }
+
+  async function saveCrmContact(ev, companyId) {
+    ev.preventDefault();
+    const button = ev.submitter;
+    const payload = {
+      company_id: companyId, contact_id: document.getElementById(`crmContactId-${companyId}`).value || null,
+      name: document.getElementById(`crmContactName-${companyId}`).value,
+      job_title: document.getElementById(`crmContactTitle-${companyId}`).value,
+      email: document.getElementById(`crmContactEmail-${companyId}`).value,
+      phone: document.getElementById(`crmContactPhone-${companyId}`).value,
+      is_primary: document.getElementById(`crmContactPrimary-${companyId}`).checked,
+      notes: document.getElementById(`crmContactNotes-${companyId}`).value,
+    };
+    button.disabled = true; button.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/admin/company/contact/save', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save contact.');
+      const company = lastCompanies.find(item => item.id === companyId);
+      if (data.contact.is_primary) {
+        (company.contacts || []).forEach(item => { item.is_primary = 0; });
+        company.crm.primary_contact_name = data.contact.name;
+        company.crm.primary_contact_email = data.contact.email;
+      }
+      const index = (company.contacts || []).findIndex(item => item.id === data.contact.id);
+      if (index >= 0) company.contacts[index] = data.contact; else company.contacts.push(data.contact);
+      company.contacts.sort((a,b) => Number(b.is_primary) - Number(a.is_primary) || a.name.localeCompare(b.name));
+      rerenderExpandedCompany(companyId);
+    } catch (error) { document.getElementById(`crmContactError-${companyId}`).textContent = error.message || 'Could not reach the server.'; }
+    finally { button.disabled = false; button.textContent = 'Save contact'; }
+    return false;
+  }
+
+  async function deleteCrmContact(companyId, contactId) {
+    if (!confirm('Remove this contact from the CRM? This does not remove any Buinee user.')) return;
+    try {
+      const res = await fetch('/api/admin/company/contact/delete', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, contact_id: contactId }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not remove contact.');
+      const company = lastCompanies.find(item => item.id === companyId);
+      const removed = (company.contacts || []).find(item => item.id === contactId);
+      company.contacts = (company.contacts || []).filter(item => item.id !== contactId);
+      if (removed && removed.is_primary) {
+        company.crm.primary_contact_name = '';
+        company.crm.primary_contact_email = '';
+      }
+      rerenderExpandedCompany(companyId);
+    } catch (error) { alert(error.message || 'Could not reach the server.'); }
   }
 
   function toggleCard(id) {

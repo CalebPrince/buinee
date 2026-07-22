@@ -274,6 +274,14 @@ weight in a security-sensitive area of the code.
   the dashboard Team page through `/api/company/profile`. Lifecycle status,
   Buinee relationship owner, and internal summary remain Command Center-only;
   both surfaces update the same `crm_accounts` record.
+  Account 360 also has a multi-contact directory backed by `crm_contacts`.
+  Platform admins can add, edit, mark primary, and remove decision-makers,
+  billing contacts, or other stakeholders without creating Buinee user access.
+  A primary CRM contact synchronizes the account's primary-contact name/email;
+  approved and pending workspace members remain a separate roster immediately
+  below the directory. Contact mutations use the authenticated
+  `/api/admin/company/contact/save` and `/api/admin/company/contact/delete`
+  routes and are always company-scoped.
   Expanded, there's also a **Delete company** button (`db.delete_company`,
   `/api/admin/company/delete`) — permanently removes the company and every
   user in it (and their sessions), with a native confirm dialog first.

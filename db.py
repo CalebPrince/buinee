@@ -161,6 +161,19 @@ def init_db() -> None:
                 updated_at           REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS crm_contacts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id  INTEGER NOT NULL REFERENCES companies(id),
+                name        TEXT NOT NULL,
+                job_title   TEXT NOT NULL DEFAULT '',
+                email       TEXT NOT NULL DEFAULT '',
+                phone       TEXT NOT NULL DEFAULT '',
+                is_primary  INTEGER NOT NULL DEFAULT 0,
+                notes       TEXT NOT NULL DEFAULT '',
+                created_at  REAL NOT NULL,
+                updated_at  REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -373,6 +386,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_reference_documents_user ON reference_documents(user_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_team_messages_company ON team_messages(company_id, id);
             CREATE INDEX IF NOT EXISTS idx_team_message_files_message ON team_message_files(message_id);
+            CREATE INDEX IF NOT EXISTS idx_crm_contacts_company ON crm_contacts(company_id, is_primary, name);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1295,6 +1309,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM crm_contacts WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_accounts WHERE company_id = ?", (company_id,))
         conn.execute(
             "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE company_id = ?)",
@@ -1332,6 +1347,12 @@ def list_companies_with_stats() -> list[dict]:
                    WHERE company_id = ? AND status = 'pending' ORDER BY created_at""",
                 (c["id"],),
             ).fetchall()
+            contacts = conn.execute(
+                """SELECT id, name, job_title, email, phone, is_primary, notes,
+                          created_at, updated_at FROM crm_contacts
+                   WHERE company_id = ? ORDER BY is_primary DESC, name""",
+                (c["id"],),
+            ).fetchall()
             supervisor = next((u for u in team if u["role"] == "finance_supervisor"), None)
             out.append({
                 "id": c["id"],
@@ -1342,6 +1363,7 @@ def list_companies_with_stats() -> list[dict]:
                 "supervisor": {"name": supervisor["name"], "email": supervisor["email"]} if supervisor else None,
                 "team": [dict(u) for u in team],
                 "pending": [dict(u) for u in pending],
+                "contacts": [dict(contact) for contact in contacts],
                 "crm": {
                     "legal_name": c["legal_name"] or "",
                     "industry": c["industry"] or "",
@@ -1935,6 +1957,85 @@ def update_company_profile(company_id: int, fields: dict) -> dict:
         )
     values["updated_at"] = now
     return values
+
+
+def save_crm_contact(company_id: int, fields: dict) -> dict:
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    try:
+        contact_id = int(fields.get("contact_id") or 0)
+    except (TypeError, ValueError):
+        raise AuthError("Bad contact.")
+    values = {
+        "name": str(fields.get("name") or "").strip()[:120],
+        "job_title": str(fields.get("job_title") or "").strip()[:120],
+        "email": str(fields.get("email") or "").strip().lower()[:254],
+        "phone": str(fields.get("phone") or "").strip()[:80],
+        "notes": str(fields.get("notes") or "").strip()[:1000],
+        "is_primary": int(bool(fields.get("is_primary"))),
+    }
+    if not values["name"]:
+        raise AuthError("Contact name is required.")
+    if values["email"] and ("@" not in values["email"] or "." not in values["email"].split("@")[-1]):
+        raise AuthError("Enter a valid contact email.")
+    now = time.time()
+    with _cursor() as conn:
+        if contact_id:
+            existing = conn.execute(
+                "SELECT id FROM crm_contacts WHERE id = ? AND company_id = ?",
+                (contact_id, company_id),
+            ).fetchone()
+            if not existing:
+                raise AuthError("Contact not found.")
+        if values["is_primary"]:
+            conn.execute("UPDATE crm_contacts SET is_primary = 0 WHERE company_id = ?", (company_id,))
+        if contact_id:
+            conn.execute(
+                """UPDATE crm_contacts SET name=?, job_title=?, email=?, phone=?,
+                     is_primary=?, notes=?, updated_at=? WHERE id=? AND company_id=?""",
+                (values["name"], values["job_title"], values["email"], values["phone"],
+                 values["is_primary"], values["notes"], now, contact_id, company_id),
+            )
+        else:
+            cur = conn.execute(
+                """INSERT INTO crm_contacts
+                     (company_id, name, job_title, email, phone, is_primary, notes, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (company_id, values["name"], values["job_title"], values["email"],
+                 values["phone"], values["is_primary"], values["notes"], now, now),
+            )
+            contact_id = cur.lastrowid
+        if values["is_primary"]:
+            conn.execute(
+                """INSERT INTO crm_accounts
+                     (company_id, primary_contact_name, primary_contact_email, updated_at)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(company_id) DO UPDATE SET
+                     primary_contact_name=excluded.primary_contact_name,
+                     primary_contact_email=excluded.primary_contact_email,
+                     updated_at=excluded.updated_at""",
+                (company_id, values["name"], values["email"], now),
+            )
+        row = conn.execute("SELECT * FROM crm_contacts WHERE id = ?", (contact_id,)).fetchone()
+    return dict(row)
+
+
+def delete_crm_contact(company_id: int, contact_id: int) -> bool:
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT is_primary FROM crm_contacts WHERE id = ? AND company_id = ?",
+            (contact_id, company_id),
+        ).fetchone()
+        if not row:
+            return False
+        conn.execute("DELETE FROM crm_contacts WHERE id = ? AND company_id = ?", (contact_id, company_id))
+        if row["is_primary"]:
+            conn.execute(
+                """UPDATE crm_accounts SET primary_contact_name='',
+                     primary_contact_email='', updated_at=? WHERE company_id=?""",
+                (time.time(), company_id),
+            )
+    return True
 
 
 def update_crm_account(company_id: int, fields: dict) -> dict:
