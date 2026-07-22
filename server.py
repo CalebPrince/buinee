@@ -605,7 +605,10 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             try:
                 conn, creds = live_mailbox(user["id"], load_env())
-                msgs = mailbox.list_recent(load_env(), conn, creds)
+                include_body = parse_qs(urlparse(self.path).query).get("body", ["0"])[0] == "1"
+                msgs = mailbox.list_recent(
+                    load_env(), conn, creds, include_body=include_body
+                )
             except mailbox.MailboxError as exc:
                 return self._json({"error": str(exc)}, 400)
             return self._json({"messages": msgs})

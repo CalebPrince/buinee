@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import email.header
 import email.utils
+import base64
+import html.parser
 import imaplib
 import json
 import ssl
@@ -40,6 +42,7 @@ import urllib.parse
 import urllib.request
 
 EXPIRY_SKEW_SECONDS = 120
+MAX_BODY_CHARS = 20_000
 
 PROVIDERS = ("microsoft", "google", "imap")
 
@@ -159,12 +162,13 @@ def _post_form(url: str, form: dict, what: str) -> dict:
         raise MailboxError(f"Could not reach the mail provider to {what.lower()}.") from exc
 
 
-def _api_get(access_token: str, url: str, params: dict | None = None) -> dict:
+def _api_get(access_token: str, url: str, params: dict | None = None,
+             headers: dict | None = None) -> dict:
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(
-        url, headers={"Authorization": f"Bearer {access_token}"}, method="GET"
-    )
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {access_token}", **(headers or {})
+    }, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -327,34 +331,123 @@ def _decode_header(raw: str) -> str:
     return "".join(out).strip()
 
 
+class _TextFromHtml(html.parser.HTMLParser):
+    """Small, dependency-free HTML-to-text converter for email bodies."""
+
+    BREAKS = {"br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag.lower() in self.BREAKS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() in self.BREAKS:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def text(self) -> str:
+        lines = [" ".join(line.split()) for line in "".join(self.parts).splitlines()]
+        return "\n".join(line for line in lines if line).strip()
+
+
+def _plain_body(value: str, content_type: str = "text/plain") -> str:
+    if not value:
+        return ""
+    if "html" in (content_type or "").lower():
+        parser = _TextFromHtml()
+        try:
+            parser.feed(value)
+            value = parser.text()
+        except Exception:
+            value = ""
+    return value.replace("\x00", "").strip()[:MAX_BODY_CHARS]
+
+
+def _mime_body(msg) -> str:
+    plain, html = [], []
+    parts = msg.walk() if msg.is_multipart() else [msg]
+    for part in parts:
+        if part.is_multipart() or part.get_content_disposition() == "attachment":
+            continue
+        kind = part.get_content_type()
+        if kind not in ("text/plain", "text/html"):
+            continue
+        raw = part.get_payload(decode=True)
+        if not raw:
+            continue
+        charset = part.get_content_charset() or "utf-8"
+        try:
+            text = raw.decode(charset, errors="replace")
+        except LookupError:
+            text = raw.decode("utf-8", errors="replace")
+        (plain if kind == "text/plain" else html).append(text)
+    if plain:
+        return _plain_body("\n\n".join(plain))
+    return _plain_body("\n\n".join(html), "text/html")
+
+
+def _gmail_part_body(payload: dict) -> str:
+    plain, html = [], []
+
+    def visit(part: dict) -> None:
+        kind = part.get("mimeType") or ""
+        data = (part.get("body") or {}).get("data")
+        if data and kind in ("text/plain", "text/html"):
+            try:
+                raw = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
+                text = raw.decode("utf-8", errors="replace")
+                (plain if kind == "text/plain" else html).append(text)
+            except Exception:
+                pass
+        for child in part.get("parts") or []:
+            visit(child)
+
+    visit(payload or {})
+    if plain:
+        return _plain_body("\n\n".join(plain))
+    return _plain_body("\n\n".join(html), "text/html")
+
+
 # ------------------------------------------------------------------- reading
 
 
-def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10) -> list[dict]:
+def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
+                include_body: bool = False) -> list[dict]:
     """The most recent messages, in one shape whoever hosts the mailbox.
 
-    Headers only - subject, sender, date, unread. Nothing here downloads
-    message bodies; that belongs with the triage work that reads them, not
-    with the connection that proves the mailbox is reachable.
+    The default is headers only. Triage opts into safe, length-limited plain
+    text bodies; the lightweight Overview card does not download them.
     """
     provider = connection["provider"]
     if provider == "microsoft":
         data = _api_get(
             creds["access_token"],
             "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages",
-            {"$top": limit, "$select": "subject,from,receivedDateTime,isRead",
+            {"$top": limit,
+             "$select": "subject,from,receivedDateTime,isRead" + (",body" if include_body else ""),
              "$orderby": "receivedDateTime desc"},
+            {"Prefer": 'outlook.body-content-type="text"'} if include_body else None,
         )
         out = []
         for m in data.get("value", []):
             sender = (m.get("from") or {}).get("emailAddress") or {}
-            out.append({
+            item = {
                 "id": m.get("id", ""),
                 "subject": m.get("subject") or "(no subject)",
                 "from": sender.get("address") or sender.get("name") or "",
                 "received": m.get("receivedDateTime") or "",
                 "unread": not m.get("isRead", True),
-            })
+            }
+            if include_body:
+                body = m.get("body") or {}
+                item["body"] = _plain_body(body.get("content") or "", body.get("contentType") or "")
+            out.append(item)
         return out
 
     if provider == "google":
@@ -368,17 +461,21 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10) -> li
             m = _api_get(
                 creds["access_token"],
                 f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{ref['id']}",
-                {"format": "metadata", "metadataHeaders": "Subject,From,Date"},
+                ({"format": "full"} if include_body else
+                 {"format": "metadata", "metadataHeaders": "Subject,From,Date"}),
             )
             headers = {h["name"].lower(): h["value"]
                        for h in (m.get("payload") or {}).get("headers", [])}
-            out.append({
+            item = {
                 "id": m.get("id", ""),
                 "subject": headers.get("subject") or "(no subject)",
                 "from": headers.get("from") or "",
                 "received": headers.get("date") or "",
                 "unread": "UNREAD" in (m.get("labelIds") or []),
-            })
+            }
+            if include_body:
+                item["body"] = _gmail_part_body(m.get("payload") or {}) or _plain_body(m.get("snippet") or "")
+            out.append(item)
         return out
 
     conn = _imap_connect(connection["imap_host"], connection["imap_port"],
@@ -395,17 +492,21 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10) -> li
             unread = set(undata[0].split())
         out = []
         for mid in ids:
-            typ, fetched = conn.fetch(mid, "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])")
+            query = "(BODY.PEEK[])" if include_body else "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])"
+            typ, fetched = conn.fetch(mid, query)
             if typ != "OK" or not fetched or not isinstance(fetched[0], tuple):
                 continue
             msg = email.message_from_bytes(fetched[0][1])
-            out.append({
+            item = {
                 "id": mid.decode(),
                 "subject": _decode_header(msg.get("Subject", "")) or "(no subject)",
                 "from": _decode_header(msg.get("From", "")),
                 "received": msg.get("Date", ""),
                 "unread": mid in unread,
-            })
+            }
+            if include_body:
+                item["body"] = _mime_body(msg)
+            out.append(item)
         return out
     finally:
         try:

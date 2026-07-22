@@ -311,9 +311,10 @@ switched client-side with no page reload:
   surfaced on its own page. Nav item carries a live count badge.
 - **Triage** — a live split-pane work queue based on the connected mailbox:
   All/Unread filters, unread count, sender, subject, received time and a
-  detail desk. It is deliberately header-only and read-only. Selecting a
-  message can pass the known sender and subject into Ask Ada, with an explicit
-  instruction not to invent the unseen body.
+  detail desk. Triage requests a safe, length-limited plain-text body while
+  the Overview remains header-only; neither view changes mailbox state.
+  Selecting a message can pass the known sender and subject into Ask Ada,
+  with an explicit instruction not to invent anything it has not been given.
 - **Ask Ada** — an authenticated version of the landing page's demo agent. A
   general assistant for the person's finance/back-office work - any business
   question, not a voucher-lookup tool - grounded in their real, role-scoped
@@ -863,7 +864,7 @@ not fetch bodies, change read state, or act on mail.
 
 **Not built yet**: semantic triage, reply detection, ranking by business
 importance, drafting, or any automation that changes the mailbox. Those need
-message bodies and an explicit review workflow; the Automations view remains
+semantic analysis of message bodies and an explicit review workflow; the Automations view remains
 an honest placeholder until that work exists.
 
 ---
