@@ -200,6 +200,7 @@ STATIC_PAGES = {
     "/admin-errors.html": "admin-errors.html",
     "/admin-reports.html": "admin-reports.html",
     "/admin-inbox.html": "admin-inbox.html",
+    "/admin-invoices.html": "admin-invoices.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -1134,6 +1135,11 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"items": db.list_admin_inbox()})
 
+        if path == "/api/admin/invoices":
+            admin = current_admin(self)
+            if not admin: return self._json({"error": "Not signed in."}, 401)
+            return self._json({"invoices": db.list_admin_invoices(), "companies": db.list_company_choices()})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1197,6 +1203,8 @@ class RouteHandlerMixin:
             "/api/admin/team/reset-password": self._handle_admin_team_reset_password,
             "/api/admin/errors/clear": self._handle_admin_errors_clear,
             "/api/admin/inbox/state": self._handle_admin_inbox_state,
+            "/api/admin/invoices/create": self._handle_admin_invoice_create,
+            "/api/admin/invoices/status": self._handle_admin_invoice_status,
         }
         handler = handlers.get(path)
         if not handler:
@@ -2049,6 +2057,23 @@ class RouteHandlerMixin:
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Could not update inbox item."}, 400)
         return self._json({"ok": True})
+
+    def _handle_admin_invoice_create(self):
+        admin=current_admin(self)
+        if not admin: return self._json({"error":"Not signed in."},401)
+        try: invoice=db.save_admin_invoice(self._body(max_len=20000))
+        except (db.AuthError,TypeError,ValueError) as exc: return self._json({"error":str(exc)},400)
+        db.record_admin_activity(admin,"created","invoice",invoice["id"],invoice["invoice_number"],invoice["customer_name"])
+        return self._json({"ok":True,"invoice":invoice})
+
+    def _handle_admin_invoice_status(self):
+        admin=current_admin(self)
+        if not admin: return self._json({"error":"Not signed in."},401)
+        try:
+            req=self._body(); invoice=db.update_admin_invoice_status(int(req.get("invoice_id")),str(req.get("status") or ""))
+        except (db.AuthError,TypeError,ValueError) as exc: return self._json({"error":str(exc)},400)
+        db.record_admin_activity(admin,"status_changed","invoice",invoice["id"],invoice["invoice_number"],"Status: "+invoice["status"])
+        return self._json({"ok":True,"invoice":invoice})
 
     def _owner_request(self):
         admin = current_admin(self)

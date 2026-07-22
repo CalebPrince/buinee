@@ -169,6 +169,18 @@ def init_db() -> None:
                 state TEXT NOT NULL DEFAULT 'unread', updated_at REAL NOT NULL,
                 PRIMARY KEY (item_type,item_id)
             );
+            CREATE TABLE IF NOT EXISTS admin_invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_number TEXT NOT NULL UNIQUE,
+                company_id INTEGER NOT NULL REFERENCES companies(id), customer_name TEXT NOT NULL,
+                customer_email TEXT NOT NULL DEFAULT '', currency TEXT NOT NULL DEFAULT 'GHS',
+                issue_date TEXT NOT NULL, due_date TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft',
+                notes TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL, updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS admin_invoice_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_id INTEGER NOT NULL REFERENCES admin_invoices(id),
+                description TEXT NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit_amount REAL NOT NULL DEFAULT 0,
+                sort_order INTEGER NOT NULL DEFAULT 0
+            );
 
             CREATE TABLE IF NOT EXISTS crm_accounts (
                 company_id           INTEGER PRIMARY KEY REFERENCES companies(id),
@@ -1521,6 +1533,42 @@ def update_admin_inbox_state(item_id: int, state: str) -> None:
                         VALUES('interaction',?,?,?) ON CONFLICT(item_type,item_id)
                         DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at""",
                      (item_id, state, time.time()))
+
+
+def list_admin_invoices() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute("""SELECT i.*,c.name company_name,COALESCE(SUM(x.quantity*x.unit_amount),0) total
+            FROM admin_invoices i JOIN companies c ON c.id=i.company_id LEFT JOIN admin_invoice_items x ON x.invoice_id=i.id
+            GROUP BY i.id ORDER BY i.created_at DESC""").fetchall()
+    return [dict(r) for r in rows]
+
+
+def save_admin_invoice(fields: dict) -> dict:
+    company_id=int(fields.get("company_id")); company=get_company(company_id)
+    if not company: raise AuthError("Choose a valid company.")
+    items=[]
+    for pos,x in enumerate(fields.get("items") or []):
+        desc=str(x.get("description") or "").strip()[:200]
+        try: qty=float(x.get("quantity") or 0); amount=float(x.get("unit_amount") or 0)
+        except (TypeError,ValueError): continue
+        if desc and qty>0 and amount>=0: items.append((desc,qty,amount,pos))
+    if not items: raise AuthError("Add at least one valid line item.")
+    now=time.time(); number=str(fields.get("invoice_number") or "").strip()[:40] or f"INV-{time.strftime('%Y%m%d')}-{secrets.token_hex(2).upper()}"
+    customer=str(fields.get("customer_name") or company["name"]).strip()[:160]
+    with _cursor() as conn:
+        cur=conn.execute("""INSERT INTO admin_invoices(invoice_number,company_id,customer_name,customer_email,currency,issue_date,due_date,notes,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)""",(number,company_id,customer,str(fields.get("customer_email") or "").strip()[:254],str(fields.get("currency") or "GHS")[:6].upper(),str(fields.get("issue_date") or time.strftime('%Y-%m-%d'))[:10],str(fields.get("due_date") or "")[:10],str(fields.get("notes") or "")[:2000],now,now))
+        invoice_id=cur.lastrowid
+        conn.executemany("INSERT INTO admin_invoice_items(invoice_id,description,quantity,unit_amount,sort_order) VALUES(?,?,?,?,?)",[(invoice_id,*x) for x in items])
+    return next(x for x in list_admin_invoices() if x["id"]==invoice_id)
+
+
+def update_admin_invoice_status(invoice_id: int, status: str) -> dict:
+    if status not in ("draft","sent","paid","void"): raise AuthError("Choose a valid invoice status.")
+    with _cursor() as conn:
+        if not conn.execute("SELECT id FROM admin_invoices WHERE id=?",(invoice_id,)).fetchone(): raise AuthError("Invoice not found.")
+        conn.execute("UPDATE admin_invoices SET status=?,updated_at=? WHERE id=?",(status,time.time(),invoice_id))
+    return next(x for x in list_admin_invoices() if x["id"]==invoice_id)
 
 
 def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) -> dict:
