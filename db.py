@@ -159,6 +159,11 @@ def init_db() -> None:
                 details      TEXT NOT NULL DEFAULT '',
                 created_at   REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS application_errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL DEFAULT 'application',
+                severity TEXT NOT NULL DEFAULT 'error', message TEXT NOT NULL,
+                details TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL
+            );
 
             CREATE TABLE IF NOT EXISTS crm_accounts (
                 company_id           INTEGER PRIMARY KEY REFERENCES companies(id),
@@ -1458,6 +1463,31 @@ def list_admin_activity(page: int = 1, per_page: int = 20, entity_type: str = ""
         ).fetchall()]
     return {"rows": [dict(r) for r in rows], "total": total, "page": page,
             "per_page": per_page, "entity_types": entity_types, "actions": actions}
+
+
+def record_application_error(source: str, message: str, details: str = "") -> None:
+    with _cursor() as conn:
+        conn.execute("INSERT INTO application_errors (source,severity,message,details,created_at) VALUES (?,'error',?,?,?)",
+                     (source[:80], message[:1000], details[:5000], time.time()))
+
+
+def list_application_errors(limit: int = 300, severity: str = "", query: str = "") -> list[dict]:
+    where, params = [], []
+    if severity:
+        where.append("severity = ?"); params.append(severity)
+    if query:
+        where.append("(message LIKE ? OR details LIKE ? OR source LIKE ?)")
+        params.extend([f"%{query}%"] * 3)
+    clause = " WHERE " + " AND ".join(where) if where else ""
+    with _cursor() as conn:
+        rows = conn.execute("SELECT * FROM application_errors" + clause + " ORDER BY created_at DESC LIMIT ?",
+                            params + [min(1000, max(1, limit))]).fetchall()
+    return [dict(r) for r in rows]
+
+
+def clear_application_errors() -> None:
+    with _cursor() as conn:
+        conn.execute("DELETE FROM application_errors")
 
 
 def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) -> dict:

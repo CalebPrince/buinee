@@ -197,6 +197,7 @@ STATIC_PAGES = {
     "/admin-payments.html": "admin-payments.html",
     "/admin-team.html": "admin-team.html",
     "/admin-activity.html": "admin-activity.html",
+    "/admin-errors.html": "admin-errors.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -1091,6 +1092,16 @@ class RouteHandlerMixin:
                 page=page, entity_type=query.get("entity_type", [""])[0],
                 action=query.get("action", [""])[0]))
 
+        if path == "/api/admin/errors":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            query = parse_qs(urlparse(self.path).query)
+            try: limit = int(query.get("limit", ["300"])[0])
+            except ValueError: limit = 300
+            return self._json({"errors": db.list_application_errors(limit,
+                query.get("severity", [""])[0], query.get("query", [""])[0])})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1152,6 +1163,7 @@ class RouteHandlerMixin:
             "/api/admin/team/create": self._handle_admin_team_create,
             "/api/admin/team/update": self._handle_admin_team_update,
             "/api/admin/team/reset-password": self._handle_admin_team_reset_password,
+            "/api/admin/errors/clear": self._handle_admin_errors_clear,
         }
         handler = handlers.get(path)
         if not handler:
@@ -1984,6 +1996,14 @@ class RouteHandlerMixin:
                                      details="Company and related records permanently removed")
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True})
+
+    def _handle_admin_errors_clear(self):
+        admin = current_admin(self)
+        if not admin_is_owner(admin):
+            return self._json({"error": "Only an owner can clear error logs."}, 403)
+        db.clear_application_errors()
+        db.record_admin_activity(admin, "cleared", "error_log", details="All stored application errors removed")
         return self._json({"ok": True})
 
     def _owner_request(self):
