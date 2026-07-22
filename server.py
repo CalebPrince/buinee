@@ -43,8 +43,10 @@ import io
 import json
 import os
 import re
+import secrets
 import sys
 import time
+import traceback
 import webbrowser
 import zipfile
 import urllib.error
@@ -79,6 +81,33 @@ OFFICE_MEDIA_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
 }
+
+
+def report_application_error(source: str, error, user: dict | None = None,
+                             context: str = "") -> str:
+    """Store private diagnostics and return a safe support reference."""
+    reference = secrets.token_hex(4).upper()
+    identity = ""
+    if user:
+        identity = f"user_id={user.get('id')} company_id={user.get('company_id')}"
+    trace = traceback.format_exc()
+    if trace.strip() == "NoneType: None":
+        trace = ""
+    # Deliberately exclude request bodies, mailbox contents, credentials and keys.
+    details = "\n".join(part for part in (
+        f"Reference: {reference}", identity, context, trace
+    ) if part)
+    technical_message = str(error).strip() or type(error).__name__
+    try:
+        db.record_application_error(source, f"[{reference}] {technical_message}", details)
+    except Exception as logging_error:
+        print(f"  ! could not record application error {reference}: {logging_error}")
+    return reference
+
+
+def ada_unavailable(reference: str, action: str = "help with that") -> str:
+    return (f"Ada couldn't {action} right now. Please try again shortly. "
+            f"Reference: {reference}.")
 
 
 def _xml_visible_text(blob: bytes) -> str:
@@ -1353,8 +1382,7 @@ class RouteHandlerMixin:
         ip = client_ip(self)
         if rate_limited(f"demo:{ip}"):
             return self._json(
-                {"error": "That's a fair few questions — give it a few minutes, "
-                          "or register and talk to the real thing."}, 429)
+                {"error": "Ada is busy right now. Please wait a few minutes and try again."}, 429)
 
         try:
             req = self._body()
@@ -1368,8 +1396,10 @@ class RouteHandlerMixin:
         cfg = load_env()
         provider = active_provider(cfg)
         if not provider:
+            reference = report_application_error(
+                "ada.demo.configuration", "No AI provider is configured for the public demo")
             return self._json(
-                {"error": "The demo agent isn't configured on this server yet."}, 503)
+                {"error": ada_unavailable(reference)}, 503)
 
         history = []
         for t in (req.get("history") or [])[-MAX_HISTORY:]:
@@ -1388,10 +1418,12 @@ class RouteHandlerMixin:
                 history, system=build_system(computed),
             )
         except providers.ProviderError as exc:
-            return self._json({"error": str(exc)}, 502)
+            reference = report_application_error("ada.demo.provider", exc)
+            return self._json({"error": ada_unavailable(reference)}, 503)
         except Exception as exc:
             print(f"  ! demo failure: {exc}")
-            return self._json({"error": "Something went wrong on our side."}, 500)
+            reference = report_application_error("ada.demo.server", exc)
+            return self._json({"error": ada_unavailable(reference)}, 500)
 
         return self._json({"reply": reply, "computed": bool(computed)})
 
@@ -1589,13 +1621,29 @@ class RouteHandlerMixin:
         try:
             result = run_automation(user["id"], key)
             db.finish_automation_run(run_id, result=result)
-        except (ValueError, mailbox.MailboxError, providers.ProviderError) as exc:
+        except providers.ProviderError as exc:
+            reference = report_application_error(
+                "ada.automation.provider", exc, user, f"automation={key}")
+            db.finish_automation_run(run_id, error=f"Reference: {reference}")
+            return self._json({"error": ada_unavailable(reference, "run that automation")}, 503)
+        except ValueError as exc:
+            if "isn't configured" in str(exc):
+                reference = report_application_error(
+                    "ada.automation.configuration", exc, user, f"automation={key}")
+                db.finish_automation_run(run_id, error=f"Reference: {reference}")
+                return self._json(
+                    {"error": ada_unavailable(reference, "run that automation")}, 503)
+            db.finish_automation_run(run_id, error=str(exc))
+            return self._json({"error": str(exc)}, 400)
+        except mailbox.MailboxError as exc:
             db.finish_automation_run(run_id, error=str(exc))
             return self._json({"error": str(exc)}, 400)
         except Exception as exc:
             print(f"  ! automation failure ({key}): {exc}")
-            db.finish_automation_run(run_id, error="Automation failed.")
-            return self._json({"error": "Automation failed."}, 500)
+            reference = report_application_error(
+                "ada.automation.server", exc, user, f"automation={key}")
+            db.finish_automation_run(run_id, error=f"Reference: {reference}")
+            return self._json({"error": ada_unavailable(reference, "run that automation")}, 500)
         return self._json({"ok": True, "result": result, "automations": public_automations(user["id"])})
 
     def _handle_mailbox_triage(self):
@@ -1607,7 +1655,7 @@ class RouteHandlerMixin:
             return self._json({"error": "Not signed in."}, 401)
         if rate_limited(f"mail-triage:{user['id']}"):
             return self._json(
-                {"error": "That's a fair few summaries — give it a few minutes."}, 429)
+                {"error": "Ada is busy right now. Please wait a few minutes and try again."}, 429)
         try:
             req = self._body()
         except Exception:
@@ -1633,7 +1681,9 @@ class RouteHandlerMixin:
         pub = public_user(user)
         provider, model = resolve_provider_model(cfg, pub["company"])
         if not provider:
-            return self._json({"error": "Ada isn't configured on this server yet."}, 503)
+            reference = report_application_error(
+                "ada.summary.configuration", "No AI provider is configured", user)
+            return self._json({"error": ada_unavailable(reference, "summarize that email")}, 503)
 
         try:
             connection, creds = live_mailbox(user["id"], cfg, connection_id)
@@ -1689,12 +1739,16 @@ class RouteHandlerMixin:
                               [email_input], briefing=effective_briefing(pub),
                               **({"docs": docs} if docs else {}))
         except providers.ProviderError as exc:
-            return self._json({"error": str(exc)}, 502)
+            reference = report_application_error("ada.summary.provider", exc, user)
+            return self._json({"error": ada_unavailable(reference, "summarize that email")}, 503)
         except Exception as exc:
             print(f"  ! mailbox triage failure: {exc}")
-            return self._json({"error": "Ada couldn't summarize that email."}, 500)
+            reference = report_application_error("ada.summary.server", exc, user)
+            return self._json({"error": ada_unavailable(reference, "summarize that email")}, 500)
         if not items:
-            return self._json({"error": "Ada returned no summary for that email."}, 502)
+            reference = report_application_error(
+                "ada.summary.empty", "AI provider returned no summary", user)
+            return self._json({"error": ada_unavailable(reference, "summarize that email")}, 503)
 
         used = db.increment_chat_usage(user["company_id"])
         return self._json({
@@ -2122,7 +2176,7 @@ class RouteHandlerMixin:
             return self._json({"error": "Not signed in."}, 401)
         if rate_limited(f"chat:{user['id']}"):
             return self._json(
-                {"error": "That's a fair few questions — give it a few minutes."}, 429)
+                {"error": "Ada is busy right now. Please wait a few minutes and try again."}, 429)
         try:
             req = self._body(max_len=60000)  # higher than the default - a pasted document is bigger than a chat message
         except Exception:
@@ -2149,8 +2203,9 @@ class RouteHandlerMixin:
         pub = public_user(user)
         provider, model = resolve_provider_model(cfg, pub["company"])
         if not provider:
-            return self._json(
-                {"error": "The assistant isn't configured on this server yet."}, 503)
+            reference = report_application_error(
+                "ada.chat.configuration", "No AI provider is configured", user)
+            return self._json({"error": ada_unavailable(reference)}, 503)
 
         history = []
         for t in (req.get("history") or [])[-MAX_HISTORY:]:
@@ -2190,10 +2245,12 @@ class RouteHandlerMixin:
                 docs=(user_reference_docs(user["id"]) + docs) or None,
             )
         except providers.ProviderError as exc:
-            return self._json({"error": str(exc)}, 502)
+            reference = report_application_error("ada.chat.provider", exc, user)
+            return self._json({"error": ada_unavailable(reference)}, 503)
         except Exception as exc:
             print(f"  ! chat failure: {exc}")
-            return self._json({"error": "Something went wrong on our side."}, 500)
+            reference = report_application_error("ada.chat.server", exc, user)
+            return self._json({"error": ada_unavailable(reference)}, 500)
 
         used = db.increment_chat_usage(user["company_id"])
         return self._json({"reply": reply, "usage": {"used": used, "limit": gate["limit"]}})
