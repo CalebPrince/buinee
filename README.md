@@ -309,6 +309,11 @@ switched client-side with no page reload:
   look (a fallback FX rate, a net payable that doesn't reconcile, etc.) -
   real data already computed for the Vouchers view, just filtered and
   surfaced on its own page. Nav item carries a live count badge.
+- **To fix** — the broader actionable exception queue: rejected vouchers,
+  deterministic voucher review notes, issues from user-triggered email
+  analysis, and structured issues saved by read-only automation runs. It
+  never treats an unread header as an issue and deduplicates an email reviewed
+  by both Triage and an automation. Its nav badge and Overview KPI are live.
 - **Triage** — a live split-pane work queue based on the connected mailbox:
   All/Unread filters, unread count, sender, subject, received time and a
   detail desk. Triage requests a safe, length-limited plain-text body while
@@ -883,10 +888,10 @@ The Overview now renders the latest ten inbox headers from
 first without pretending that unread automatically means important. It does
 not fetch bodies, change read state, or act on mail.
 
-**Not built yet**: automatic/batch triage, a persisted morning brief, ranking
-across the whole inbox, or any automation that changes the mailbox. Per-email
-Ada analysis is deliberately user-triggered and read-only; the Automations
-view remains an honest placeholder until those broader workflows exist.
+**Not built yet**: ranking across the whole inbox or any automation that
+changes the mailbox. Per-email analysis and scheduled automation runs are
+deliberately read-only; they can surface issues in To fix but cannot send,
+move, delete, or mark mail as read.
 
 ---
 

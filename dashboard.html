@@ -408,6 +408,20 @@
   .activity-copy .document { color: var(--ink-2); overflow-wrap: anywhere; }
   .activity-copy .note { margin-top: 5px; color: var(--bad); font-size: 12px; }
   .activity-row .when { color: var(--ink-4); font: 10.5px var(--mono); white-space: nowrap; }
+  .fix-toolbar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 12px 15px; border-bottom: 1px solid var(--line); }
+  .fix-toolbar .eyebrow { margin-right: auto; }
+  .fix-filter { padding: 5px 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink-3); font-size: 11px; font-weight: 700; }
+  .fix-filter.on { border-color: var(--ochre); background: var(--ochre-soft); color: var(--ochre); }
+  .fix-list { display: flex; flex-direction: column; }
+  .fix-item { display: grid; grid-template-columns: 36px minmax(0,1fr) auto; gap: 13px; align-items: start; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+  .fix-item:last-child { border-bottom: 0; }
+  .fix-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-weight: 850; }
+  .fix-mark.high { background: var(--bad-soft); color: var(--bad); }
+  .fix-copy { min-width: 0; }
+  .fix-copy h3 { font-size: 13.5px; line-height: 1.35; overflow-wrap: anywhere; }
+  .fix-copy p { margin-top: 4px; color: var(--ink-3); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .fix-meta { display: flex; gap: 7px; align-items: center; margin-top: 8px; color: var(--ink-4); font-size: 10.5px; }
+  .fix-source { padding: 2px 7px; border-radius: 12px; background: var(--surface-2); color: var(--ink-3); font-weight: 750; }
   .voucher-row { cursor: pointer; }
   .voucher-detail { padding: 14px 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
   .voucher-detail .drow { display: flex; justify-content: space-between; padding: 5px 0; }
@@ -507,6 +521,8 @@
     .auto-result { grid-column: 1 / -1; }
     .activity-row { grid-template-columns: 30px minmax(0, 1fr); }
     .activity-row .when { grid-column: 2; }
+    .fix-item { grid-template-columns: 36px minmax(0,1fr); }
+    .fix-item > .btn { grid-column: 2; justify-self: start; }
     .instructions-layout { grid-template-columns: 1fr; }
     .role-guide-grid { grid-template-columns: 1fr; }
     .role-guide-item { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -546,6 +562,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
         Flagged
         <span class="count" id="flaggedNavCount" style="display:none"></span>
+      </button>
+      <button class="nav-item" data-view="fix" onclick="go('fix')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        To fix
+        <span class="count" id="fixNavCount" style="display:none"></span>
       </button>
       <button class="nav-item" data-view="triage" onclick="go('triage')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
@@ -719,6 +740,25 @@
       <div class="card full">
         <div class="card-h"><h3>Flagged vouchers</h3><div class="sub" id="flaggedSub"></div></div>
         <div class="card-b" id="flaggedRows"></div>
+      </div>
+    </section>
+
+    <!-- ===== TO FIX ===== -->
+    <section class="view" data-view="fix" id="viewFix" hidden>
+      <div class="hello">
+        <div>
+          <h1>Things to fix</h1>
+          <p>Real exceptions from vouchers and emails Ada has actually reviewed—rejections, calculation checks, missing references, and concrete discrepancies.</p>
+        </div>
+      </div>
+      <div class="card full">
+        <div class="fix-toolbar">
+          <span class="eyebrow" id="fixCount">Exceptions</span>
+          <button class="fix-filter on" type="button" data-fix-filter="all" onclick="setFixFilter('all')">All</button>
+          <button class="fix-filter" type="button" data-fix-filter="voucher" onclick="setFixFilter('voucher')">Vouchers</button>
+          <button class="fix-filter" type="button" data-fix-filter="email" onclick="setFixFilter('email')">Email</button>
+        </div>
+        <div class="fix-list" id="fixRows"></div>
       </div>
     </section>
 
@@ -1006,7 +1046,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   const CRUMB_NAMES = {
     overview: 'Overview', team: 'Team', vouchers: 'Vouchers', triage: 'Triage',
-    flagged: 'Flagged', chat: 'Ask Ada', automations: 'Automations',
+    flagged: 'Flagged', fix: 'To fix', chat: 'Ask Ada', automations: 'Automations',
     activity: 'Activity', instructions: 'Instructions',
   };
   const STATUS_INFO = {
@@ -1019,6 +1059,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
   let automationStates = {};
   let activityEvents = [], activityFilter = 'all';
+  let fixFilter = 'all';
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
@@ -1101,7 +1142,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     kpis.push({ key: 'flagged', n: 0, l: 'Flagged' });
     kpis.push({ key: 'triaged', n: '—', l: 'Emails triaged', sub: 'Triage not enabled yet' });
     kpis.push({ key: 'replies', n: '—', l: 'Replies drafted', sub: 'Drafting not enabled yet' });
-    kpis.push({ key: 'issues', n: '—', l: 'Issues flagged', sub: 'Triage not enabled yet' });
+    kpis.push({ key: 'issues', n: 0, l: 'Issues flagged', sub: 'Vouchers and reviewed mail' });
     kpis.push({ key: 'timesaved', n: '—', l: 'Est. time saved', sub: 'Tracking not enabled yet' });
     const kpiBox = document.getElementById('kpis');
 
@@ -1110,6 +1151,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     kpis.find(k => k.key === 'mine').n = voucherCounts.mine;
     if (seesApprovals) kpis.find(k => k.key === 'awaiting').n = voucherCounts.awaiting;
     kpis.find(k => k.key === 'flagged').n = voucherCounts.flagged;
+    kpis.find(k => k.key === 'issues').n = collectFixItems().length;
 
     const cards = document.getElementById('overviewCards');
     cards.appendChild(emptyCard(
@@ -1204,6 +1246,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       const html = automationResult(item);
       if (resultBox) { resultBox.hidden = !html; resultBox.innerHTML = html; }
     });
+    renderToFix();
   }
 
   async function updateAutomation(key, enabled, button) {
@@ -1461,6 +1504,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       }
       triageAnalyses.set(String(message.id), data.item);
       box.innerHTML = triageAnalysisHtml(message);
+      renderToFix();
       checkChatUsage();
     } catch {
       box.innerHTML = '<div class="triage-ada-body"><div class="msg-error">Could not reach Ada.</div><button class="btn" type="button" onclick="summarizeTriage()">Try again</button></div>';
@@ -1901,6 +1945,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       else { flagBadge.style.display = 'none'; }
     }
     renderFlagged();
+    renderToFix();
     renderActivity();
 
     return { mine, awaiting, flagged };
@@ -1926,6 +1971,88 @@ Do not promise a payment date unless it has already been approved."></textarea>
     box.innerHTML = flagged.length
       ? flagged.map(renderVoucherRow).join('')
       : '<div class="empty"><h4>Nothing flagged</h4><p>Every voucher you can see currently reconciles cleanly.</p></div>';
+  }
+
+  function collectFixItems() {
+    const items = [];
+    allVouchers.forEach(voucher => {
+      const notes = (voucher.computed && voucher.computed.review_notes) || [];
+      if (voucher.status !== 'rejected' && !notes.length) return;
+      const details = [];
+      if (voucher.status === 'rejected') details.push(`Rejected: ${voucher.rejection_reason || 'No reason recorded.'}`);
+      details.push(...notes);
+      items.push({
+        key: `voucher-${voucher.id}`, type: 'voucher', priority: voucher.status === 'rejected' ? 'high' : 'medium',
+        title: `${voucher.supplier_name} · Invoice ${voucher.invoice_number}`,
+        detail: details.join('\n'), meta: voucher.status === 'rejected' ? 'Rejected voucher' : 'Voucher review',
+        targetId: voucher.id,
+      });
+    });
+
+    const seenEmail = new Set();
+    const addEmail = (id, analysis, source) => {
+      const issues = Array.isArray(analysis && analysis.issues) ? analysis.issues.filter(Boolean) : [];
+      if (!issues.length || seenEmail.has(String(id))) return;
+      seenEmail.add(String(id));
+      const message = triageMessages.find(row => String(row.id) === String(id));
+      items.push({
+        key: `email-${id}`, type: 'email', priority: analysis.priority === 'high' ? 'high' : 'medium',
+        title: message ? (message.subject || '(no subject)') : (analysis.summary || 'Email issue'),
+        detail: issues.join('\n'), meta: message ? `From ${mailboxSender(message.from)}` : source,
+        targetId: String(id),
+      });
+    };
+    triageAnalyses.forEach((analysis, id) => addEmail(id, analysis, 'Ada email review'));
+    Object.values(automationStates).forEach(state => {
+      const result = state.latest_run && state.latest_run.result;
+      (result && Array.isArray(result.items) ? result.items : []).forEach(item =>
+        addEmail(item.id, item, state.name || 'Automation'));
+    });
+    return items;
+  }
+
+  function setFixFilter(filter) {
+    fixFilter = filter === 'voucher' || filter === 'email' ? filter : 'all';
+    document.querySelectorAll('[data-fix-filter]').forEach(button =>
+      button.classList.toggle('on', button.dataset.fixFilter === fixFilter));
+    renderToFix();
+  }
+
+  function renderToFix() {
+    const box = document.getElementById('fixRows');
+    if (!box) return;
+    const all = collectFixItems();
+    const visible = fixFilter === 'all' ? all : all.filter(item => item.type === fixFilter);
+    const badge = document.getElementById('fixNavCount');
+    badge.style.display = all.length ? 'inline-block' : 'none';
+    badge.textContent = all.length || '';
+    const issueKpi = document.querySelector('[data-kpi="issues"] .val');
+    if (issueKpi) issueKpi.textContent = all.length;
+    document.getElementById('fixCount').textContent = `${visible.length} ${visible.length === 1 ? 'exception' : 'exceptions'}`;
+    if (!visible.length) {
+      box.innerHTML = `<div class="empty"><div class="ico">${ICO_CHECK}</div><h4>Nothing to fix</h4><p>${fixFilter === 'all' ? 'No rejected or flagged vouchers, and no reviewed emails have concrete issues.' : `No ${fixFilter} exceptions are currently visible.`}</p></div>`;
+      return;
+    }
+    box.innerHTML = visible.map(item => `
+      <article class="fix-item">
+        <div class="fix-mark ${item.priority === 'high' ? 'high' : ''}">!</div>
+        <div class="fix-copy">
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>${escapeHtml(item.detail)}</p>
+          <div class="fix-meta"><span class="fix-source">${item.type === 'voucher' ? 'Voucher' : 'Email'}</span><span>${escapeHtml(item.meta)}</span></div>
+        </div>
+        <button class="btn sm" type="button" onclick="${item.type === 'voucher' ? "go('vouchers')" : `openFixEmail('${escapeHtml(item.targetId).replace(/'/g, '&#39;')}')`}">Review</button>
+      </article>`).join('');
+  }
+
+  async function openFixEmail(messageId) {
+    if (!triageMessages.length) await loadTriage();
+    go('triage');
+    if (triageMessages.some(message => String(message.id) === String(messageId))) {
+      selectTriage(String(messageId));
+    } else {
+      alert('That email is no longer in the recent inbox list. Refresh Triage to check again.');
+    }
   }
 
   const EVENT_INFO = {
