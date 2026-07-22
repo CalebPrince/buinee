@@ -113,6 +113,8 @@ def init_db() -> None:
                 salt          TEXT NOT NULL,
                 role          TEXT NOT NULL,
                 status        TEXT NOT NULL DEFAULT 'pending',
+                terms_accepted_at REAL,
+                terms_version TEXT NOT NULL DEFAULT '',
                 created_at    REAL NOT NULL
             );
 
@@ -480,6 +482,7 @@ def init_db() -> None:
         _migrate_team_message_recipient(conn)
         _migrate_crm_profile_fields(conn)
         _migrate_crm_task_assignee(conn)
+        _migrate_user_terms_acceptance(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -603,6 +606,14 @@ def _migrate_crm_task_assignee(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(crm_tasks)").fetchall()}
     if "assigned_user_id" not in cols:
         conn.execute("ALTER TABLE crm_tasks ADD COLUMN assigned_user_id INTEGER REFERENCES users(id)")
+
+
+def _migrate_user_terms_acceptance(conn: sqlite3.Connection) -> None:
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "terms_accepted_at" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN terms_accepted_at REAL")
+    if "terms_version" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN terms_version TEXT NOT NULL DEFAULT ''")
 
 
 # ------------------------------------------------------------------ passwords
@@ -2028,6 +2039,12 @@ def get_team_file(company_id: int, viewer_id: int, file_id: int, include_content
             (company_id, file_id, viewer_id, viewer_id, viewer_id, viewer_id),
         ).fetchone()
     return dict(row) if row else None
+
+
+def record_terms_acceptance(user_id: int, version: str) -> None:
+    with _cursor() as conn:
+        conn.execute("UPDATE users SET terms_accepted_at=?, terms_version=? WHERE id=?",
+                     (time.time(), version[:40], user_id))
 
 
 def automation_states(user_id: int) -> dict[str, dict]:

@@ -208,6 +208,7 @@ MAX_HISTORY = 8
 # --- auth ---------------------------------------------------------------
 COOKIE_NAME = "ledgerline_session"
 ADMIN_COOKIE_NAME = "ledgerline_admin_session"
+TERMS_VERSION = "2026-07-22"
 
 PROVIDER_KEYS = {
     "anthropic": "ANTHROPIC_API_KEY",
@@ -1181,6 +1182,8 @@ class RouteHandlerMixin:
         except Exception:
             return self._json({"error": "Bad request."}, 400)
         try:
+            if req.get("terms_accepted") is not True:
+                return self._json({"error": "You must agree to the Terms of Use and Privacy Policy."}, 400)
             plan_id = int(req["plan_id"]) if req.get("plan_id") is not None else None
         except (TypeError, ValueError):
             plan_id = None
@@ -1205,6 +1208,7 @@ class RouteHandlerMixin:
             }, 409)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
+        db.record_terms_acceptance(user["id"], TERMS_VERSION)
         token = db.create_session(user["id"])
         return self._json(
             {"ok": True, "user": public_user(user)},
@@ -1434,6 +1438,8 @@ class RouteHandlerMixin:
         except (TypeError, ValueError):
             return self._json({"error": "Pick a company from the list first."}, 400)
         try:
+            if req.get("terms_accepted") is not True:
+                return self._json({"error": "You must agree to the Terms of Use and Privacy Policy."}, 400)
             user = db.request_to_join(
                 company_id,
                 str(req.get("name") or ""),
@@ -1444,6 +1450,7 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
 
+        db.record_terms_acceptance(user["id"], TERMS_VERSION)
         if user["status"] == "approved":
             # Only reachable by claiming Supervisor on a company that
             # doesn't have one yet — same bootstrap case as registering.

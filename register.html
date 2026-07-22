@@ -197,6 +197,9 @@
   .clash .btnrow .btn { flex: 1; min-width: 150px; }
 
   .note { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+  .terms-check { flex-direction: row; align-items: flex-start; gap: 9px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); font-size: 12px; font-weight: 500; line-height: 1.45; }
+  .terms-check input { width: 17px; height: 17px; margin: 1px 0 0; flex: none; accent-color: var(--violet); }
+  .terms-check a { color: var(--violet); font-weight: 700; }
   .msg { font-size: 13.5px; padding: 10px 13px; border-radius: 9px; display: none; }
   .msg.show { display: block; }
   .msg.error { background: var(--bad-soft); color: var(--bad); }
@@ -366,6 +369,7 @@
         <label>Password
           <input type="password" id="regPassword" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
         </label>
+        <label class="terms-check"><input type="checkbox" id="regTerms" required><span>I agree to Buinee’s <a href="/terms.html" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy.html" target="_blank">Privacy Policy</a>.</span></label>
         <button class="btn primary" type="submit" id="regSubmit">Register company</button>
         <p class="note" id="regNote">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
       </form>
@@ -400,6 +404,7 @@
             <option value="finance_supervisor">Supervisor — only if nobody holds this role yet</option>
           </select>
         </label>
+        <label class="terms-check"><input type="checkbox" id="joinTerms" required><span>I agree to Buinee’s <a href="/terms.html" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy.html" target="_blank">Privacy Policy</a>.</span></label>
         <button class="btn primary" type="submit" id="joinSubmit">Request to join</button>
         <p class="note">A supervisor at that company approves every join request before it's active — company name alone doesn't grant access. The one exception: claiming Supervisor when the company doesn't have one yet gets you in immediately, since there'd be no one to approve it.</p>
       </form>
@@ -526,6 +531,7 @@
       document.getElementById('joinName').value = document.getElementById('regName').value;
       document.getElementById('joinEmail').value = document.getElementById('regEmail').value;
       document.getElementById('joinPassword').value = document.getElementById('regPassword').value;
+      document.getElementById('joinTerms').checked = document.getElementById('regTerms').checked;
       showMode('join');
       pickCompany(company);
     };
@@ -541,6 +547,7 @@
     showMsg('registerError', '');
     document.getElementById('clash').classList.remove('show');
     if (!chosenPlan) { showMode('register'); return false; }
+    if (!document.getElementById('regTerms').checked) { showMsg('registerError', 'Agree to the Terms of Use and Privacy Policy to continue.'); return false; }
     const btn = document.getElementById('regSubmit');
     const idleLabel = btn.textContent;
     btn.disabled = true; btn.textContent = 'Setting up…';
@@ -556,6 +563,7 @@
           role: document.getElementById('regRole').value,
           plan_id: chosenPlan.id,
           allow_duplicate_name: allowDuplicateName,
+          terms_accepted: document.getElementById('regTerms').checked,
         }),
       });
       const data = await res.json();
@@ -632,6 +640,7 @@
     ev.preventDefault();
     showMsg('joinError', '');
     if (!pickedCompany) { showMsg('joinError', 'Pick your company from the list first.'); return false; }
+    if (!document.getElementById('joinTerms').checked) { showMsg('joinError', 'Agree to the Terms of Use and Privacy Policy to continue.'); return false; }
     const btn = document.getElementById('joinSubmit');
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
@@ -644,6 +653,7 @@
           email: document.getElementById('joinEmail').value,
           password: document.getElementById('joinPassword').value,
           role: document.getElementById('joinRole').value,
+          terms_accepted: document.getElementById('joinTerms').checked,
         }),
       });
       const data = await res.json();
