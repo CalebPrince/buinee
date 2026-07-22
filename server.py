@@ -337,7 +337,7 @@ def session_token(handler) -> str | None:
     return _cookie(handler, COOKIE_NAME)
 
 
-def live_mailbox(user_id: int, cfg: dict) -> tuple[dict, dict]:
+def live_mailbox(user_id: int, cfg: dict, connection_id: int | None = None) -> tuple[dict, dict]:
     """A user's connection plus usable, current credentials.
 
     Everything that touches a mailbox goes through here rather than trusting
@@ -347,7 +347,7 @@ def live_mailbox(user_id: int, cfg: dict) -> tuple[dict, dict]:
     (revoked, password changed, admin removed the app), so the connection is
     dropped - the UI should say "not connected", not fail forever.
     """
-    conn = db.get_mailbox_connection(user_id)
+    conn = db.get_mailbox_connection(user_id, connection_id)
     if not conn:
         raise mailbox.MailboxError("No mailbox is connected.")
     try:
@@ -358,20 +358,26 @@ def live_mailbox(user_id: int, cfg: dict) -> tuple[dict, dict]:
     try:
         fresh = mailbox.refresh(cfg, conn["provider"], creds)
     except mailbox.MailboxError:
-        db.delete_mailbox_connection(user_id)
+        db.delete_mailbox_connection(user_id, conn["id"])
         raise mailbox.MailboxError(
             "The mailbox connection has expired or been revoked. "
             "Connect it again to carry on."
         )
     if fresh:
-        db.update_mailbox_credentials(user_id, secretstore.encrypt(cfg, fresh))
+        db.update_mailbox_credentials(user_id, secretstore.encrypt(cfg, fresh), conn["id"])
         creds = fresh
     return conn, creds
 
 
 def public_mailbox(user_id: int, cfg: dict) -> dict:
     """What the dashboard is told about someone's mailbox. Never credentials."""
-    conn = db.get_mailbox_connection(user_id)
+    connections = db.list_mailbox_connections(user_id)
+    user = db.get_user(user_id)
+    limit = db.plan_for_company(user["company_id"])["mailbox_limit"] if user else 1
+    accounts = [{"id": conn["id"], "provider": conn["provider"],
+                 "label": mailbox.LABELS.get(conn["provider"], conn["provider"]),
+                 "email": conn["account_email"], "name": conn["account_name"],
+                 "connected_at": conn["connected_at"]} for conn in connections]
     return {
         # Which providers this deployment can actually offer. An empty list
         # is a different situation from "you haven't connected yet", and the
@@ -383,14 +389,9 @@ def public_mailbox(user_id: int, cfg: dict) -> dict:
         # needs to explain why connecting is unavailable.
         "secrets_ready": secretstore.is_ready(cfg),
         "secrets_problem": secretstore.why_unavailable(cfg),
-        "connected": bool(conn),
-        "account": {
-            "provider": conn["provider"],
-            "label": mailbox.LABELS.get(conn["provider"], conn["provider"]),
-            "email": conn["account_email"],
-            "name": conn["account_name"],
-            "connected_at": conn["connected_at"],
-        } if conn else None,
+        "connected": bool(accounts), "accounts": accounts,
+        "account": accounts[0] if accounts else None,
+        "mailbox_limit": limit, "can_connect": len(accounts) < limit,
     }
 
 
@@ -579,8 +580,10 @@ def run_automation(user_id: int, recipe_key: str) -> dict:
     provider, model = resolve_provider_model(cfg, pub["company"])
     if not provider:
         raise ValueError("Ada isn't configured on this server yet.")
-    connection, creds = live_mailbox(user_id, cfg)
-    messages = mailbox.list_recent(cfg, connection, creds, include_body=True)
+    messages = []
+    for saved in db.list_mailbox_connections(user_id):
+        connection, creds = live_mailbox(user_id, cfg, saved["id"])
+        messages.extend(mailbox.list_recent(cfg, connection, creds, include_body=True))
     readable = [m for m in messages if (m.get("body") or "").strip()]
     if not readable:
         return {"headline": "No readable new mail", "items": [], "message_count": 0}
@@ -1051,11 +1054,17 @@ class RouteHandlerMixin:
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
             try:
-                conn, creds = live_mailbox(user["id"], load_env())
                 include_body = parse_qs(urlparse(self.path).query).get("body", ["0"])[0] == "1"
-                msgs = mailbox.list_recent(
-                    load_env(), conn, creds, include_body=include_body
-                )
+                msgs = []
+                for saved in db.list_mailbox_connections(user["id"]):
+                    conn, creds = live_mailbox(user["id"], load_env(), saved["id"])
+                    for msg in mailbox.list_recent(load_env(), conn, creds, include_body=include_body):
+                        msg["connection_id"] = conn["id"]
+                        msg["mailbox_email"] = conn["account_email"]
+                        msg["id"] = f"{conn['id']}:{msg['id']}"
+                        msgs.append(msg)
+                msgs.sort(key=lambda item: item.get("received") or "", reverse=True)
+                msgs = msgs[:25]
             except mailbox.MailboxError as exc:
                 return self._json({"error": str(exc)}, 400)
             return self._json({"messages": msgs})
@@ -1067,11 +1076,16 @@ class RouteHandlerMixin:
             query = parse_qs(urlparse(self.path).query)
             message_id = str(query.get("message_id", [""])[0])
             part = str(query.get("part", [""])[0])
-            if not message_id or not part or len(message_id) > 1000 or len(part) > 2000:
+            try:
+                connection_id_text, provider_message_id = message_id.split(":", 1)
+                connection_id = int(connection_id_text)
+            except (ValueError, TypeError):
+                return self._json({"error": "Bad attachment reference."}, 400)
+            if not provider_message_id or not part or len(provider_message_id) > 1000 or len(part) > 2000:
                 return self._json({"error": "Bad attachment reference."}, 400)
             try:
-                connection, creds = live_mailbox(user["id"], load_env())
-                attachment = mailbox.get_attachment(connection, creds, message_id, part)
+                connection, creds = live_mailbox(user["id"], load_env(), connection_id)
+                attachment = mailbox.get_attachment(connection, creds, provider_message_id, part)
             except mailbox.MailboxError as exc:
                 return self._json({"error": str(exc)}, 400)
             disposition = "attachment; filename*=UTF-8''" + quote(attachment["name"])
@@ -1094,6 +1108,8 @@ class RouteHandlerMixin:
             user = current_user(self)
             if not user or user["status"] != "approved":
                 return self._redirect("/login")
+            if len(db.list_mailbox_connections(user["id"])) >= db.plan_for_company(user["company_id"])["mailbox_limit"]:
+                return self._redirect("/dashboard?mailbox=limit")
             cfg = load_env()
             provider = parse_qs(urlparse(self.path).query).get("provider", [""])[0]
             if provider not in mailbox.OAUTH or not mailbox.is_configured(cfg, provider):
@@ -1492,7 +1508,13 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
-        db.delete_mailbox_connection(user["id"])
+        if len(db.list_mailbox_connections(user["id"])) >= db.plan_for_company(user["company_id"])["mailbox_limit"]:
+            return self._json({"error": "Your plan's mailbox limit has been reached."}, 402)
+        try:
+            connection_id = int(self._body().get("connection_id"))
+        except Exception:
+            return self._json({"error": "Choose a mailbox to disconnect."}, 400)
+        db.delete_mailbox_connection(user["id"], connection_id)
         return self._json({"ok": True, "mailbox": public_mailbox(user["id"], load_env())})
 
     def _handle_automation_update(self):
@@ -1557,6 +1579,11 @@ class RouteHandlerMixin:
         message_id = str(req.get("message_id") or "").strip()
         if not message_id:
             return self._json({"error": "Choose an email first."}, 400)
+        try:
+            connection_id_text, provider_message_id = message_id.split(":", 1)
+            connection_id = int(connection_id_text)
+        except (ValueError, TypeError):
+            return self._json({"error": "That email reference is invalid."}, 400)
 
         gate = db.can_use_chat(user["company_id"])
         if not gate["allowed"]:
@@ -1573,11 +1600,11 @@ class RouteHandlerMixin:
             return self._json({"error": "Ada isn't configured on this server yet."}, 503)
 
         try:
-            connection, creds = live_mailbox(user["id"], cfg)
+            connection, creds = live_mailbox(user["id"], cfg, connection_id)
             messages = mailbox.list_recent(cfg, connection, creds, include_body=True)
         except mailbox.MailboxError as exc:
             return self._json({"error": str(exc)}, 400)
-        message = next((m for m in messages if str(m.get("id")) == message_id), None)
+        message = next((m for m in messages if str(m.get("id")) == provider_message_id), None)
         if not message:
             return self._json({"error": "That email is no longer in the recent inbox list."}, 404)
         if not (message.get("body") or "").strip():
@@ -2402,6 +2429,7 @@ class RouteHandlerMixin:
                 chat_enabled=bool(req.get("chat_enabled")),
                 chat_monthly_limit=chat_limit,
                 audience=str(req.get("audience") or "team"),
+                mailbox_limit=int(req.get("mailbox_limit") or 1),
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)
@@ -2433,6 +2461,7 @@ class RouteHandlerMixin:
                 user_limit=(int(req["user_limit"]) if req.get("user_limit") is not None else None),
                 chat_enabled=(bool(req["chat_enabled"]) if "chat_enabled" in req else None),
                 chat_monthly_limit=chat_limit,
+                mailbox_limit=(int(req["mailbox_limit"]) if req.get("mailbox_limit") is not None else None),
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)

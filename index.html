@@ -709,6 +709,7 @@
     const solo = p.audience === "individual";
     const seats = solo ? "Just you" : `Up to ${p.user_limit} people`;
     const items = [[seats, true], ["Messages, documents and workflows", true],
+                   [`${p.mailbox_limit} connected mailbox${p.mailbox_limit === 1 ? '' : 'es'} per user`, true],
                    [solo ? "Your own activity history" : "Team roles and activity history", true],
                    [p.team_chat_enabled ? "Team chat, direct messages and shared files" : "Team chat not included", !!p.team_chat_enabled]];
     if (!p.chat_enabled) {

@@ -1999,7 +1999,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       <div class="triage-desk-inner">
         <div class="eyebrow">${m.unread ? 'Unread message' : 'Recent message'}</div>
         <h1>${escapeHtml(m.subject || '(no subject)')}</h1>
-        <div class="triage-meta">From <b>${escapeHtml(sender)}</b>${m.received ? ` · ${escapeHtml(new Date(m.received).toLocaleString())}` : ''}</div>
+        <div class="triage-meta">From <b>${escapeHtml(sender)}</b>${m.mailbox_email ? ` · Inbox ${escapeHtml(m.mailbox_email)}` : ''}${m.received ? ` · ${escapeHtml(new Date(m.received).toLocaleString())}` : ''}</div>
         <div class="triage-body">${escapeHtml(m.body || 'This message has no readable text body.')}</div>
         ${attachmentHtml}
         <div class="triage-ada" id="triageAda">${triageAnalysisHtml(m)}</div>
@@ -2117,6 +2117,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     badstate: ['warn', 'That sign-in link had expired or belonged to another session. Start the connection again.'],
     unconfigured: ['warn', 'That mail provider isn\'t set up on this deployment yet.'],
     nokey: ['warn', 'Mailbox credentials can\'t be stored safely on this deployment yet, so the connection was refused.'],
+    limit: ['warn', 'Your plan\'s connected-mailbox limit has been reached. Disconnect one mailbox or upgrade the plan to add another.'],
   };
 
   function showMailboxResult() {
@@ -2159,7 +2160,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       ico.textContent = icon[0];
       ico.style.background = data.account.provider === 'google' ? '#4285f4'
         : data.account.provider === 'microsoft' ? '#1676c4' : 'var(--ink-3)';
-      name.textContent = data.account.label || 'Email inbox';
+      name.textContent = data.accounts.length > 1 ? `${data.accounts.length} mailboxes` : (data.account.label || 'Email inbox');
       document.getElementById('mailboxSource').title =
         `${data.account.label} · ${data.account.email}`;
       return;
@@ -2191,24 +2192,9 @@ Do not promise a payment date unless it has already been approved."></textarea>
       return;
     }
     if (data.connected) {
-      const icon = sourceIcon(data.account.provider);
-      options.innerHTML = `
-        <div class="source-option">
-          <span class="source-option-icon ${icon[1]}">${icon[0]}</span>
-          <span class="source-option-copy"><b>${escapeHtml(data.account.label)}</b><span>${escapeHtml(data.account.email)}</span></span>
-          <span class="source-option-state">Connected</span>
-        </div>
-        <button class="btn bad" id="sourceDisconnect" type="button" onclick="disconnectMailbox()">Disconnect mailbox</button>
-        ${data.account.provider === 'google' ? '' : `<button class="source-option" type="button" disabled>
-          <span class="source-option-icon google">G</span>
-          <span class="source-option-copy"><b>Gmail / Google Workspace</b><span>Google authorization will be added later</span></span>
-          <span class="source-option-state">Coming soon</span>
-        </button>`}
-        <button class="source-option" type="button" disabled>
-          <span class="source-option-icon accounts">$</span>
-          <span class="source-option-copy"><b>Accounting system</b><span>Voucher cross-checking and reconciliation</span></span>
-          <span class="source-option-state">Coming later</span>
-        </button>`;
+      const connected = (data.accounts || []).map(account => { const icon=sourceIcon(account.provider); return `<div class="source-option"><span class="source-option-icon ${icon[1]}">${icon[0]}</span><span class="source-option-copy"><b>${escapeHtml(account.label)}</b><span>${escapeHtml(account.email)}</span></span><button class="btn sm bad" type="button" onclick="disconnectMailbox(${account.id})">Disconnect</button></div>`; }).join('');
+      const more = data.can_connect ? data.providers.map(p => { const icon=sourceIcon(p.id); return `<button class="source-option" type="button" onclick="connectMailbox('${p.id}')"><span class="source-option-icon ${icon[1]}">${icon[0]}</span><span class="source-option-copy"><b>${escapeHtml(p.label)}</b><span>Connect another inbox</span></span><span class="source-option-state">Connect</span></button>`; }).join('') : `<div class="source-modal-note">Your plan includes ${data.mailbox_limit} mailbox${data.mailbox_limit===1?'':'es'} per user. Upgrade or change the allowance in your plan to add more.</div>`;
+      options.innerHTML = `<div class="source-modal-note">Connected ${(data.accounts||[]).length} of ${data.mailbox_limit}</div>${connected}${more}`;
     } else if (!data.secrets_ready) {
       options.innerHTML = `<div class="source-modal-note">${escapeHtml(data.secrets_problem)}</div>`;
     } else if (!data.providers.length) {
@@ -2305,29 +2291,26 @@ Do not promise a payment date unless it has already been approved."></textarea>
     return false;
   }
 
-  async function disconnectMailbox() {
+  async function disconnectMailbox(connectionId) {
     let where = '';
     try {
       const res = await fetch('/api/mailbox/status', { credentials: 'same-origin' });
       const data = await res.json();
-      where = REVOKE_AT[(data.account || {}).provider] || '';
+      const account = (data.accounts || []).find(item => item.id === connectionId);
+      where = REVOKE_AT[(account || {}).provider] || '';
     } catch {}
     const tail = where
       ? ` To withdraw the permission at the provider's end too, remove Buinee at ${where}.`
       : ' The stored password is deleted.';
     if (!confirm('Disconnect this mailbox? Buinee stops reading it straight away.' + tail)) return;
-    const btn = document.getElementById('sourceDisconnect');
-    if (btn) btn.disabled = true;
     try {
-      const res = await fetch('/api/mailbox/disconnect', { method: 'POST', credentials: 'same-origin' });
+      const res = await fetch('/api/mailbox/disconnect', { method: 'POST', credentials: 'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({connection_id:connectionId}) });
       if (!res.ok) { alert('Could not disconnect.'); return; }
       await loadMailbox();
       closeSourceModal();
     } catch {
       alert('Could not reach the server.');
-    } finally {
-      if (btn) btn.disabled = false;
-    }
+    } finally {}
   }
 
   async function checkChatAvailable() {

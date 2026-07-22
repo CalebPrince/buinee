@@ -262,6 +262,9 @@
                   <input type="text" id="newCurrency" value="GHS" maxlength="6" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
                 </label>
               </div>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:14px">Mailboxes per user
+                <input type="number" id="newMailboxLimit" value="1" min="1" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
+              </label>
               <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;align-items:end">
                 <label style="display:flex;flex-direction:row;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink-2)">
                   <input type="checkbox" id="newChatEnabled" style="width:auto">
@@ -340,6 +343,7 @@
             ? 'One person, their own workspace'
             : `Up to <b>${p.user_limit}</b> user${p.user_limit === 1 ? '' : 's'}`}</div>
         <div class="plan-limit">Team chat: <b>${p.team_chat_enabled ? 'included' : 'not included'}</b></div>
+        <div class="plan-limit">Connected mailboxes per user: <b>${p.mailbox_limit}</b></div>
         <div class="plan-limit">${p.chat_enabled
             ? `AI assistant: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
             : 'AI assistant: <b>not included</b>'}</div>
@@ -362,6 +366,9 @@
           <label>User limit
             <input type="number" id="editLimit-${p.id}" value="${p.user_limit}" min="1"
               ${p.audience === 'individual' ? 'disabled title="An individual plan always covers exactly one person."' : ''}>
+          </label>
+          <label>Mailboxes per user
+            <input type="number" id="editMailboxLimit-${p.id}" value="${p.mailbox_limit}" min="1">
           </label>
           <label style="flex-direction:row;align-items:center;gap:7px">
             <input type="checkbox" id="editChatEnabled-${p.id}" ${p.chat_enabled ? 'checked' : ''} style="width:auto">
@@ -398,6 +405,7 @@
           user_limit: document.getElementById(`editLimit-${id}`).value,
           chat_enabled: document.getElementById(`editChatEnabled-${id}`).checked,
           chat_monthly_limit: document.getElementById(`editChatLimit-${id}`).value || null,
+          mailbox_limit: document.getElementById(`editMailboxLimit-${id}`).value,
         }),
       });
       const data = await res.json();
@@ -444,6 +452,7 @@
           chat_enabled: document.getElementById('newChatEnabled').checked,
           chat_monthly_limit: document.getElementById('newChatLimit').value || null,
           audience: document.getElementById('newAudience').value,
+          mailbox_limit: document.getElementById('newMailboxLimit').value,
         }),
       });
       const data = await res.json();

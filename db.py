@@ -514,8 +514,10 @@ def init_db() -> None:
         # no-op here because there are no rows to backfill yet.
         _migrate_plan_chat_gating(conn)
         _migrate_plan_audience(conn)
+        _migrate_multiple_mailboxes(conn)
         _seed_default_plans(conn)
         _seed_individual_plans(conn)
+        _migrate_plan_mailbox_limits(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
@@ -600,6 +602,33 @@ def _migrate_plan_audience(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE plans ADD COLUMN audience TEXT NOT NULL DEFAULT 'team'"
         )
+
+
+def _migrate_plan_mailbox_limits(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(plans)").fetchall()]
+    if "mailbox_limit" not in cols:
+        conn.execute("ALTER TABLE plans ADD COLUMN mailbox_limit INTEGER NOT NULL DEFAULT 1")
+        conn.execute("UPDATE plans SET mailbox_limit=3 WHERE name IN ('Starter','Solo Pro')")
+        conn.execute("UPDATE plans SET mailbox_limit=10 WHERE name='Growth'")
+
+
+def _migrate_multiple_mailboxes(conn: sqlite3.Connection) -> None:
+    cols = conn.execute("PRAGMA table_info(mailbox_connections)").fetchall()
+    if any(row["name"] == "id" for row in cols):
+        return
+    conn.execute("ALTER TABLE mailbox_connections RENAME TO mailbox_connections_single")
+    conn.execute("""CREATE TABLE mailbox_connections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id), company_id INTEGER NOT NULL REFERENCES companies(id),
+        provider TEXT NOT NULL DEFAULT 'microsoft', account_email TEXT NOT NULL DEFAULT '',
+        account_name TEXT NOT NULL DEFAULT '', imap_host TEXT NOT NULL DEFAULT '', imap_port INTEGER NOT NULL DEFAULT 0,
+        credentials_enc TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', connected_at REAL NOT NULL,
+        UNIQUE(user_id, provider, account_email))""")
+    conn.execute("""INSERT INTO mailbox_connections
+        (user_id,company_id,provider,account_email,account_name,imap_host,imap_port,credentials_enc,scopes,connected_at)
+        SELECT user_id,company_id,provider,account_email,account_name,imap_host,imap_port,credentials_enc,scopes,connected_at
+        FROM mailbox_connections_single""")
+    conn.execute("DROP TABLE mailbox_connections_single")
 
 
 def _migrate_company_plan_id(conn: sqlite3.Connection) -> None:
@@ -939,7 +968,7 @@ def consume_oauth_state(state: str) -> tuple[int, str] | None:
 
 
 def save_mailbox_connection(user_id: int, company_id: int, connection: dict,
-                             credentials_enc: str) -> None:
+                             credentials_enc: str) -> int:
     """Store (or replace) someone's mailbox connection.
 
     Takes credentials already encrypted - this layer never sees a key and
@@ -952,10 +981,7 @@ def save_mailbox_connection(user_id: int, company_id: int, connection: dict,
                (user_id, company_id, provider, account_email, account_name,
                 imap_host, imap_port, credentials_enc, scopes, connected_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(user_id) DO UPDATE SET
-                 company_id = excluded.company_id,
-                 provider = excluded.provider,
-                 account_email = excluded.account_email,
+               ON CONFLICT(user_id, provider, account_email) DO UPDATE SET
                  account_name = excluded.account_name,
                  imap_host = excluded.imap_host,
                  imap_port = excluded.imap_port,
@@ -967,26 +993,36 @@ def save_mailbox_connection(user_id: int, company_id: int, connection: dict,
              connection.get("imap_port", 0), credentials_enc,
              connection.get("scopes", ""), time.time()),
         )
+        row = conn.execute("SELECT id FROM mailbox_connections WHERE user_id=? AND provider=? AND account_email=?",
+                           (user_id, connection["provider"], connection["account_email"])).fetchone()
+    return row["id"]
 
 
-def get_mailbox_connection(user_id: int) -> dict | None:
+def list_mailbox_connections(user_id: int) -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute("SELECT * FROM mailbox_connections WHERE user_id=? ORDER BY connected_at", (user_id,)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_mailbox_connection(user_id: int, connection_id: int | None = None) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT * FROM mailbox_connections WHERE user_id = ?", (user_id,)
+            "SELECT * FROM mailbox_connections WHERE user_id=? AND (? IS NULL OR id=?) ORDER BY id LIMIT 1",
+            (user_id, connection_id, connection_id)
         ).fetchone()
     return dict(row) if row else None
 
 
-def update_mailbox_credentials(user_id: int, credentials_enc: str) -> None:
+def update_mailbox_credentials(user_id: int, credentials_enc: str, connection_id: int | None = None) -> None:
     """Write back re-encrypted credentials after a token refresh."""
     with _cursor() as conn:
         conn.execute(
-            "UPDATE mailbox_connections SET credentials_enc = ? WHERE user_id = ?",
-            (credentials_enc, user_id),
+            "UPDATE mailbox_connections SET credentials_enc=? WHERE user_id=? AND (? IS NULL OR id=?)",
+            (credentials_enc, user_id, connection_id, connection_id),
         )
 
 
-def delete_mailbox_connection(user_id: int) -> None:
+def delete_mailbox_connection(user_id: int, connection_id: int | None = None) -> None:
     """Forget a mailbox entirely - credentials included.
 
     This is Buinee's side only. For the OAuth providers the consent still
@@ -994,7 +1030,8 @@ def delete_mailbox_connection(user_id: int) -> None:
     account, which the UI tells them.
     """
     with _cursor() as conn:
-        conn.execute("DELETE FROM mailbox_connections WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM mailbox_connections WHERE user_id=? AND (? IS NULL OR id=?)",
+                     (user_id, connection_id, connection_id))
 
 
 # ------------------------------------------------------------------ plans
@@ -1034,7 +1071,7 @@ def get_default_plan() -> dict:
 
 def create_plan(name: str, price: float, currency: str, user_limit: int,
                  chat_enabled: bool = False, chat_monthly_limit: int | None = None,
-                 audience: str = "team") -> dict:
+                 audience: str = "team", mailbox_limit: int = 1) -> dict:
     name = name.strip()
     currency = currency.strip().upper() or "GHS"
     if len(name) < 2:
@@ -1045,6 +1082,8 @@ def create_plan(name: str, price: float, currency: str, user_limit: int,
         raise AuthError("An individual plan covers exactly 1 person.")
     if user_limit < 1:
         raise AuthError("A plan needs to allow at least 1 user.")
+    if mailbox_limit < 1:
+        raise AuthError("A plan needs to allow at least one mailbox.")
     if price < 0:
         raise AuthError("Price can't be negative.")
     if chat_monthly_limit is not None and chat_monthly_limit < 0:
@@ -1053,10 +1092,10 @@ def create_plan(name: str, price: float, currency: str, user_limit: int,
         next_sort = conn.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM plans").fetchone()["n"]
         cur = conn.execute(
             """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
-                                   chat_enabled, chat_monthly_limit, audience, created_at)
-               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
+                                   chat_enabled, chat_monthly_limit, audience, mailbox_limit, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)""",
             (name, price, currency, user_limit, next_sort,
-             int(bool(chat_enabled)), chat_monthly_limit, audience, time.time()),
+             int(bool(chat_enabled)), chat_monthly_limit, audience, mailbox_limit, time.time()),
         )
         plan_id = cur.lastrowid
     return get_plan(plan_id)
@@ -1064,7 +1103,8 @@ def create_plan(name: str, price: float, currency: str, user_limit: int,
 
 def update_plan(plan_id: int, name: str | None = None, price: float | None = None,
                  currency: str | None = None, user_limit: int | None = None,
-                 chat_enabled: bool | None = None, chat_monthly_limit: int | float | None = "unset") -> dict:
+                 chat_enabled: bool | None = None, chat_monthly_limit: int | float | None = "unset",
+                 mailbox_limit: int | None = None) -> dict:
     plan = get_plan(plan_id)
     if not plan:
         raise AuthError("No such plan.")
@@ -1076,6 +1116,9 @@ def update_plan(plan_id: int, name: str | None = None, price: float | None = Non
     new_price = plan["price"] if price is None else price
     new_currency = (currency.strip().upper() if currency and currency.strip() else plan["currency"])
     new_limit = plan["user_limit"] if user_limit is None else user_limit
+    new_mailbox_limit = plan["mailbox_limit"] if mailbox_limit is None else mailbox_limit
+    if new_mailbox_limit < 1:
+        raise AuthError("A plan needs to allow at least one mailbox.")
     # Audience is fixed at creation. Flipping a team plan to individual would
     # strand every company already on it above the seat cap, and widening an
     # individual plan past one seat would quietly turn someone's personal
@@ -1095,8 +1138,8 @@ def update_plan(plan_id: int, name: str | None = None, price: float | None = Non
     with _cursor() as conn:
         conn.execute(
             "UPDATE plans SET name = ?, price = ?, currency = ?, user_limit = ?, "
-            "chat_enabled = ?, chat_monthly_limit = ? WHERE id = ?",
-            (new_name, new_price, new_currency, new_limit, new_chat_enabled, new_chat_limit, plan_id),
+            "chat_enabled = ?, chat_monthly_limit = ?, mailbox_limit=? WHERE id = ?",
+            (new_name, new_price, new_currency, new_limit, new_chat_enabled, new_chat_limit, new_mailbox_limit, plan_id),
         )
     return get_plan(plan_id)
 
