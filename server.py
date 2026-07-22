@@ -788,6 +788,42 @@ def paystack_config(cfg: dict) -> dict:
     }
 
 
+def _mail_received_timestamp(value: str) -> float:
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError):
+        try:
+            parsed = email.utils.parsedate_to_datetime(value)
+            return parsed.timestamp() if parsed else 0
+        except (ValueError, TypeError, OverflowError):
+            return 0
+
+
+def recent_mail_context(user_id: int, cfg: dict, limit: int = 8) -> str:
+    """Recent connected-mail content supplied only for mailbox-related chat."""
+    messages = []
+    for saved in db.list_mailbox_connections(user_id):
+        try:
+            connection, creds = live_mailbox(user_id, cfg, saved["id"])
+            for item in mailbox.list_recent(cfg, connection, creds, limit=5, include_body=True):
+                item = dict(item)
+                item["mailbox_email"] = connection["account_email"]
+                messages.append(item)
+        except mailbox.MailboxError:
+            continue
+    messages.sort(key=lambda item: _mail_received_timestamp(item.get("received") or ""), reverse=True)
+    lines = []
+    for index, item in enumerate(messages[:limit], 1):
+        attachments = ", ".join(file.get("name") or "attachment" for file in item.get("attachments", [])) or "none"
+        lines.append(
+            f"### {index}. {'LATEST EMAIL' if index == 1 else 'Recent email'}\n"
+            f"Inbox: {item.get('mailbox_email') or ''}\nFrom: {item.get('from') or ''}\n"
+            f"Received: {item.get('received') or ''}\nSubject: {item.get('subject') or '(no subject)'}\n"
+            f"Attachments: {attachments}\nBody:\n{(item.get('body') or '(no readable body)')[:12000]}"
+        )
+    return "\n\n".join(lines)
+
+
 def paystack_api(method: str, path: str, cfg: dict, payload: dict | None = None) -> dict:
     ps = paystack_config(cfg)
     if not ps["secret_key"]:
@@ -2141,6 +2177,10 @@ class RouteHandlerMixin:
         for v in vouchers:
             enrich_voucher(v)
         digest = build_voucher_digest(vouchers)
+        if re.search(r"\b(email|emails|mailbox|inbox|sender|thread|reply|replies)\b", message, re.I):
+            mail_context = recent_mail_context(user["id"], cfg)
+            digest += ("\n\n## Recent connected mailbox messages\n"
+                       + (mail_context or "No recent readable messages were returned by the connected mailboxes."))
 
         try:
             reply = providers.chat(
