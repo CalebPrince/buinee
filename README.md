@@ -113,10 +113,12 @@ section before assuming this applies):
 | `index.html` | Public landing page, with a rate-limited public demo agent |
 | `register.html` | Register a new company, or request to join one that exists |
 | `login.html` | Sign in |
+| `legal.html` | Shared Privacy, Terms, Cookie, Refund and Security document page, routed under their public URLs |
 | `dashboard.html` | Post-login workspace — sidebar app shell, role-scoped views, see below |
 | `admin.html` | Command Center: Overview — platform stat tiles, the 5 newest signups, system status |
 | `admin-companies.html` | Command Center: Companies — every company in full, Supervisor + complete team/pending |
 | `admin-pipeline.html` | Command Center CRM: opportunity pipeline, forecast value, probability and close dates |
+| `admin-payments.html` | Command Center: Paystack configuration status, verified totals and recent safe payment metadata |
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
 | `admin-settings.html` | Command Center: Settings — change the platform owner's own password |
 | `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes — routing logic is transport-agnostic, see Deployment above |

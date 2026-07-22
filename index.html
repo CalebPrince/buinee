@@ -282,6 +282,7 @@
   .foot { display: flex; justify-content: space-between; gap: 22px; flex-wrap: wrap; align-items: center; }
   .foot p { font-size: 13.5px; color: var(--ink-3); }
   .foot a { color: var(--teal); text-decoration: none; font-weight: 600; }
+  .foot-legal { display: flex; gap: 12px; flex-wrap: wrap; }
 
   @media (max-width: 900px) {
     .hero-grid, .feat { grid-template-columns: 1fr; gap: 38px; }
@@ -683,6 +684,7 @@
 <footer>
   <div class="wrap foot">
     <p>Buinee — the back-office approval workspace. <span style="opacity:.7">Working name.</span></p>
+    <nav class="foot-legal" aria-label="Legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/cookies.html">Cookies</a><a href="/refunds.html">Refunds</a><a href="/security.html">Security</a></nav>
     <p>Built by <a href="https://princecaleb.dev" target="_blank" rel="noopener">princecaleb.dev</a> · <a href="/admin-login.html" style="color:var(--ink-4);font-weight:400">Owner sign in</a></p>
   </div>
 </footer>
