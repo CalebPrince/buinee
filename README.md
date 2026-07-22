@@ -857,11 +857,15 @@ still exists until the person removes it at
 [myaccount.google.com/permissions](https://myaccount.google.com/permissions),
 which the confirm dialog names.
 
-**Not built yet**: anything that *acts on* the mail. `mailbox.list_recent`
-returns the latest inbox headers in one shape across all three providers
-(`GET /api/mailbox/messages`), but no triage, ranking or drafting runs
-against it — the Overview's "Needs your reply first" card and the
-Automations view are still placeholders.
+The Overview now renders the latest ten inbox headers from
+`mailbox.list_recent` (`GET /api/mailbox/messages`), putting unread messages
+first without pretending that unread automatically means important. It does
+not fetch bodies, change read state, or act on mail.
+
+**Not built yet**: semantic triage, reply detection, ranking by business
+importance, drafting, or any automation that changes the mailbox. Those need
+message bodies and an explicit review workflow; the Automations view remains
+an honest placeholder until that work exists.
 
 ---
 

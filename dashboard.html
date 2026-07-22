@@ -218,6 +218,29 @@
   .empty h4 { font-size: 13.5px; color: var(--ink); }
   .empty p { margin: 0; font-size: 12.5px; max-width: 40ch; }
 
+  .mail-list { display: flex; flex-direction: column; }
+  .mail-item {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 14px; padding: 12px 12px 12px 17px; border-bottom: 1px solid var(--line);
+  }
+  .mail-item:last-child { border-bottom: none; }
+  .mail-item.unread::before {
+    content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+    border-radius: 0 3px 3px 0; background: var(--ochre);
+  }
+  .mail-from, .mail-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mail-from { color: var(--ink-2); font-size: 12px; }
+  .mail-item.unread .mail-from { color: var(--ink); font-weight: 700; }
+  .mail-subject { grid-column: 1 / -1; color: var(--ink); font-size: 13.5px; }
+  .mail-when { color: var(--ink-4); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+  .mail-summary {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 9px 12px; background: var(--surface-2); color: var(--ink-3); font-size: 11.5px;
+  }
+  .mail-summary b { color: var(--ink-2); }
+  .mail-refresh { border: 0; background: none; color: var(--teal); font: inherit; font-weight: 700; padding: 2px 0; }
+  .mail-refresh:hover { color: var(--teal-deep); }
+
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 8px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
   .row:last-child { border-bottom: none; }
   .row .who2 { display: flex; flex-direction: column; min-width: 0; }
@@ -751,10 +774,10 @@
     const kpis = [{ key: 'mine', n: 0, l: 'My vouchers' }];
     if (seesApprovals) kpis.push({ key: 'awaiting', n: 0, l: 'Awaiting my approval' });
     kpis.push({ key: 'flagged', n: 0, l: 'Flagged' });
-    kpis.push({ key: 'triaged', n: '—', l: 'Emails triaged', sub: 'Waiting for first sync' });
-    kpis.push({ key: 'replies', n: '—', l: 'Replies drafted', sub: 'Waiting for first sync' });
-    kpis.push({ key: 'issues', n: '—', l: 'Issues flagged', sub: 'Waiting for first sync' });
-    kpis.push({ key: 'timesaved', n: '—', l: 'Est. time saved', sub: 'Waiting for first sync' });
+    kpis.push({ key: 'triaged', n: '—', l: 'Emails triaged', sub: 'Triage not enabled yet' });
+    kpis.push({ key: 'replies', n: '—', l: 'Replies drafted', sub: 'Drafting not enabled yet' });
+    kpis.push({ key: 'issues', n: '—', l: 'Issues flagged', sub: 'Triage not enabled yet' });
+    kpis.push({ key: 'timesaved', n: '—', l: 'Est. time saved', sub: 'Tracking not enabled yet' });
     const kpiBox = document.getElementById('kpis');
 
     // ---- Vouchers (drives both the Vouchers tab and these overview cards) ----
@@ -776,11 +799,14 @@
         voucherCounts.awaiting ? 'Review them in the Vouchers tab.' : ''
       ));
     }
-    cards.appendChild(emptyCard(
-      'Needs your reply first', 'Ranked once a mailbox is connected', ICO_MAIL,
-      'No mail yet',
-      'Once your mailbox is connected, the emails the assistant thinks need you personally will appear here, ranked.'
-    ));
+    const mailCard = emptyCard(
+      'Inbox at a glance', 'Unread first · latest 10 messages', ICO_MAIL,
+      'Checking your inbox…',
+      'Buinee reads message headers only for this view.'
+    );
+    mailCard.id = 'mailPreviewCard';
+    cards.appendChild(mailCard);
+    loadMailboxPreview();
 
     if (isSupervisor) {
       document.getElementById('teamNavItem').style.display = 'flex';
@@ -813,6 +839,60 @@
   }
 
   // ------------------------------------------------------- connected mailbox
+
+  function mailboxWhen(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  function mailboxSender(value) {
+    const raw = String(value || '').trim();
+    const named = raw.match(/^\s*"?([^"<]+?)"?\s*<[^>]+>\s*$/);
+    return (named ? named[1] : raw) || 'Unknown sender';
+  }
+
+  async function loadMailboxPreview() {
+    const card = document.getElementById('mailPreviewCard');
+    if (!card) return;
+    const body = card.querySelector('.card-b');
+    body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Checking your inbox…</h4><p>Reading the latest message headers.</p></div>`;
+    try {
+      const res = await fetch('/api/mailbox/messages', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) {
+        body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Inbox unavailable</h4><p>${escapeHtml(data.error || 'Reconnect your mailbox and try again.')}</p></div>`;
+        return;
+      }
+      const messages = Array.isArray(data.messages) ? data.messages : [];
+      if (!messages.length) {
+        body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Your inbox is clear</h4><p>No recent messages were returned by the mail provider.</p></div>`;
+        return;
+      }
+      const ranked = [...messages].sort((a, b) => Number(!!b.unread) - Number(!!a.unread));
+      const unread = ranked.filter(m => m.unread).length;
+      body.innerHTML = `
+        <div class="mail-list">
+          ${ranked.map(m => `
+            <div class="mail-item${m.unread ? ' unread' : ''}">
+              <div class="mail-from">${escapeHtml(mailboxSender(m.from))}</div>
+              <time class="mail-when">${escapeHtml(mailboxWhen(m.received))}</time>
+              <div class="mail-subject">${escapeHtml(m.subject || '(no subject)')}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="mail-summary">
+          <span><b>${unread}</b> unread · headers only</span>
+          <button class="mail-refresh" type="button" onclick="loadMailboxPreview()">Refresh</button>
+        </div>`;
+    } catch {
+      body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Couldn’t reach your inbox</h4><p>Check the connection and refresh this page.</p></div>`;
+    }
+  }
 
   // What the OAuth round trip can come back saying. The callback redirects
   // here with one of these rather than rendering its own page, so the person
