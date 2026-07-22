@@ -1030,6 +1030,8 @@ class RouteHandlerMixin:
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
+            "/api/admin/company/interaction/save": self._handle_admin_save_crm_interaction,
+            "/api/admin/company/interaction/delete": self._handle_admin_delete_crm_interaction,
             "/api/admin/opportunity/save": self._handle_admin_save_opportunity,
             "/api/admin/opportunity/delete": self._handle_admin_delete_opportunity,
             "/api/admin/plans/create": self._handle_admin_create_plan,
@@ -1840,6 +1842,33 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad contact."}, 400)
         if not db.delete_crm_contact(company_id, contact_id):
             return self._json({"error": "Contact not found."}, 404)
+        return self._json({"ok": True})
+
+    def _handle_admin_save_crm_interaction(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=12000)
+            interaction = db.save_crm_interaction(
+                int(req.get("company_id")), req, admin["name"]
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad interaction."}, 400)
+        return self._json({"ok": True, "interaction": interaction})
+
+    def _handle_admin_delete_crm_interaction(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            company_id = int(req.get("company_id"))
+            interaction_id = int(req.get("interaction_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad interaction."}, 400)
+        if not db.delete_crm_interaction(company_id, interaction_id):
+            return self._json({"error": "Interaction not found."}, 404)
         return self._json({"ok": True})
 
     def _handle_admin_save_opportunity(self):

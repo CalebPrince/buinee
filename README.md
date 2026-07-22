@@ -283,6 +283,15 @@ weight in a security-sensitive area of the code.
   below the directory. Contact mutations use the authenticated
   `/api/admin/company/contact/save` and `/api/admin/company/contact/delete`
   routes and are always company-scoped.
+  The same Account 360 view now includes an internal notes and communication
+  timeline backed by `crm_interactions`. Command Center admins can manually
+  log notes, calls, emails, meetings, and messages as internal, inbound, or
+  outbound; optionally link an entry to a CRM contact; and edit or remove it.
+  The latest 50 entries appear newest-first. Removing a contact preserves its
+  history and only unlinks the contact. Writes use the authenticated,
+  company-scoped `/api/admin/company/interaction/save` and
+  `/api/admin/company/interaction/delete` routes. This is manual CRM history,
+  not an automatic mailbox sync.
   Lifecycle management is operational rather than a bare dropdown: the CRM
   stores `lifecycle_changed_at`, resetting it only when the stage actually
   changes. The Customer accounts page shows a six-stage portfolio board (Lead,

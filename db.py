@@ -190,6 +190,20 @@ def init_db() -> None:
                 updated_at          REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS crm_interactions (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id    INTEGER NOT NULL REFERENCES companies(id),
+                contact_id    INTEGER REFERENCES crm_contacts(id),
+                interaction_type TEXT NOT NULL DEFAULT 'note',
+                direction     TEXT NOT NULL DEFAULT 'internal',
+                subject       TEXT NOT NULL DEFAULT '',
+                body          TEXT NOT NULL,
+                occurred_at   REAL NOT NULL,
+                author_name   TEXT NOT NULL DEFAULT '',
+                created_at    REAL NOT NULL,
+                updated_at    REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -404,6 +418,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_team_message_files_message ON team_message_files(message_id);
             CREATE INDEX IF NOT EXISTS idx_crm_contacts_company ON crm_contacts(company_id, is_primary, name);
             CREATE INDEX IF NOT EXISTS idx_crm_opportunities_stage ON crm_opportunities(stage, expected_close_date);
+            CREATE INDEX IF NOT EXISTS idx_crm_interactions_company ON crm_interactions(company_id, occurred_at DESC);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1329,6 +1344,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM crm_interactions WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_opportunities WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_contacts WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_accounts WHERE company_id = ?", (company_id,))
@@ -1375,6 +1391,17 @@ def list_companies_with_stats() -> list[dict]:
                    WHERE company_id = ? ORDER BY is_primary DESC, name""",
                 (c["id"],),
             ).fetchall()
+            interactions = conn.execute(
+                """SELECT i.id, i.company_id, i.contact_id, i.interaction_type,
+                          i.direction, i.subject, i.body, i.occurred_at,
+                          i.author_name, i.created_at, i.updated_at,
+                          ct.name AS contact_name
+                   FROM crm_interactions i
+                   LEFT JOIN crm_contacts ct ON ct.id = i.contact_id
+                   WHERE i.company_id = ?
+                   ORDER BY i.occurred_at DESC, i.id DESC LIMIT 50""",
+                (c["id"],),
+            ).fetchall()
             supervisor = next((u for u in team if u["role"] == "finance_supervisor"), None)
             out.append({
                 "id": c["id"],
@@ -1386,6 +1413,7 @@ def list_companies_with_stats() -> list[dict]:
                 "team": [dict(u) for u in team],
                 "pending": [dict(u) for u in pending],
                 "contacts": [dict(contact) for contact in contacts],
+                "interactions": [dict(interaction) for interaction in interactions],
                 "crm": {
                     "legal_name": c["legal_name"] or "",
                     "industry": c["industry"] or "",
@@ -2051,6 +2079,10 @@ def delete_crm_contact(company_id: int, contact_id: int) -> bool:
         ).fetchone()
         if not row:
             return False
+        conn.execute(
+            "UPDATE crm_interactions SET contact_id = NULL WHERE company_id = ? AND contact_id = ?",
+            (company_id, contact_id),
+        )
         conn.execute("DELETE FROM crm_contacts WHERE id = ? AND company_id = ?", (contact_id, company_id))
         if row["is_primary"]:
             conn.execute(
@@ -2059,6 +2091,81 @@ def delete_crm_contact(company_id: int, contact_id: int) -> bool:
                 (time.time(), company_id),
             )
     return True
+
+
+CRM_INTERACTION_TYPES = {"note", "call", "email", "meeting", "message"}
+CRM_INTERACTION_DIRECTIONS = {"internal", "inbound", "outbound"}
+
+
+def save_crm_interaction(company_id: int, fields: dict, author_name: str) -> dict:
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    try:
+        interaction_id = int(fields.get("interaction_id") or 0)
+        contact_id = int(fields.get("contact_id") or 0) or None
+        occurred_at = float(fields.get("occurred_at") or time.time())
+    except (TypeError, ValueError):
+        raise AuthError("Bad interaction.")
+    interaction_type = str(fields.get("interaction_type") or "note").strip().lower()
+    direction = str(fields.get("direction") or "internal").strip().lower()
+    subject = str(fields.get("subject") or "").strip()[:160]
+    body = str(fields.get("body") or "").strip()[:8000]
+    if interaction_type not in CRM_INTERACTION_TYPES:
+        raise AuthError("Choose a valid interaction type.")
+    if direction not in CRM_INTERACTION_DIRECTIONS:
+        raise AuthError("Choose a valid direction.")
+    if not body:
+        raise AuthError("Add details for this interaction.")
+    if occurred_at != occurred_at or occurred_at <= 0 or occurred_at > time.time() + 86400:
+        raise AuthError("Choose a valid interaction date.")
+    now = time.time()
+    with _cursor() as conn:
+        if contact_id:
+            contact = conn.execute(
+                "SELECT id FROM crm_contacts WHERE id = ? AND company_id = ?",
+                (contact_id, company_id),
+            ).fetchone()
+            if not contact:
+                raise AuthError("Contact not found for this company.")
+        if interaction_id:
+            existing = conn.execute(
+                "SELECT id FROM crm_interactions WHERE id = ? AND company_id = ?",
+                (interaction_id, company_id),
+            ).fetchone()
+            if not existing:
+                raise AuthError("Interaction not found.")
+            conn.execute(
+                """UPDATE crm_interactions SET contact_id=?, interaction_type=?,
+                     direction=?, subject=?, body=?, occurred_at=?, updated_at=?
+                   WHERE id=? AND company_id=?""",
+                (contact_id, interaction_type, direction, subject, body,
+                 occurred_at, now, interaction_id, company_id),
+            )
+        else:
+            cur = conn.execute(
+                """INSERT INTO crm_interactions
+                     (company_id, contact_id, interaction_type, direction, subject,
+                      body, occurred_at, author_name, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (company_id, contact_id, interaction_type, direction, subject, body,
+                 occurred_at, str(author_name or "Command Center")[:120], now, now),
+            )
+            interaction_id = cur.lastrowid
+        row = conn.execute(
+            """SELECT i.*, ct.name AS contact_name FROM crm_interactions i
+               LEFT JOIN crm_contacts ct ON ct.id = i.contact_id WHERE i.id = ?""",
+            (interaction_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def delete_crm_interaction(company_id: int, interaction_id: int) -> bool:
+    with _cursor() as conn:
+        cur = conn.execute(
+            "DELETE FROM crm_interactions WHERE id = ? AND company_id = ?",
+            (interaction_id, company_id),
+        )
+    return bool(cur.rowcount)
 
 
 CRM_OPPORTUNITY_STAGES = {"prospecting", "qualified", "proposal", "negotiation", "won", "lost"}

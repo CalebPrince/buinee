@@ -212,6 +212,21 @@
   .crm-contact-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
   .crm-primary-check { flex-direction: row !important; align-items: center; }
   .crm-primary-check input { width: auto; }
+  .crm-history { margin-bottom: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+  .crm-history-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .crm-history-head p { margin: 2px 0 0; color: var(--ink-3); font-size: 11px; }
+  .crm-timeline { position: relative; display: grid; gap: 0; margin-left: 14px; padding-left: 20px; border-left: 1px solid var(--line-strong); }
+  .crm-event { position: relative; padding: 0 0 16px 10px; }
+  .crm-event:last-child { padding-bottom: 2px; }
+  .crm-event-marker { position: absolute; left: -28px; top: 2px; display: grid; place-items: center; width: 16px; height: 16px; border: 2px solid var(--surface); border-radius: 50%; background: var(--violet); color: white; font: 800 8px/1 var(--mono); box-shadow: 0 0 0 1px var(--line-strong); }
+  .crm-event-marker.inbound { background: var(--teal); }
+  .crm-event-marker.outbound { background: var(--warn); }
+  .crm-event-top { display: flex; justify-content: space-between; gap: 10px; }
+  .crm-event-title { min-width: 0; font-size: 12.5px; font-weight: 750; overflow-wrap: anywhere; }
+  .crm-event-meta { margin: 2px 0 5px; color: var(--ink-3); font: 10.5px/1.4 var(--mono); }
+  .crm-event-body { color: var(--ink-2); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .crm-event-actions { display: flex; flex: none; gap: 5px; }
+  .crm-history-form { margin-top: 13px; padding: 13px; border: 1px dashed var(--line-strong); border-radius: 9px; background: var(--surface-2); }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
 
@@ -406,6 +421,7 @@
             : '<div class="supervisor-line"><span class="no-super">No Supervisor yet</span></div>'}
           ${renderCrmProfile(c)}
           ${renderCrmContacts(c)}
+          ${renderCrmHistory(c)}
           ${renderTeamAndPending(c)}
           <div class="plan-change" onclick="event.stopPropagation()">
             <label for="planSelect-${c.id}">Change plan</label>
@@ -601,6 +617,111 @@
         company.crm.primary_contact_name = '';
         company.crm.primary_contact_email = '';
       }
+      rerenderExpandedCompany(companyId);
+    } catch (error) { alert(error.message || 'Could not reach the server.'); }
+  }
+
+  const INTERACTION_LABELS = { note: 'Note', call: 'Call', email: 'Email', meeting: 'Meeting', message: 'Message' };
+  const DIRECTION_LABELS = { internal: 'Internal', inbound: 'Inbound', outbound: 'Outbound' };
+
+  function localDateTime(epoch) {
+    const date = epoch ? new Date(Number(epoch) * 1000) : new Date();
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  function renderCrmHistory(c) {
+    const entries = c.interactions || [];
+    const timeline = entries.length ? `<div class="crm-timeline">${entries.map(item => {
+      const type = INTERACTION_LABELS[item.interaction_type] || item.interaction_type;
+      const direction = DIRECTION_LABELS[item.direction] || item.direction;
+      const title = item.subject || `${type}${item.contact_name ? ` with ${item.contact_name}` : ''}`;
+      return `<article class="crm-event">
+        <span class="crm-event-marker ${escapeAttr(item.direction)}" title="${escapeAttr(direction)}">${escapeHtml(type.charAt(0))}</span>
+        <div class="crm-event-top"><div class="crm-event-title">${escapeHtml(title)}</div><div class="crm-event-actions"><button class="btn sm" type="button" onclick="editCrmInteraction(${c.id},${item.id})">Edit</button><button class="btn sm" type="button" onclick="deleteCrmInteraction(${c.id},${item.id})">Remove</button></div></div>
+        <div class="crm-event-meta">${escapeHtml(type)} · ${escapeHtml(direction)}${item.contact_name ? ` · ${escapeHtml(item.contact_name)}` : ''} · ${escapeHtml(fmtDate(item.occurred_at))} · logged by ${escapeHtml(item.author_name || 'Command Center')}</div>
+        <div class="crm-event-body">${escapeHtml(item.body)}</div>
+      </article>`;
+    }).join('')}</div>` : '<div class="empty-mini">No history yet. Log a note, call, email, meeting, or message to build the account record.</div>';
+    const contacts = (c.contacts || []).map(contact => `<option value="${contact.id}">${escapeHtml(contact.name)}</option>`).join('');
+    return `<section class="crm-history" onclick="event.stopPropagation()">
+      <div class="crm-history-head"><div><h4>Notes & communication</h4><p>Internal history · latest 50 entries</p></div><button class="btn sm" type="button" onclick="openCrmInteractionForm(${c.id})">+ Log interaction</button></div>
+      ${timeline}
+      <form class="crm-history-form" id="crmInteractionForm-${c.id}" hidden onsubmit="return saveCrmInteraction(event,${c.id})">
+        <input type="hidden" id="crmInteractionId-${c.id}">
+        <div class="crm-fields">
+          <label>Type<select id="crmInteractionType-${c.id}">${Object.entries(INTERACTION_LABELS).map(([value,label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
+          <label>Direction<select id="crmInteractionDirection-${c.id}">${Object.entries(DIRECTION_LABELS).map(([value,label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
+          <label>When<input id="crmInteractionWhen-${c.id}" type="datetime-local" required></label>
+          <label>Contact<select id="crmInteractionContact-${c.id}"><option value="">No linked contact</option>${contacts}</select></label>
+          <label class="wide">Subject<input id="crmInteractionSubject-${c.id}" maxlength="160" placeholder="Short summary (optional)"></label>
+          <label class="wide">Details<textarea id="crmInteractionBody-${c.id}" maxlength="8000" required placeholder="What happened, what was agreed, and what matters next…"></textarea></label>
+        </div>
+        <div class="crm-actions"><button class="btn sm" type="submit">Save interaction</button><button class="btn sm" type="button" onclick="closeCrmInteractionForm(${c.id})">Cancel</button><span class="msg error" id="crmInteractionError-${c.id}"></span></div>
+      </form>
+    </section>`;
+  }
+
+  function openCrmInteractionForm(companyId, item = null) {
+    const form = document.getElementById(`crmInteractionForm-${companyId}`);
+    form.hidden = false;
+    document.getElementById(`crmInteractionId-${companyId}`).value = item ? item.id : '';
+    document.getElementById(`crmInteractionType-${companyId}`).value = item ? item.interaction_type : 'note';
+    document.getElementById(`crmInteractionDirection-${companyId}`).value = item ? item.direction : 'internal';
+    document.getElementById(`crmInteractionWhen-${companyId}`).value = localDateTime(item && item.occurred_at);
+    document.getElementById(`crmInteractionContact-${companyId}`).value = item && item.contact_id ? item.contact_id : '';
+    document.getElementById(`crmInteractionSubject-${companyId}`).value = item ? item.subject : '';
+    document.getElementById(`crmInteractionBody-${companyId}`).value = item ? item.body : '';
+    document.getElementById(`crmInteractionError-${companyId}`).textContent = '';
+    document.getElementById(`crmInteractionBody-${companyId}`).focus();
+  }
+
+  function closeCrmInteractionForm(companyId) { document.getElementById(`crmInteractionForm-${companyId}`).hidden = true; }
+
+  function editCrmInteraction(companyId, interactionId) {
+    const company = lastCompanies.find(item => item.id === companyId);
+    const interaction = company && (company.interactions || []).find(item => item.id === interactionId);
+    if (interaction) openCrmInteractionForm(companyId, interaction);
+  }
+
+  async function saveCrmInteraction(ev, companyId) {
+    ev.preventDefault();
+    const button = ev.submitter;
+    const when = document.getElementById(`crmInteractionWhen-${companyId}`).value;
+    const payload = {
+      company_id: companyId,
+      interaction_id: document.getElementById(`crmInteractionId-${companyId}`).value || null,
+      interaction_type: document.getElementById(`crmInteractionType-${companyId}`).value,
+      direction: document.getElementById(`crmInteractionDirection-${companyId}`).value,
+      occurred_at: new Date(when).getTime() / 1000,
+      contact_id: document.getElementById(`crmInteractionContact-${companyId}`).value || null,
+      subject: document.getElementById(`crmInteractionSubject-${companyId}`).value,
+      body: document.getElementById(`crmInteractionBody-${companyId}`).value,
+    };
+    button.disabled = true; button.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/admin/company/interaction/save', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save interaction.');
+      const company = lastCompanies.find(item => item.id === companyId);
+      const index = (company.interactions || []).findIndex(item => item.id === data.interaction.id);
+      if (index >= 0) company.interactions[index] = data.interaction; else company.interactions.push(data.interaction);
+      company.interactions.sort((a,b) => Number(b.occurred_at) - Number(a.occurred_at) || b.id - a.id);
+      company.interactions = company.interactions.slice(0, 50);
+      rerenderExpandedCompany(companyId);
+    } catch (error) { document.getElementById(`crmInteractionError-${companyId}`).textContent = error.message || 'Could not reach the server.'; }
+    finally { button.disabled = false; button.textContent = 'Save interaction'; }
+    return false;
+  }
+
+  async function deleteCrmInteraction(companyId, interactionId) {
+    if (!confirm('Remove this CRM history entry? This cannot be undone.')) return;
+    try {
+      const res = await fetch('/api/admin/company/interaction/delete', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, interaction_id: interactionId }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not remove interaction.');
+      const company = lastCompanies.find(item => item.id === companyId);
+      company.interactions = (company.interactions || []).filter(item => item.id !== interactionId);
       rerenderExpandedCompany(companyId);
     } catch (error) { alert(error.message || 'Could not reach the server.'); }
   }
