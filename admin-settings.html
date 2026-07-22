@@ -132,7 +132,7 @@
 
 <div class="shell">
   <aside class="sidebar">
-    <a class="sidebar-brand" href="/admin.html">
+    <a class="sidebar-brand" href="/admin">
       <span class="mark" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg>
       </span>
@@ -140,25 +140,25 @@
     </a>
     <div class="sidebar-tag">Command Center</div>
     <nav class="sidebar-nav">
-      <a class="sidebar-link" href="/admin.html">
+      <a class="sidebar-link" href="/admin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         <span class="label">Overview</span>
       </a>
-      <a class="sidebar-link" href="/admin-companies.html">
+      <a class="sidebar-link" href="/admin/companies">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M6 21V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v14"/><path d="M14 21V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v17"/></svg>
         <span class="label">Companies</span>
       </a>
-      <a class="sidebar-link" href="/admin-pipeline.html">
+      <a class="sidebar-link" href="/admin/pipeline">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
         <span class="label">Pipeline</span>
       </a>
-      <a class="sidebar-link" href="/admin-payments.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="label">Payments</span></a>
-      <a class="sidebar-link" href="/admin-plans.html">
+      <a class="sidebar-link" href="/admin/payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="label">Payments</span></a>
+      <a class="sidebar-link" href="/admin/plans">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span class="label">Plans</span>
       </a>
-      <a class="sidebar-link" href="/admin-team.html"><span class="label">Back-office team</span></a>
-      <a class="sidebar-link" href="/admin-reports.html"><span class="label">Reports</span></a><a class="sidebar-link" href="/admin-inbox.html"><span class="label">Inbox</span></a><a class="sidebar-link" href="/admin-invoices.html"><span class="label">Invoices</span></a><a class="sidebar-link" href="/admin-errors.html"><span class="label">Error logs</span></a><a class="sidebar-link" href="/admin-activity.html"><span class="label">Activity log</span></a><a class="sidebar-link" href="/" target="_blank"><span class="label">View site</span></a><a class="sidebar-link active" href="/admin-settings.html">
+      <a class="sidebar-link" href="/admin/team"><span class="label">Back-office team</span></a>
+      <a class="sidebar-link" href="/admin/reports"><span class="label">Reports</span></a><a class="sidebar-link" href="/admin/inbox"><span class="label">Inbox</span></a><a class="sidebar-link" href="/admin/invoices"><span class="label">Invoices</span></a><a class="sidebar-link" href="/admin/errors"><span class="label">Error logs</span></a><a class="sidebar-link" href="/admin/activity"><span class="label">Activity log</span></a><a class="sidebar-link" href="/" target="_blank"><span class="label">View site</span></a><a class="sidebar-link active" href="/admin/settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
         <span class="label">Settings</span>
       </a>
@@ -220,16 +220,16 @@
 
   async function logout() {
     await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
-    location.href = '/admin-login.html';
+    location.href = '/admin/login';
   }
 
   async function main() {
     let admin;
     try {
       const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
-      if (!res.ok) { location.href = '/admin-login.html'; return; }
+      if (!res.ok) { location.href = '/admin/login'; return; }
       admin = (await res.json()).admin;
-    } catch { location.href = '/admin-login.html'; return; }
+    } catch { location.href = '/admin/login'; return; }
 
     document.getElementById('whoLine').textContent = `Signed in as ${admin.name} · ${admin.email}`;
     document.getElementById('loading').style.display = 'none';
@@ -282,16 +282,16 @@
   main();
 </script>
 <style>:root[data-theme="dark"]{--paper:#0e1315;--p:#0e1315;--surface:#151b1e;--s:#151b1e;--surface-2:#1c2427;--surface2:#1c2427;--s2:#1c2427;--line:#2b3539;--l:#2b3539;--line-strong:#3a474c;--ink:#eef1f0;--i:#eef1f0;--ink-2:#bcc5c7;--ink2:#bcc5c7;--ink-3:#8b9599;--muted:#8b9599;--m:#8b9599;--teal:#4fb3a6;--green:#4fb3a6;--g:#4fb3a6;--teal-soft:#10312e;--green-soft:#10312e;--soft:#10312e;--gs:#10312e}.admin-shared-brand{display:flex!important;align-items:center!important;gap:10px!important;padding:0 8px 20px!important;color:var(--ink,var(--i,#101619))!important;text-decoration:none!important;font-size:initial!important}.admin-shared-brand:before{content:none!important}.admin-brand-mark{width:30px;height:30px;display:grid;place-items:center;flex:0 0 30px;border-radius:8px;background:linear-gradient(140deg,var(--teal,var(--green,var(--g,#0e5d57))),#0a4340);color:#fff}.admin-brand-mark svg{width:16px;height:16px}.admin-brand-copy{display:block!important;min-width:0}.admin-shared-brand .admin-brand-name{display:block!important;color:inherit!important;font:600 19px Georgia,"Times New Roman",serif!important;letter-spacing:-.02em!important;text-transform:none!important}.admin-shared-brand .admin-brand-tag{display:block!important;margin-top:1px;color:var(--teal,var(--green,var(--g,#0e5d57)))!important;font:800 9px "Segoe UI",system-ui,sans-serif!important;letter-spacing:.08em!important;text-transform:uppercase!important}.admin-nav-icon{width:17px;height:17px;flex:0 0 17px;display:block}.side,.sidebar{position:sticky!important;top:0!important;height:100vh!important;max-height:100vh!important;overflow-y:auto!important;overflow-x:hidden!important;padding-bottom:24px!important;align-self:flex-start}.side nav,.sidebar-nav,.sidebar .nav{padding-bottom:14px}.side .nav a,.sidebar-nav a,.sidebar .nav a,.admin-theme-toggle{display:flex;align-items:center;gap:10px}.side .nav a:before,.sidebar .nav a:before{content:none!important}.admin-theme-toggle{width:100%;padding:10px 12px;border:0;border-top:1px solid var(--line,var(--l,#ddd));border-radius:0;background:transparent;color:var(--ink-2,var(--ink2,#3c4750));font:600 14px "Segoe UI",system-ui,sans-serif;text-align:left;cursor:pointer}.admin-theme-toggle:hover{color:var(--teal,var(--g,#0e5d57));background:var(--teal-soft,var(--gs,#dfece9))}.sidebar-foot button[onclick="toggleTheme()"]{display:none!important}:root[data-theme="dark"]{color-scheme:dark}:root[data-theme="dark"] body,:root[data-theme="dark"] main,:root[data-theme="dark"] .content,:root[data-theme="dark"] .wrap{color:#eef1f0}:root[data-theme="dark"] .side nav a,:root[data-theme="dark"] .sidebar-nav a,:root[data-theme="dark"] .sidebar .nav a,:root[data-theme="dark"] .admin-theme-toggle{color:#eef1f0!important}:root[data-theme="dark"] .side nav a.active,:root[data-theme="dark"] .side nav a.on,:root[data-theme="dark"] .sidebar-nav a.active,:root[data-theme="dark"] .sidebar .nav a.active{background:#10312e!important;color:#6fcbbd!important}:root[data-theme="dark"] input,:root[data-theme="dark"] select,:root[data-theme="dark"] textarea,:root[data-theme="dark"] option{border-color:#3a474c!important;background:#101719!important;color:#eef1f0!important}:root[data-theme="dark"] input::placeholder,:root[data-theme="dark"] textarea::placeholder{color:#8b9599!important}:root[data-theme="dark"] .btn:not(.primary),:root[data-theme="dark"] button:not(.primary):not(.admin-theme-toggle){border-color:#3a474c;color:#eef1f0}:root[data-theme="dark"] .brand,:root[data-theme="dark"] .sidebar-brand{color:#eef1f0!important}:root[data-theme="dark"] pre,:root[data-theme="dark"] td,:root[data-theme="dark"] th{color:#d7dfdd}@media(max-width:850px){.admin-brand-copy{display:none!important}.admin-theme-toggle{justify-content:center}.admin-theme-toggle .label{display:none!important}}</style><script>(()=>{const p={
-'/admin.html':'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
-'/admin-reports.html':'<path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/>',
-'/admin-inbox.html':'<path d="M4 4h16v16H4zM4 14h4l2 3h4l2-3h4"/>',
-'/admin-companies.html':'<path d="M3 21h18M6 21V7h6v14M14 21V3h6v18"/>',
-'/admin-pipeline.html':'<path d="M4 5h16M7 12h10M10 19h4"/>',
-'/admin-payments.html':'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
-'/admin-invoices.html':'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4"/>',
-'/admin-plans.html':'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/>',
-'/admin-team.html':'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-'/admin-activity.html':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-'/admin-errors.html':'<path d="M12 3 2 21h20L12 3zM12 9v5M12 18h.01"/>',
-'/admin-settings.html':'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',
-'/':'<path d="M14 3h7v7M10 14 21 3M21 14v7H3V3h7"/>'};const brand=document.querySelector('aside > a[href="/admin.html"]');if(brand){brand.classList.add('admin-shared-brand');brand.innerHTML='<span class="admin-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg></span><span class="admin-brand-copy"><span class="admin-brand-name">Buinee</span><span class="admin-brand-tag">Command Center</span></span>'};const nav=document.querySelector('aside nav');const menu=[['/admin.html','Overview'],['/admin-reports.html','Reports'],['/admin-inbox.html','Inbox'],['/admin-companies.html','Companies'],['/admin-pipeline.html','Pipeline'],['/admin-payments.html','Payments'],['/admin-invoices.html','Invoices'],['/admin-plans.html','Plans'],['/admin-team.html','Back-office team'],['/admin-activity.html','Activity log'],['/admin-errors.html','Error logs'],['/admin-settings.html','Settings'],['/','View site']];if(nav){nav.innerHTML=menu.map(([href,label])=>`<a class="sidebar-link ${location.pathname===href?'active on':''}" href="${href}" ${href==='/'?'target="_blank" rel="noopener"':''}><span class="label">${label}</span></a>`).join('')};if(nav){nav.insertAdjacentHTML('beforeend','<button class="admin-theme-toggle" id="adminThemeToggle" type="button" aria-label="Toggle light and dark mode"><svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg><span class="label">Dark mode</span></button>')}const root=document.documentElement,toggle=document.getElementById('adminThemeToggle'),saved=localStorage.getItem('buinee-admin-theme'),initial=saved||((matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');root.setAttribute('data-theme',initial);const syncThemeLabel=()=>{if(toggle)toggle.querySelector('.label').textContent=root.getAttribute('data-theme')==='dark'?'Light mode':'Dark mode'};syncThemeLabel();if(toggle)toggle.addEventListener('click',()=>{const next=root.getAttribute('data-theme')==='dark'?'light':'dark';root.setAttribute('data-theme',next);localStorage.setItem('buinee-admin-theme',next);syncThemeLabel()});document.querySelectorAll('aside nav a[href]').forEach(a=>{if(a.querySelector('svg'))return;let u=new URL(a.href,location.origin);let d=p[u.pathname];if(!d)return;let s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('class','admin-nav-icon');s.innerHTML=d;a.prepend(s)})})();</script>
+'/admin':'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+'/admin/reports':'<path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/>',
+'/admin/inbox':'<path d="M4 4h16v16H4zM4 14h4l2 3h4l2-3h4"/>',
+'/admin/companies':'<path d="M3 21h18M6 21V7h6v14M14 21V3h6v18"/>',
+'/admin/pipeline':'<path d="M4 5h16M7 12h10M10 19h4"/>',
+'/admin/payments':'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+'/admin/invoices':'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4"/>',
+'/admin/plans':'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/>',
+'/admin/team':'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+'/admin/activity':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+'/admin/errors':'<path d="M12 3 2 21h20L12 3zM12 9v5M12 18h.01"/>',
+'/admin/settings':'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',
+'/':'<path d="M14 3h7v7M10 14 21 3M21 14v7H3V3h7"/>'};const brand=document.querySelector('aside > a[href="/admin"]');if(brand){brand.classList.add('admin-shared-brand');brand.innerHTML='<span class="admin-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg></span><span class="admin-brand-copy"><span class="admin-brand-name">Buinee</span><span class="admin-brand-tag">Command Center</span></span>'};const nav=document.querySelector('aside nav');const menu=[['/admin','Overview'],['/admin/reports','Reports'],['/admin/inbox','Inbox'],['/admin/companies','Companies'],['/admin/pipeline','Pipeline'],['/admin/payments','Payments'],['/admin/invoices','Invoices'],['/admin/plans','Plans'],['/admin/team','Back-office team'],['/admin/activity','Activity log'],['/admin/errors','Error logs'],['/admin/settings','Settings'],['/','View site']];if(nav){nav.innerHTML=menu.map(([href,label])=>`<a class="sidebar-link ${location.pathname===href?'active on':''}" href="${href}" ${href==='/'?'target="_blank" rel="noopener"':''}><span class="label">${label}</span></a>`).join('')};if(nav){nav.insertAdjacentHTML('beforeend','<button class="admin-theme-toggle" id="adminThemeToggle" type="button" aria-label="Toggle light and dark mode"><svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg><span class="label">Dark mode</span></button>')}const root=document.documentElement,toggle=document.getElementById('adminThemeToggle'),saved=localStorage.getItem('buinee-admin-theme'),initial=saved||((matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');root.setAttribute('data-theme',initial);const syncThemeLabel=()=>{if(toggle)toggle.querySelector('.label').textContent=root.getAttribute('data-theme')==='dark'?'Light mode':'Dark mode'};syncThemeLabel();if(toggle)toggle.addEventListener('click',()=>{const next=root.getAttribute('data-theme')==='dark'?'light':'dark';root.setAttribute('data-theme',next);localStorage.setItem('buinee-admin-theme',next);syncThemeLabel()});document.querySelectorAll('aside nav a[href]').forEach(a=>{if(a.querySelector('svg'))return;let u=new URL(a.href,location.origin);let d=p[u.pathname];if(!d)return;let s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('class','admin-nav-icon');s.innerHTML=d;a.prepend(s)})})();</script>

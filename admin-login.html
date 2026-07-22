@@ -104,7 +104,7 @@
       </label>
       <button class="btn" type="submit" id="submitBtn">Sign in</button>
     </form>
-    <div class="foot-link">Not the platform owner? <a href="/login.html">Go to company sign-in</a>.</div>
+    <div class="foot-link">Not the platform owner? <a href="/login">Go to company sign-in</a>.</div>
   </div>
 </main>
 
@@ -130,7 +130,7 @@
         errEl.classList.add('show');
         return false;
       }
-      location.href = '/admin.html';
+      location.href = '/admin';
     } catch {
       errEl.textContent = 'Could not reach the server.';
       errEl.classList.add('show');

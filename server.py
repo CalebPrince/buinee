@@ -181,28 +181,52 @@ def normalize_document_upload(req: dict) -> dict:
 
 STATIC_PAGES = {
     "/": "index.html",
-    "/index.html": "index.html",
-    "/register.html": "register.html",
-    "/login.html": "login.html",
-    "/privacy.html": "legal.html",
-    "/terms.html": "legal.html",
-    "/cookies.html": "legal.html",
-    "/refunds.html": "legal.html",
-    "/security.html": "legal.html",
-    "/dashboard.html": "dashboard.html",
-    "/admin.html": "admin.html",
-    "/admin-companies.html": "admin-companies.html",
-    "/admin-plans.html": "admin-plans.html",
-    "/admin-pipeline.html": "admin-pipeline.html",
-    "/admin-payments.html": "admin-payments.html",
-    "/admin-team.html": "admin-team.html",
-    "/admin-activity.html": "admin-activity.html",
-    "/admin-errors.html": "admin-errors.html",
-    "/admin-reports.html": "admin-reports.html",
-    "/admin-inbox.html": "admin-inbox.html",
-    "/admin-invoices.html": "admin-invoices.html",
-    "/admin-login.html": "admin-login.html",
-    "/admin-settings.html": "admin-settings.html",
+    "/register": "register.html",
+    "/login": "login.html",
+    "/privacy": "legal.html",
+    "/terms": "legal.html",
+    "/cookies": "legal.html",
+    "/refunds": "legal.html",
+    "/security": "legal.html",
+    "/dashboard": "dashboard.html",
+    "/admin": "admin.html",
+    "/admin/companies": "admin-companies.html",
+    "/admin/plans": "admin-plans.html",
+    "/admin/pipeline": "admin-pipeline.html",
+    "/admin/payments": "admin-payments.html",
+    "/admin/team": "admin-team.html",
+    "/admin/activity": "admin-activity.html",
+    "/admin/errors": "admin-errors.html",
+    "/admin/reports": "admin-reports.html",
+    "/admin/inbox": "admin-inbox.html",
+    "/admin/invoices": "admin-invoices.html",
+    "/admin/login": "admin-login.html",
+    "/admin/settings": "admin-settings.html",
+}
+
+LEGACY_PAGE_REDIRECTS = {
+    "/index.html": "/",
+    "/register.html": "/register",
+    "/login.html": "/login",
+    "/privacy.html": "/privacy",
+    "/terms.html": "/terms",
+    "/cookies.html": "/cookies",
+    "/refunds.html": "/refunds",
+    "/security.html": "/security",
+    "/dashboard.html": "/dashboard",
+    "/admin.html": "/admin",
+    "/admin-companies.html": "/admin/companies",
+    "/admin-plans.html": "/admin/plans",
+    "/admin-pipeline.html": "/admin/pipeline",
+    "/admin-payments.html": "/admin/payments",
+    "/admin-team.html": "/admin/team",
+    "/admin-activity.html": "/admin/activity",
+    "/admin-errors.html": "/admin/errors",
+    "/admin-reports.html": "/admin/reports",
+    "/admin-inbox.html": "/admin/inbox",
+    "/admin-invoices.html": "/admin/invoices",
+    "/admin-login.html": "/admin/login",
+    "/admin-settings.html": "/admin/settings",
 }
 
 # --- public-endpoint limits ------------------------------------------------
@@ -799,10 +823,10 @@ class RouteHandlerMixin:
     def _json(self, obj, code=200, extra_headers=None):
         self._send(code, json.dumps(obj).encode(), "application/json", extra_headers)
 
-    def _redirect(self, location: str):
+    def _redirect(self, location: str, status: int = 302):
         """Browser-facing redirect - used by the OAuth round trip, which is a
         navigation rather than a fetch, so it can't answer in JSON."""
-        self._send(302, b"", "text/plain; charset=utf-8", [("Location", location)])
+        self._send(status, b"", "text/plain; charset=utf-8", [("Location", location)])
 
     def _body(self, max_len: int = 20000) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
@@ -820,6 +844,11 @@ class RouteHandlerMixin:
 
     def _route_get(self):
         path = self.path.split("?")[0]
+
+        if path in LEGACY_PAGE_REDIRECTS:
+            query = urlparse(self.path).query
+            location = LEGACY_PAGE_REDIRECTS[path] + (f"?{query}" if query else "")
+            return self._redirect(location, 301)
 
         if path == "/api/demo/status":
             cfg = load_env()
@@ -881,7 +910,7 @@ class RouteHandlerMixin:
                     db.record_paystack_payment(paystack_api("GET", "/transaction/verify/" + quote(reference), load_env()))
                 except ValueError:
                     pass
-            return self._redirect("/dashboard.html#team")
+            return self._redirect("/dashboard#team")
 
         if path == "/api/team-chat":
             user = current_user(self)
@@ -1008,13 +1037,13 @@ class RouteHandlerMixin:
             # the user would never see.
             user = current_user(self)
             if not user or user["status"] != "approved":
-                return self._redirect("/login.html")
+                return self._redirect("/login")
             cfg = load_env()
             provider = parse_qs(urlparse(self.path).query).get("provider", [""])[0]
             if provider not in mailbox.OAUTH or not mailbox.is_configured(cfg, provider):
-                return self._redirect("/dashboard.html?mailbox=unconfigured")
+                return self._redirect("/dashboard?mailbox=unconfigured")
             if not secretstore.is_ready(cfg):
-                return self._redirect("/dashboard.html?mailbox=nokey")
+                return self._redirect("/dashboard?mailbox=nokey")
             state = db.new_oauth_state(user["id"], provider)
             return self._redirect(
                 mailbox.authorize_url(cfg, provider, state, login_hint=user["email"])
@@ -1314,7 +1343,7 @@ class RouteHandlerMixin:
         # required, app not approved in that tenant, unverified app). Either
         # way it arrives as ?error= rather than a code.
         if params.get("error"):
-            return self._redirect("/dashboard.html?mailbox=denied")
+            return self._redirect("/dashboard?mailbox=denied")
 
         # State is checked before anything else is trusted: it proves this
         # callback belongs to a connect this browser started, it carries the
@@ -1322,7 +1351,7 @@ class RouteHandlerMixin:
         # on read so a replay finds nothing.
         spent = db.consume_oauth_state(params.get("state", [""])[0])
         if not spent:
-            return self._redirect("/dashboard.html?mailbox=badstate")
+            return self._redirect("/dashboard?mailbox=badstate")
         user_id, provider = spent
 
         # The state says which user asked, but the cookie says who is
@@ -1331,27 +1360,27 @@ class RouteHandlerMixin:
         # attach a mailbox to whichever account happens to be signed in.
         user = current_user(self)
         if not user or user["id"] != user_id or user["status"] != "approved":
-            return self._redirect("/dashboard.html?mailbox=badstate")
+            return self._redirect("/dashboard?mailbox=badstate")
 
         code = params.get("code", [""])[0]
         if not code:
-            return self._redirect("/dashboard.html?mailbox=denied")
+            return self._redirect("/dashboard?mailbox=denied")
 
         try:
             connection = mailbox.exchange_code(cfg, provider, code)
             enc = secretstore.encrypt(cfg, connection["credentials"])
         except mailbox.MailboxError:
-            return self._redirect("/dashboard.html?mailbox=failed")
+            return self._redirect("/dashboard?mailbox=failed")
         except secretstore.SecretsUnavailable:
             # Credentials are never written in the clear - better to lose the
             # connection attempt than to store a token unprotected.
-            return self._redirect("/dashboard.html?mailbox=nokey")
+            return self._redirect("/dashboard?mailbox=nokey")
 
         db.save_mailbox_connection(user["id"], user["company_id"], connection, enc)
         # Not written to the activity log: that table hangs off a voucher
         # (voucher_events.voucher_id is NOT NULL), and connecting a mailbox
         # isn't an event about one.
-        return self._redirect("/dashboard.html?mailbox=connected")
+        return self._redirect("/dashboard?mailbox=connected")
 
     def _handle_mailbox_connect_imap(self):
         """IMAP has no consent screen, so it's a form post rather than a

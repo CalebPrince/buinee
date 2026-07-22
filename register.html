@@ -298,7 +298,7 @@
       <button class="icobtn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
-      <a class="btn ghost sm" href="/login.html">Sign in</a>
+      <a class="btn ghost sm" href="/login">Sign in</a>
     </div>
     <main>
   <div class="card">
@@ -312,7 +312,7 @@
       <div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
       <h2>Choose a plan first</h2>
       <p>Registering a company starts with picking the tier it runs on — how many people it covers, and whether the AI assistant is included.</p>
-      <a class="btn primary" href="/index.html#pricing">See the plans</a>
+      <a class="btn primary" href="/#pricing">See the plans</a>
       <p class="alt">Joining a company that's already here?
         <button type="button" onclick="showMode('join')">Join instead</button> — no plan needed, you inherit theirs.</p>
     </div>
@@ -348,7 +348,7 @@
             <div class="t" id="planChipName"></div>
             <div class="s" id="planChipDetail"></div>
           </div>
-          <a href="/index.html#pricing">Change</a>
+          <a href="/#pricing">Change</a>
         </div>
         <label id="regCompanyLabel"><span id="regCompanyCaption">Company name</span>
           <input type="text" id="regCompany" required autocomplete="organization" placeholder="e.g. Coastal Logistics Ltd">
@@ -369,7 +369,7 @@
         <label>Password
           <input type="password" id="regPassword" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
         </label>
-        <label class="terms-check"><input type="checkbox" id="regTerms" required><span>I agree to Buinee’s <a href="/terms.html" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy.html" target="_blank">Privacy Policy</a>.</span></label>
+        <label class="terms-check"><input type="checkbox" id="regTerms" required><span>I agree to Buinee’s <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         <button class="btn primary" type="submit" id="regSubmit">Register company</button>
         <p class="note" id="regNote">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
       </form>
@@ -404,19 +404,19 @@
             <option value="finance_supervisor">Supervisor — only if nobody holds this role yet</option>
           </select>
         </label>
-        <label class="terms-check"><input type="checkbox" id="joinTerms" required><span>I agree to Buinee’s <a href="/terms.html" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy.html" target="_blank">Privacy Policy</a>.</span></label>
+        <label class="terms-check"><input type="checkbox" id="joinTerms" required><span>I agree to Buinee’s <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
         <button class="btn primary" type="submit" id="joinSubmit">Request to join</button>
         <p class="note">A supervisor at that company approves every join request before it's active — company name alone doesn't grant access. The one exception: claiming Supervisor when the company doesn't have one yet gets you in immediately, since there'd be no one to approve it.</p>
       </form>
 
-      <div class="foot-link">Already registered? <a href="/login.html">Sign in</a></div>
+      <div class="foot-link">Already registered? <a href="/login">Sign in</a></div>
     </div>
   </div>
     </main>
   </div>
 </div>
 
-<footer class="auth-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/cookies.html">Cookies</a><a href="/refunds.html">Refunds</a><a href="/security.html">Security</a></footer><style>.auth-legal{padding:20px;text-align:center;font-size:12px}.auth-legal a{margin:0 7px;color:var(--ink-3)}</style>
+<footer class="auth-legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/cookies">Cookies</a><a href="/refunds">Refunds</a><a href="/security">Security</a></footer><style>.auth-legal{padding:20px;text-align:center;font-size:12px}.auth-legal a{margin:0 7px;color:var(--ink-3)}</style>
 <script>
   function toggleTheme() {
     const root = document.documentElement;
@@ -572,7 +572,7 @@
         return false;
       }
       if (!res.ok) { showMsg('registerError', data.error || 'Something went wrong.'); return false; }
-      location.href = '/dashboard.html';
+      location.href = '/dashboard';
     } catch {
       showMsg('registerError', 'Could not reach the server.');
     } finally {
@@ -659,7 +659,7 @@
       const data = await res.json();
       if (!res.ok) { showMsg('joinError', data.error || 'Something went wrong.'); return false; }
       if (data.pending === false) {
-        location.href = '/dashboard.html';
+        location.href = '/dashboard';
         return false;
       }
       document.getElementById('pendingText').textContent =

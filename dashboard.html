@@ -1184,7 +1184,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   async function logout() {
     await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
-    location.href = '/login.html';
+    location.href = '/login';
   }
 
   const ROLE_INFO = {
@@ -1282,10 +1282,10 @@ Do not promise a payment date unless it has already been approved."></textarea>
     let me;
     try {
       const res = await fetch('/api/me', { credentials: 'same-origin' });
-      if (!res.ok) { location.href = '/login.html'; return; }
+      if (!res.ok) { location.href = '/login'; return; }
       me = (await res.json()).user;
     } catch {
-      location.href = '/login.html'; return;
+      location.href = '/login'; return;
     }
 
     const info = ROLE_INFO[me.role] || { label: me.role, blurb: '', sees: '' };
