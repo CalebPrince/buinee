@@ -207,6 +207,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS crm_tasks (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 company_id    INTEGER NOT NULL REFERENCES companies(id),
+                assigned_user_id INTEGER REFERENCES users(id),
                 title         TEXT NOT NULL,
                 details       TEXT NOT NULL DEFAULT '',
                 owner         TEXT NOT NULL DEFAULT '',
@@ -449,6 +450,7 @@ def init_db() -> None:
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
         _migrate_crm_profile_fields(conn)
+        _migrate_crm_task_assignee(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -566,6 +568,12 @@ def _migrate_crm_profile_fields(conn: sqlite3.Connection) -> None:
     if "lifecycle_changed_at" not in cols:
         conn.execute("ALTER TABLE crm_accounts ADD COLUMN lifecycle_changed_at REAL NOT NULL DEFAULT 0")
         conn.execute("UPDATE crm_accounts SET lifecycle_changed_at = updated_at WHERE lifecycle_changed_at = 0")
+
+
+def _migrate_crm_task_assignee(conn: sqlite3.Connection) -> None:
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(crm_tasks)").fetchall()}
+    if "assigned_user_id" not in cols:
+        conn.execute("ALTER TABLE crm_tasks ADD COLUMN assigned_user_id INTEGER REFERENCES users(id)")
 
 
 # ------------------------------------------------------------------ passwords
@@ -1420,10 +1428,12 @@ def list_companies_with_stats() -> list[dict]:
                 (c["id"],),
             ).fetchall()
             tasks = conn.execute(
-                """SELECT * FROM crm_tasks WHERE company_id = ?
-                   ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END,
-                            CASE WHEN due_date = '' THEN 1 ELSE 0 END,
-                            due_date, id DESC LIMIT 100""",
+                """SELECT t.*, u.name AS assigned_user_name, u.email AS assigned_user_email
+                   FROM crm_tasks t LEFT JOIN users u ON u.id = t.assigned_user_id
+                   WHERE t.company_id = ?
+                   ORDER BY CASE t.status WHEN 'open' THEN 0 ELSE 1 END,
+                            CASE WHEN t.due_date = '' THEN 1 ELSE 0 END,
+                            t.due_date, t.id DESC LIMIT 100""",
                 (c["id"],),
             ).fetchall()
             supervisor = next((u for u in team if u["role"] == "finance_supervisor"), None)
@@ -1875,9 +1885,33 @@ def notification_summary(user: dict) -> dict:
                WHERE company_id = ? AND created_by = ? AND status = 'rejected'""",
             (company_id, user_id),
         ).fetchone()["n"]
+        task_seen_row = conn.execute(
+            "SELECT state_value FROM user_notification_state WHERE user_id=? AND state_key='crm_tasks_seen_at'",
+            (user_id,),
+        ).fetchone()
+        task_seen_at = task_seen_row["state_value"] if task_seen_row else 0
+        task_scope = "t.company_id = ?" if role == "finance_supervisor" else "t.company_id = ? AND t.assigned_user_id = ?"
+        task_params = (company_id,) if role == "finance_supervisor" else (company_id, user_id)
+        task_rows = conn.execute(
+            f"""SELECT t.due_date, t.updated_at FROM crm_tasks t
+                WHERE {task_scope} AND t.status='open'""",
+            task_params,
+        ).fetchall()
+        today = time.strftime("%Y-%m-%d")
+        task_open = len(task_rows)
+        task_overdue = sum(1 for row in task_rows if row["due_date"] and row["due_date"] < today)
+        task_due_today = sum(1 for row in task_rows if row["due_date"] == today)
+        task_new = sum(1 for row in task_rows if row["updated_at"] > task_seen_at)
+        task_attention = sum(
+            1 for row in task_rows
+            if (row["due_date"] and row["due_date"] <= today) or row["updated_at"] > task_seen_at
+        )
     return {"team_messages": unread_team, "team_conversations": unread_conversations,
             "pending_users": pending,
-            "awaiting_approval": awaiting, "rejected_vouchers": rejected}
+            "awaiting_approval": awaiting, "rejected_vouchers": rejected,
+            "follow_up_open": task_open, "follow_up_overdue": task_overdue,
+            "follow_up_due_today": task_due_today, "follow_up_new": task_new,
+            "follow_up_attention": task_attention}
 
 
 def mark_team_messages_seen(user: dict, recipient_id: int | None = None) -> None:
@@ -2202,6 +2236,7 @@ def save_crm_task(company_id: int, fields: dict, admin_name: str) -> dict:
         raise AuthError("No such company.")
     try:
         task_id = int(fields.get("task_id") or 0)
+        assigned_user_id = int(fields.get("assigned_user_id") or 0) or None
     except (TypeError, ValueError):
         raise AuthError("Bad follow-up task.")
     title = str(fields.get("title") or "").strip()[:180]
@@ -2221,6 +2256,18 @@ def save_crm_task(company_id: int, fields: dict, admin_name: str) -> dict:
         raise AuthError("Choose a valid priority and status.")
     now = time.time()
     with _cursor() as conn:
+        assigned_user = None
+        if assigned_user_id:
+            assigned_user = conn.execute(
+                """SELECT id, name FROM users WHERE id=? AND company_id=?
+                   AND status='approved'""",
+                (assigned_user_id, company_id),
+            ).fetchone()
+            if not assigned_user:
+                raise AuthError("Choose an approved employee from this company.")
+            owner = assigned_user["name"]
+        else:
+            owner = ""
         if task_id:
             existing = conn.execute(
                 "SELECT status, completed_at FROM crm_tasks WHERE id=? AND company_id=?",
@@ -2232,24 +2279,28 @@ def save_crm_task(company_id: int, fields: dict, admin_name: str) -> dict:
             if status == "open":
                 completed_at = None
             conn.execute(
-                """UPDATE crm_tasks SET title=?, details=?, owner=?, due_date=?,
+                """UPDATE crm_tasks SET assigned_user_id=?, title=?, details=?, owner=?, due_date=?,
                      priority=?, status=?, completed_at=?, updated_at=?
                    WHERE id=? AND company_id=?""",
-                (title, details, owner, due_date, priority, status, completed_at,
+                (assigned_user_id, title, details, owner, due_date, priority, status, completed_at,
                  now, task_id, company_id),
             )
         else:
             completed_at = now if status == "completed" else None
             cur = conn.execute(
                 """INSERT INTO crm_tasks
-                     (company_id, title, details, owner, due_date, priority,
+                     (company_id, assigned_user_id, title, details, owner, due_date, priority,
                       status, completed_at, created_by, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (company_id, title, details, owner, due_date, priority, status,
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (company_id, assigned_user_id, title, details, owner, due_date, priority, status,
                  completed_at, str(admin_name or "Command Center")[:120], now, now),
             )
             task_id = cur.lastrowid
-        row = conn.execute("SELECT * FROM crm_tasks WHERE id = ?", (task_id,)).fetchone()
+        row = conn.execute(
+            """SELECT t.*, u.name AS assigned_user_name, u.email AS assigned_user_email
+               FROM crm_tasks t LEFT JOIN users u ON u.id=t.assigned_user_id WHERE t.id=?""",
+            (task_id,),
+        ).fetchone()
     return dict(row)
 
 
@@ -2259,6 +2310,61 @@ def delete_crm_task(company_id: int, task_id: int) -> bool:
             "DELETE FROM crm_tasks WHERE id=? AND company_id=?", (task_id, company_id)
         )
     return bool(cur.rowcount)
+
+
+def list_user_crm_tasks(user: dict) -> list[dict]:
+    with _cursor() as conn:
+        if user["role"] == "finance_supervisor":
+            rows = conn.execute(
+                """SELECT t.*, u.name AS assigned_user_name, u.email AS assigned_user_email
+                   FROM crm_tasks t LEFT JOIN users u ON u.id=t.assigned_user_id
+                   WHERE t.company_id=? ORDER BY CASE t.status WHEN 'open' THEN 0 ELSE 1 END,
+                   CASE WHEN t.due_date='' THEN 1 ELSE 0 END, t.due_date, t.id DESC""",
+                (user["company_id"],),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT t.*, u.name AS assigned_user_name, u.email AS assigned_user_email
+                   FROM crm_tasks t LEFT JOIN users u ON u.id=t.assigned_user_id
+                   WHERE t.company_id=? AND t.assigned_user_id=?
+                   ORDER BY CASE t.status WHEN 'open' THEN 0 ELSE 1 END,
+                   CASE WHEN t.due_date='' THEN 1 ELSE 0 END, t.due_date, t.id DESC""",
+                (user["company_id"], user["id"]),
+            ).fetchall()
+        conn.execute(
+            """INSERT INTO user_notification_state(user_id,state_key,state_value,updated_at)
+               VALUES (?, 'crm_tasks_seen_at', ?, ?)
+               ON CONFLICT(user_id,state_key) DO UPDATE SET state_value=excluded.state_value,
+               updated_at=excluded.updated_at""",
+            (user["id"], time.time(), time.time()),
+        )
+    return [dict(row) for row in rows]
+
+
+def set_user_crm_task_status(user: dict, task_id: int, status: str) -> dict:
+    if status not in CRM_TASK_STATUSES:
+        raise AuthError("Choose a valid task status.")
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT * FROM crm_tasks WHERE id=? AND company_id=?",
+            (task_id, user["company_id"]),
+        ).fetchone()
+        if not row:
+            raise AuthError("Follow-up task not found.")
+        if user["role"] != "finance_supervisor" and row["assigned_user_id"] != user["id"]:
+            raise AuthError("This follow-up is not assigned to you.")
+        now = time.time()
+        completed_at = now if status == "completed" else None
+        conn.execute(
+            "UPDATE crm_tasks SET status=?, completed_at=?, updated_at=? WHERE id=?",
+            (status, completed_at, now, task_id),
+        )
+        saved = conn.execute(
+            """SELECT t.*, u.name AS assigned_user_name, u.email AS assigned_user_email
+               FROM crm_tasks t LEFT JOIN users u ON u.id=t.assigned_user_id WHERE t.id=?""",
+            (task_id,),
+        ).fetchone()
+    return dict(saved)
 
 
 CRM_OPPORTUNITY_STAGES = {"prospecting", "qualified", "proposal", "negotiation", "won", "lost"}

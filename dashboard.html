@@ -425,6 +425,19 @@
   .activity-copy .document { color: var(--ink-2); overflow-wrap: anywhere; }
   .activity-copy .note { margin-top: 5px; color: var(--bad); font-size: 12px; }
   .activity-row .when { color: var(--ink-4); font: 10.5px var(--mono); white-space: nowrap; }
+  .follow-list { display: grid; gap: 10px; }
+  .follow-task { display: grid; grid-template-columns: 6px minmax(0,1fr) auto; gap: 13px; align-items: start; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+  .follow-rail { align-self: stretch; min-height: 52px; border-radius: 6px; background: var(--teal); }
+  .follow-task.upcoming .follow-rail { background: var(--violet); }
+  .follow-task.today .follow-rail, .follow-task.urgent .follow-rail { background: var(--warn); }
+  .follow-task.overdue .follow-rail { background: var(--bad); }
+  .follow-task.completed { opacity: .62; }
+  .follow-task.completed .follow-title { text-decoration: line-through; }
+  .follow-copy { min-width: 0; }
+  .follow-title { color: var(--ink); font-size: 14px; font-weight: 750; overflow-wrap: anywhere; }
+  .follow-meta { margin-top: 4px; color: var(--ink-4); font: 10.5px/1.5 var(--mono); }
+  .follow-details { margin-top: 7px; color: var(--ink-2); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .follow-actions { display: flex; gap: 6px; }
   .fix-toolbar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 12px 15px; border-bottom: 1px solid var(--line); }
   .fix-toolbar .eyebrow { margin-right: auto; }
   .fix-filter { padding: 5px 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink-3); font-size: 11px; font-weight: 700; }
@@ -591,6 +604,8 @@
     .auto-result { grid-column: 1 / -1; }
     .activity-row { grid-template-columns: 30px minmax(0, 1fr); }
     .activity-row .when { grid-column: 2; }
+    .follow-task { grid-template-columns: 6px minmax(0,1fr); }
+    .follow-actions { grid-column: 2; }
     .fix-item { grid-template-columns: 36px minmax(0,1fr); }
     .fix-item > .btn { grid-column: 2; justify-self: start; }
     .instructions-layout { grid-template-columns: 1fr; }
@@ -637,6 +652,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
         To fix
         <span class="count" id="fixNavCount" style="display:none"></span>
+      </button>
+      <button class="nav-item" data-view="followups" onclick="go('followups')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Follow-ups
+        <span class="count" id="followUpNavCount" style="display:none"></span>
       </button>
       <button class="nav-item" data-view="triage" onclick="go('triage')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
@@ -783,6 +803,12 @@
         <div class="card-h"><h3>All vouchers</h3><div class="sub" id="voucherListSub"></div></div>
         <div class="card-b" id="voucherRows"></div>
       </div>
+    </section>
+
+    <!-- ===== TRIAGE ===== -->
+    <section class="view" data-view="followups" id="viewFollowUps" hidden>
+      <div class="hello"><div><h1>Assigned follow-ups</h1><p id="followUpBlurb">Your next actions, due dates, and completed work.</p></div></div>
+      <div class="card full"><div class="card-h"><h3 id="followUpHeading">My follow-ups</h3><div class="sub" id="followUpSummary"></div></div><div class="card-b"><div class="follow-list" id="followUpRows"><div class="empty"><h4>Loading follow-ups…</h4></div></div></div></div>
     </section>
 
     <!-- ===== TRIAGE ===== -->
@@ -1177,7 +1203,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   const CRUMB_NAMES = {
     overview: 'Overview', team: 'Team', vouchers: 'Vouchers', triage: 'Triage',
-    flagged: 'Flagged', fix: 'To fix', chat: 'Ask Ada', teamchat: 'Team chat', automations: 'Automations',
+    flagged: 'Flagged', fix: 'To fix', followups: 'Follow-ups', chat: 'Ask Ada', teamchat: 'Team chat', automations: 'Automations',
     activity: 'Activity', instructions: 'Instructions',
   };
   const STATUS_INFO = {
@@ -1192,6 +1218,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   let activityEvents = [], activityFilter = 'all';
   let fixFilter = 'all';
   let teamChatAvailable = false, teamMessages = [], pendingTeamFiles = [], teamMembers = [], notificationCounts = {};
+  let followUpTasks = [], followUpsLoaded = false;
   let teamChatRecipient = null, teamChatCompanyName = '';
   const triageAnalyses = new Map();
 
@@ -1205,6 +1232,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.getElementById('crumbView').textContent = CRUMB_NAMES[view] || 'Overview';
     if (view === 'teamchat' && teamChatAvailable) markTeamMessagesSeen();
     if (view === 'triage' && !triageMessages.length) loadTriage();
+    if (view === 'followups') loadFollowUps();
     if (syncUrl) {
       const url = new URL(location.href);
       url.hash = view;
@@ -1376,6 +1404,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (n.rejected_vouchers) items.push({ count: n.rejected_vouchers, title: 'Returned vouchers', copy: 'Correct vouchers sent back to you', view: 'fix' });
     if (n.unread_email) items.push({ count: n.unread_email, title: 'Unread inbox messages', copy: 'Open your mailbox triage queue', view: 'triage' });
     if (n.team_messages && teamChatAvailable) items.push({ count: n.team_messages, title: 'New team messages', copy: 'Read messages sent since your last visit', view: 'teamchat' });
+    if (n.follow_up_attention) items.push({ count: n.follow_up_attention, title: 'Follow-ups need action', copy: `${n.follow_up_overdue || 0} overdue · ${n.follow_up_due_today || 0} due today · ${n.follow_up_new || 0} new`, view: 'followups' });
     const box = document.getElementById('attentionCenter');
     const total = items.reduce((sum, item) => sum + item.count, 0);
     document.title = total ? `(${total}) Buinee — Needs attention` : 'Buinee — Dashboard';
@@ -1385,6 +1414,61 @@ Do not promise a payment date unless it has already been approved."></textarea>
     const badge = document.getElementById('teamChatNavCount');
     badge.style.display = n.team_messages ? 'inline-block' : 'none';
     badge.textContent = n.team_messages || '';
+    const followBadge = document.getElementById('followUpNavCount');
+    followBadge.style.display = n.follow_up_attention ? 'inline-block' : 'none';
+    followBadge.textContent = n.follow_up_attention || '';
+  }
+
+  const FOLLOW_PRIORITY = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
+
+  function followDueState(task) {
+    if (task.status === 'completed') return 'completed';
+    if (!task.due_date) return task.priority === 'urgent' ? 'urgent' : 'upcoming';
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    if (task.due_date < today) return 'overdue';
+    if (task.due_date === today) return 'today';
+    return task.priority === 'urgent' ? 'urgent' : 'upcoming';
+  }
+
+  function renderFollowUps() {
+    const box = document.getElementById('followUpRows');
+    const open = followUpTasks.filter(task => task.status === 'open');
+    const overdue = open.filter(task => followDueState(task) === 'overdue').length;
+    document.getElementById('followUpSummary').textContent = `${open.length} open${overdue ? ` · ${overdue} overdue` : ''} · ${followUpTasks.length - open.length} completed`;
+    document.getElementById('followUpHeading').textContent = myRole === 'finance_supervisor' ? 'Company follow-ups' : 'My follow-ups';
+    document.getElementById('followUpBlurb').textContent = myRole === 'finance_supervisor' ? 'Every assignment in your company. You can complete or reopen work when overseeing the team.' : 'Tasks assigned to you by the Command Center. Complete them here when the work is done.';
+    box.innerHTML = followUpTasks.length ? followUpTasks.map(task => {
+      const state = followDueState(task);
+      const due = task.due_date ? `${state === 'overdue' ? 'Overdue' : state === 'today' ? 'Due today' : 'Due'} · ${task.due_date}` : 'No due date';
+      const assigned = myRole === 'finance_supervisor' ? ` · ${task.assigned_user_name ? `Assigned to ${escapeHtml(task.assigned_user_name)}` : 'Unassigned'}` : '';
+      return `<article class="follow-task ${state}"><span class="follow-rail"></span><div class="follow-copy"><div class="follow-title">${escapeHtml(task.title)}</div><div class="follow-meta">${escapeHtml(FOLLOW_PRIORITY[task.priority] || task.priority)} · ${escapeHtml(due)}${assigned} · From ${escapeHtml(task.created_by || 'Command Center')}</div>${task.details ? `<div class="follow-details">${escapeHtml(task.details)}</div>` : ''}</div><div class="follow-actions"><button class="btn sm ${task.status === 'completed' ? '' : 'primary'}" type="button" onclick="setFollowUpStatus(${task.id},'${task.status === 'completed' ? 'open' : 'completed'}',this)">${task.status === 'completed' ? 'Reopen' : 'Complete'}</button></div></article>`;
+    }).join('') : '<div class="empty"><h4>No follow-ups assigned</h4><p>New tasks from the Command Center will appear here.</p></div>';
+  }
+
+  async function loadFollowUps() {
+    const box = document.getElementById('followUpRows');
+    if (!followUpsLoaded) box.innerHTML = '<div class="empty"><h4>Loading follow-ups…</h4></div>';
+    try {
+      const res = await fetch('/api/follow-ups', { credentials:'same-origin' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load follow-ups.');
+      followUpTasks = data.tasks || []; followUpsLoaded = true; renderFollowUps();
+      loadNotifications();
+    } catch(error) { box.innerHTML = `<div class="empty"><h4>Could not load follow-ups</h4><p>${escapeHtml(error.message || 'Try again.')}</p></div>`; }
+  }
+
+  async function setFollowUpStatus(taskId, status, button) {
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/follow-ups/status', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,status}) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update follow-up.');
+      const index = followUpTasks.findIndex(task => task.id === data.task.id);
+      if (index >= 0) followUpTasks[index] = data.task;
+      followUpTasks.sort((a,b) => (a.status === 'completed') - (b.status === 'completed') || (!a.due_date) - (!b.due_date) || (a.due_date || '').localeCompare(b.due_date || ''));
+      renderFollowUps(); loadNotifications();
+    } catch(error) { alert(error.message || 'Could not reach the server.'); button.disabled = false; }
   }
 
   async function markTeamMessagesSeen() {

@@ -763,13 +763,13 @@
     const list = tasks.length ? `<div class="crm-task-list">${tasks.map(task => {
       const dueState = taskDueState(task);
       const dueText = task.due_date ? `${dueState === 'overdue' ? 'Overdue · ' : dueState === 'today' ? 'Due today · ' : 'Due · '}${task.due_date}` : 'No due date';
-      return `<article class="crm-task ${dueState}"><span class="crm-task-rail"></span><div><div class="crm-task-title">${escapeHtml(task.title)}</div><div class="crm-task-meta">${escapeHtml(TASK_PRIORITY_LABELS[task.priority] || task.priority)} · ${escapeHtml(dueText)}${task.owner ? ` · Owner: ${escapeHtml(task.owner)}` : ' · Unassigned'}</div>${task.details ? `<div class="crm-task-details">${escapeHtml(task.details)}</div>` : ''}</div><div class="crm-task-actions"><button class="btn sm" type="button" onclick="toggleCrmTask(${c.id},${task.id})">${task.status === 'completed' ? 'Reopen' : 'Complete'}</button><button class="btn sm" type="button" onclick="editCrmTask(${c.id},${task.id})">Edit</button><button class="btn sm" type="button" onclick="deleteCrmTask(${c.id},${task.id})">Remove</button></div></article>`;
+      return `<article class="crm-task ${dueState}"><span class="crm-task-rail"></span><div><div class="crm-task-title">${escapeHtml(task.title)}</div><div class="crm-task-meta">${escapeHtml(TASK_PRIORITY_LABELS[task.priority] || task.priority)} · ${escapeHtml(dueText)}${task.assigned_user_name ? ` · Assigned to ${escapeHtml(task.assigned_user_name)}` : ' · Unassigned'}</div>${task.details ? `<div class="crm-task-details">${escapeHtml(task.details)}</div>` : ''}</div><div class="crm-task-actions"><button class="btn sm" type="button" onclick="toggleCrmTask(${c.id},${task.id})">${task.status === 'completed' ? 'Reopen' : 'Complete'}</button><button class="btn sm" type="button" onclick="editCrmTask(${c.id},${task.id})">Edit</button><button class="btn sm" type="button" onclick="deleteCrmTask(${c.id},${task.id})">Remove</button></div></article>`;
     }).join('')}</div>` : '<div class="empty-mini">No follow-ups yet. Add the next action so this account does not go quiet.</div>';
-    const suggestions = [...new Set([c.crm && c.crm.relationship_owner, ...(c.team || []).map(user => user.name)].filter(Boolean))];
+    const assignees = (c.team || []).map(user => `<option value="${user.id}">${escapeHtml(user.name)} · ${escapeHtml(ROLE_LABELS[user.role] || user.role)}</option>`).join('');
     return `<section class="crm-tasks" onclick="event.stopPropagation()"><div class="crm-history-head"><div><h4>Follow-ups (${openCount} open)</h4><p>Owners, priorities, and due dates for the next account actions</p></div><button class="btn sm" type="button" onclick="openCrmTaskForm(${c.id})">+ Add follow-up</button></div>${list}
       <form class="crm-history-form" id="crmTaskForm-${c.id}" hidden onsubmit="return saveCrmTask(event,${c.id})"><input type="hidden" id="crmTaskId-${c.id}"><div class="crm-fields">
         <label class="wide">Task<input id="crmTaskTitle-${c.id}" maxlength="180" required placeholder="e.g. Confirm renewal decision"></label>
-        <label>Owner<input id="crmTaskOwner-${c.id}" maxlength="120" list="crmTaskOwners-${c.id}" placeholder="Assign someone"><datalist id="crmTaskOwners-${c.id}">${suggestions.map(name => `<option value="${escapeAttr(name)}">`).join('')}</datalist></label>
+        <label>Assign to<select id="crmTaskAssignee-${c.id}"><option value="">Unassigned</option>${assignees}</select></label>
         <label>Due date<input id="crmTaskDue-${c.id}" type="date"></label>
         <label>Priority<select id="crmTaskPriority-${c.id}">${Object.entries(TASK_PRIORITY_LABELS).map(([value,label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
         <label class="wide">Details<textarea id="crmTaskDetails-${c.id}" maxlength="4000" placeholder="Context, expected outcome, or hand-off notes…"></textarea></label>
@@ -780,7 +780,7 @@
     document.getElementById(`crmTaskForm-${companyId}`).hidden = false;
     document.getElementById(`crmTaskId-${companyId}`).value = task ? task.id : '';
     document.getElementById(`crmTaskTitle-${companyId}`).value = task ? task.title : '';
-    document.getElementById(`crmTaskOwner-${companyId}`).value = task ? task.owner : '';
+    document.getElementById(`crmTaskAssignee-${companyId}`).value = task && task.assigned_user_id ? task.assigned_user_id : '';
     document.getElementById(`crmTaskDue-${companyId}`).value = task ? task.due_date : '';
     document.getElementById(`crmTaskPriority-${companyId}`).value = task ? task.priority : 'normal';
     document.getElementById(`crmTaskDetails-${companyId}`).value = task ? task.details : '';
@@ -804,7 +804,7 @@
     ev.preventDefault(); const button=ev.submitter; button.textContent='Saving…';
     const existingId=document.getElementById(`crmTaskId-${companyId}`).value;
     const existing=(lastCompanies.find(c=>c.id===companyId).tasks||[]).find(t=>String(t.id)===existingId);
-    const task={task_id:existingId||null,title:document.getElementById(`crmTaskTitle-${companyId}`).value,owner:document.getElementById(`crmTaskOwner-${companyId}`).value,due_date:document.getElementById(`crmTaskDue-${companyId}`).value,priority:document.getElementById(`crmTaskPriority-${companyId}`).value,details:document.getElementById(`crmTaskDetails-${companyId}`).value,status:existing ? existing.status : 'open'};
+    const task={task_id:existingId||null,title:document.getElementById(`crmTaskTitle-${companyId}`).value,assigned_user_id:document.getElementById(`crmTaskAssignee-${companyId}`).value||null,due_date:document.getElementById(`crmTaskDue-${companyId}`).value,priority:document.getElementById(`crmTaskPriority-${companyId}`).value,details:document.getElementById(`crmTaskDetails-${companyId}`).value,status:existing ? existing.status : 'open'};
     try { await sendCrmTask(companyId,task,button); } catch(error) { document.getElementById(`crmTaskError-${companyId}`).textContent=error.message||'Could not reach the server.'; button.disabled=false; button.textContent='Save follow-up'; } return false;
   }
 

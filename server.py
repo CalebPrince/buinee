@@ -805,6 +805,12 @@ class RouteHandlerMixin:
             db.touch_presence(user["id"])
             return self._json({"notifications": db.notification_summary(user)})
 
+        if path == "/api/follow-ups":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"tasks": db.list_user_crm_tasks(user)})
+
         if path == "/api/team-chat":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -1019,6 +1025,7 @@ class RouteHandlerMixin:
             "/api/team-chat/clear": self._handle_clear_team_conversation,
             "/api/team-chat/seen": self._handle_team_messages_seen,
             "/api/team-chat/add-to-library": self._handle_team_file_to_library,
+            "/api/follow-ups/status": self._handle_follow_up_status,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
             "/api/vouchers/review": self._handle_voucher_review,
@@ -1512,6 +1519,19 @@ class RouteHandlerMixin:
         if not db.delete_reference_document(user["id"], document_id):
             return self._json({"error": "Document not found."}, 404)
         return self._json({"ok": True})
+
+    def _handle_follow_up_status(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            task = db.set_user_crm_task_status(
+                user, int(req.get("task_id")), str(req.get("status") or "")
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad follow-up task."}, 400)
+        return self._json({"ok": True, "task": task})
 
     def _handle_team_message(self):
         user = current_user(self)
