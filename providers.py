@@ -34,7 +34,7 @@ For each email, decide:
   if nothing is wrong. Do not invent problems.
 - suggested_reply: a ready-to-edit reply if needs_reply is true, otherwise "".
   Match a normal professional business tone. Never promise a payment or a date that
-  is not already stated in the email. Sign off as Rufus.
+  is not already stated in the email. Do not invent the user's name or signature.
 
 Be accurate over impressive. If an email is routine, say so plainly."""
 

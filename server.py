@@ -33,6 +33,7 @@ explains, code computes.
 
 from __future__ import annotations
 
+import email.utils
 import json
 import os
 import re
@@ -683,6 +684,7 @@ class RouteHandlerMixin:
             "/api/demo": self._handle_demo,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
+            "/api/mailbox/triage": self._handle_mailbox_triage,
             "/api/register": self._handle_register,
             "/api/join": self._handle_join,
             "/api/login": self._handle_login,
@@ -885,6 +887,79 @@ class RouteHandlerMixin:
             return self._json({"error": "Not signed in."}, 401)
         db.delete_mailbox_connection(user["id"])
         return self._json({"ok": True, "mailbox": public_mailbox(user["id"], load_env())})
+
+    def _handle_mailbox_triage(self):
+        """Run Ada's structured review on one message already visible in
+        this user's connected inbox. Nothing is cached or written back to the
+        mailbox; the result exists only in the current dashboard session."""
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if rate_limited(f"mail-triage:{user['id']}"):
+            return self._json(
+                {"error": "That's a fair few summaries — give it a few minutes."}, 429)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        message_id = str(req.get("message_id") or "").strip()
+        if not message_id:
+            return self._json({"error": "Choose an email first."}, 400)
+
+        gate = db.can_use_chat(user["company_id"])
+        if not gate["allowed"]:
+            reason = (f"AI summaries aren't included in your company's {gate['plan']} plan."
+                      if gate["reason"] == "not_included" else
+                      f"Your company has used all {gate['limit']} AI messages included "
+                      f"in the {gate['plan']} plan this month.")
+            return self._json({"error": reason, "reason": gate["reason"]}, 402)
+
+        cfg = load_env()
+        pub = public_user(user)
+        provider, model = resolve_provider_model(cfg, pub["company"])
+        if not provider:
+            return self._json({"error": "Ada isn't configured on this server yet."}, 503)
+
+        try:
+            connection, creds = live_mailbox(user["id"], cfg)
+            messages = mailbox.list_recent(cfg, connection, creds, include_body=True)
+        except mailbox.MailboxError as exc:
+            return self._json({"error": str(exc)}, 400)
+        message = next((m for m in messages if str(m.get("id")) == message_id), None)
+        if not message:
+            return self._json({"error": "That email is no longer in the recent inbox list."}, 404)
+        if not (message.get("body") or "").strip():
+            return self._json({"error": "That email has no readable text body to summarize."}, 400)
+
+        from_name, from_email = email.utils.parseaddr(message.get("from") or "")
+        email_input = {
+            "id": message_id,
+            "from_name": from_name or from_email or "Unknown sender",
+            "from_email": from_email,
+            "received": message.get("received") or "",
+            "subject": message.get("subject") or "(no subject)",
+            "attachments": [],
+            "body": message["body"],
+            "unread": bool(message.get("unread")),
+        }
+        try:
+            items = providers.triage(
+                provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
+                [email_input], briefing=pub["company"].get("briefing", ""),
+            )
+        except providers.ProviderError as exc:
+            return self._json({"error": str(exc)}, 502)
+        except Exception as exc:
+            print(f"  ! mailbox triage failure: {exc}")
+            return self._json({"error": "Ada couldn't summarize that email."}, 500)
+        if not items:
+            return self._json({"error": "Ada returned no summary for that email."}, 502)
+
+        used = db.increment_chat_usage(user["company_id"])
+        return self._json({
+            "item": items[0],
+            "usage": {"used": used, "limit": gate["limit"]},
+        })
 
     def _handle_join(self):
         if rate_limited(f"auth:{client_ip(self)}", max_hits=20, window=600):

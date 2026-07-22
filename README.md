@@ -313,8 +313,10 @@ switched client-side with no page reload:
   All/Unread filters, unread count, sender, subject, received time and a
   detail desk. Triage requests a safe, length-limited plain-text body while
   the Overview remains header-only; neither view changes mailbox state.
-  Selecting a message can pass the known sender and subject into Ask Ada,
-  with an explicit instruction not to invent anything it has not been given.
+  A person can run Ada's structured analysis in that same detail desk to get
+  a summary, category, priority, next action, concrete issues, and an editable
+  reply draft when a reply is genuinely needed. Results stay in the browser
+  session and consume the same plan allowance as Ask Ada.
 - **Ask Ada** — an authenticated version of the landing page's demo agent. A
   general assistant for the person's finance/back-office work - any business
   question, not a voucher-lookup tool - grounded in their real, role-scoped
@@ -862,10 +864,10 @@ The Overview now renders the latest ten inbox headers from
 first without pretending that unread automatically means important. It does
 not fetch bodies, change read state, or act on mail.
 
-**Not built yet**: semantic triage, reply detection, ranking by business
-importance, drafting, or any automation that changes the mailbox. Those need
-semantic analysis of message bodies and an explicit review workflow; the Automations view remains
-an honest placeholder until that work exists.
+**Not built yet**: automatic/batch triage, a persisted morning brief, ranking
+across the whole inbox, or any automation that changes the mailbox. Per-email
+Ada analysis is deliberately user-triggered and read-only; the Automations
+view remains an honest placeholder until those broader workflows exist.
 
 ---
 

@@ -293,6 +293,27 @@
   .triage-known h3 { font: 600 14px var(--serif); margin-bottom: 5px; }
   .triage-known p { color: var(--ink-3); font-size: 12.5px; }
   .triage-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .triage-ada { margin-top: 20px; overflow: hidden; border: 1px solid var(--ochre); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+  .triage-ada-head { display: flex; align-items: center; gap: 10px; padding: 12px 15px; background: var(--ochre-soft); }
+  .triage-ada-mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--ochre); color: #fff; font-weight: 800; }
+  .triage-ada-head b { display: block; color: var(--ochre); font-size: 13px; }
+  .triage-ada-head span { display: block; color: var(--ink-3); font-size: 11px; }
+  .triage-ada-body { padding: 15px; }
+  .triage-ada-section { padding: 13px 0; border-bottom: 1px solid var(--line); }
+  .triage-ada-section:first-child { padding-top: 0; }
+  .triage-ada-section:last-child { padding-bottom: 0; border-bottom: 0; }
+  .triage-ada-label { margin-bottom: 6px; color: var(--ink-4); font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .triage-ada-section p { color: var(--ink-2); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .triage-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .triage-tag { padding: 2px 8px; border-radius: 20px; background: var(--surface); color: var(--ochre); font-size: 10px; font-weight: 800; text-transform: capitalize; }
+  .triage-tag.high { background: var(--bad-soft); color: var(--bad); }
+  .triage-tag.medium { background: var(--warn-soft); color: var(--warn); }
+  .triage-issues { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; }
+  .triage-draft { width: 100%; min-height: 150px; resize: vertical; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--paper); color: var(--ink); font: 13px/1.6 var(--sans); }
+  .triage-ada-loading { display: flex; align-items: center; gap: 10px; padding: 18px; color: var(--ink-3); font-size: 12.5px; }
+  .spin { width: 15px; height: 15px; border: 2px solid var(--line-strong); border-top-color: var(--ochre); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; border-color: var(--ochre); } }
 
   .ada-starters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 14px; }
   .ada-starter { padding: 11px 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink-3); text-align: left; font-size: 11.5px; line-height: 1.4; }
@@ -816,6 +837,7 @@
   };
   let myId = null, myRole = null, allVouchers = [], chatHistory = [], pendingAttachment = null;
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
+  const triageAnalyses = new Map();
 
   function go(view) {
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
@@ -1079,15 +1101,72 @@
         <h1>${escapeHtml(m.subject || '(no subject)')}</h1>
         <div class="triage-meta">From <b>${escapeHtml(sender)}</b>${m.received ? ` · ${escapeHtml(new Date(m.received).toLocaleString())}` : ''}</div>
         <div class="triage-body">${escapeHtml(m.body || 'This message has no readable text body.')}</div>
-        <div class="triage-known">
-          <h3>Read-only mailbox view</h3>
-          <p>Opening a message here does not mark it as read or change anything in the mailbox. AI summaries, reply detection, and drafts are still a separate semantic-triage step.</p>
-        </div>
+        <div class="triage-ada" id="triageAda">${triageAnalysisHtml(m)}</div>
         <div class="triage-actions">
-          <button class="btn primary" type="button" onclick="askAdaAboutTriage()">Ask Ada about this</button>
           <button class="btn" type="button" onclick="loadTriage(true)">Refresh inbox</button>
         </div>
       </div>`;
+  }
+
+  function triageAnalysisHtml(message) {
+    const item = triageAnalyses.get(String(message.id));
+    if (!item) return `
+      <div class="triage-ada-head">
+        <span class="triage-ada-mark">A</span>
+        <span><b>Ada’s read</b><span>Summary, priority, next action and a draft when needed</span></span>
+      </div>
+      <div class="triage-ada-body">
+        <p style="color:var(--ink-3);font-size:12.5px;margin-bottom:12px">Ada analyzes this email here. Nothing is sent or changed in your mailbox.</p>
+        <button class="btn primary" type="button" onclick="summarizeTriage()">Summarize with Ada</button>
+      </div>`;
+    const issues = Array.isArray(item.issues) ? item.issues : [];
+    return `
+      <div class="triage-ada-head">
+        <span class="triage-ada-mark">A</span>
+        <span><b>Ada’s read</b><span>Review this before acting</span></span>
+        <span class="triage-tags">
+          <span class="triage-tag ${escapeHtml(item.priority || '')}">${escapeHtml(item.priority || 'normal')} priority</span>
+          <span class="triage-tag">${escapeHtml(item.category || 'other')}</span>
+        </span>
+      </div>
+      <div class="triage-ada-body">
+        <div class="triage-ada-section"><div class="triage-ada-label">Summary</div><p>${escapeHtml(item.summary || 'No summary returned.')}</p></div>
+        <div class="triage-ada-section"><div class="triage-ada-label">Next action</div><p>${escapeHtml(item.action || 'No action suggested.')}</p></div>
+        ${issues.length ? `<div class="triage-ada-section"><div class="triage-ada-label">Check before acting</div><ul class="triage-issues">${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}</ul></div>` : ''}
+        ${item.needs_reply && item.suggested_reply ? `<div class="triage-ada-section"><div class="triage-ada-label">Suggested reply · edit before using</div><textarea class="triage-draft">${escapeHtml(item.suggested_reply)}</textarea><div class="triage-actions"><button class="btn sm" type="button" onclick="copyTriageDraft(this)">Copy draft</button></div></div>` : ''}
+      </div>`;
+  }
+
+  async function summarizeTriage() {
+    const message = triageMessages.find(item => String(item.id) === selectedTriageId);
+    const box = document.getElementById('triageAda');
+    if (!message || !box) return;
+    box.innerHTML = '<div class="triage-ada-loading"><span class="spin"></span> Ada is reading this email…</div>';
+    try {
+      const res = await fetch('/api/mailbox/triage', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: String(message.id) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        box.innerHTML = `<div class="triage-ada-body"><div class="msg-error">${escapeHtml(data.error || 'Ada could not summarize this email.')}</div><button class="btn" type="button" onclick="summarizeTriage()">Try again</button></div>`;
+        return;
+      }
+      triageAnalyses.set(String(message.id), data.item);
+      box.innerHTML = triageAnalysisHtml(message);
+      checkChatUsage();
+    } catch {
+      box.innerHTML = '<div class="triage-ada-body"><div class="msg-error">Could not reach Ada.</div><button class="btn" type="button" onclick="summarizeTriage()">Try again</button></div>';
+    }
+  }
+
+  function copyTriageDraft(button) {
+    const text = button.closest('.triage-ada-section').querySelector('.triage-draft').value;
+    navigator.clipboard.writeText(text).then(() => {
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy draft'; }, 1600);
+    });
   }
 
   function primeAda(prompt) {
@@ -1095,12 +1174,6 @@
     const input = document.getElementById('chatInput');
     input.value = prompt;
     input.focus();
-  }
-
-  function askAdaAboutTriage() {
-    const m = triageMessages.find(item => String(item.id) === selectedTriageId);
-    if (!m) return;
-    primeAda(`I have an email from ${mailboxSender(m.from)} with the subject “${m.subject || '(no subject)'}”. You cannot see its body yet. Help me decide what facts to check before I respond, and do not invent its contents.`);
   }
 
   // What the OAuth round trip can come back saying. The callback redirects
