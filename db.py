@@ -224,6 +224,41 @@ def init_db() -> None:
                 PRIMARY KEY (company_id, year_month)
             );
 
+            -- A person's own connected mailbox - Microsoft, Google or plain
+            -- IMAP. One row per user, not per company: the credential is
+            -- that individual's access to their own mail, and nobody else at
+            -- the company - supervisor included - is entitled to read it
+            -- through them. Deleting the row is what "disconnect" means.
+            --
+            -- credentials_enc holds whatever that provider needs (a refresh
+            -- token, or an IMAP password), encrypted via secretstore. It is
+            -- the only column here that is secret: host, port and address
+            -- are ordinary settings and stay readable so the UI can show
+            -- them without a key. Nothing is ever written unencrypted - with
+            -- no key configured, connecting is refused instead.
+            CREATE TABLE IF NOT EXISTS mailbox_connections (
+                user_id         INTEGER PRIMARY KEY REFERENCES users(id),
+                company_id      INTEGER NOT NULL REFERENCES companies(id),
+                provider        TEXT NOT NULL DEFAULT 'microsoft',
+                account_email   TEXT NOT NULL DEFAULT '',
+                account_name    TEXT NOT NULL DEFAULT '',
+                imap_host       TEXT NOT NULL DEFAULT '',
+                imap_port       INTEGER NOT NULL DEFAULT 0,
+                credentials_enc TEXT NOT NULL,
+                scopes          TEXT NOT NULL DEFAULT '',
+                connected_at    REAL NOT NULL
+            );
+
+            -- Short-lived CSRF state for the OAuth round trip. A row is spent
+            -- the moment the callback consumes it, so a replayed callback
+            -- finds nothing and is rejected.
+            CREATE TABLE IF NOT EXISTS oauth_states (
+                state      TEXT PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id),
+                provider   TEXT NOT NULL DEFAULT 'microsoft',
+                created_at REAL NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
@@ -556,6 +591,120 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         user_id = cur.lastrowid
 
     return get_user(user_id) | {"company": {"id": company_id, "name": company_name}}
+
+
+# ------------------------------------------------------- connected mailboxes
+#
+# One mailbox per user, whoever hosts it - see mailbox.py. Everything here is
+# scoped by user_id and never by company: a supervisor can see that somebody
+# on their team connected a mailbox (it's their plan paying for it), but no
+# route hands them another person's credentials or mail.
+
+OAUTH_STATE_TTL_SECONDS = 10 * 60
+
+
+def new_oauth_state(user_id: int, provider: str) -> str:
+    """Mint a single-use state token for an OAuth round trip.
+
+    Carries the provider so the callback doesn't have to trust a query
+    parameter to decide whose token endpoint to talk to.
+    """
+    state = secrets.token_urlsafe(32)
+    now = time.time()
+    with _cursor() as conn:
+        # Opportunistic sweep - these are worthless once expired and there is
+        # no scheduled job on this host to tidy them up.
+        conn.execute(
+            "DELETE FROM oauth_states WHERE created_at < ?",
+            (now - OAUTH_STATE_TTL_SECONDS,),
+        )
+        conn.execute(
+            "INSERT INTO oauth_states (state, user_id, provider, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (state, user_id, provider, now),
+        )
+    return state
+
+
+def consume_oauth_state(state: str) -> tuple[int, str] | None:
+    """Spend a state token, returning (user_id, provider).
+
+    Single use by construction: the row is deleted as it's read, so a
+    replayed callback finds nothing. Returns None if the state is unknown,
+    already spent, or older than the TTL.
+    """
+    if not state:
+        return None
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT user_id, provider, created_at FROM oauth_states WHERE state = ?",
+            (state,),
+        ).fetchone()
+        if not row:
+            return None
+        conn.execute("DELETE FROM oauth_states WHERE state = ?", (state,))
+    if time.time() - row["created_at"] > OAUTH_STATE_TTL_SECONDS:
+        return None
+    return row["user_id"], row["provider"]
+
+
+def save_mailbox_connection(user_id: int, company_id: int, connection: dict,
+                             credentials_enc: str) -> None:
+    """Store (or replace) someone's mailbox connection.
+
+    Takes credentials already encrypted - this layer never sees a key and
+    never decides whether encryption happened, so there's no path where a
+    plaintext credential reaches the table by accident.
+    """
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO mailbox_connections
+               (user_id, company_id, provider, account_email, account_name,
+                imap_host, imap_port, credentials_enc, scopes, connected_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                 company_id = excluded.company_id,
+                 provider = excluded.provider,
+                 account_email = excluded.account_email,
+                 account_name = excluded.account_name,
+                 imap_host = excluded.imap_host,
+                 imap_port = excluded.imap_port,
+                 credentials_enc = excluded.credentials_enc,
+                 scopes = excluded.scopes,
+                 connected_at = excluded.connected_at""",
+            (user_id, company_id, connection["provider"], connection["account_email"],
+             connection["account_name"], connection.get("imap_host", ""),
+             connection.get("imap_port", 0), credentials_enc,
+             connection.get("scopes", ""), time.time()),
+        )
+
+
+def get_mailbox_connection(user_id: int) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT * FROM mailbox_connections WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_mailbox_credentials(user_id: int, credentials_enc: str) -> None:
+    """Write back re-encrypted credentials after a token refresh."""
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE mailbox_connections SET credentials_enc = ? WHERE user_id = ?",
+            (credentials_enc, user_id),
+        )
+
+
+def delete_mailbox_connection(user_id: int) -> None:
+    """Forget a mailbox entirely - credentials included.
+
+    This is Buinee's side only. For the OAuth providers the consent still
+    exists at Microsoft/Google until the person removes it from their own
+    account, which the UI tells them.
+    """
+    with _cursor() as conn:
+        conn.execute("DELETE FROM mailbox_connections WHERE user_id = ?", (user_id,))
 
 
 # ------------------------------------------------------------------ plans

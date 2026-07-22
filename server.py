@@ -50,7 +50,9 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
 import db  # noqa: E402
+import mailbox  # noqa: E402
 import providers  # noqa: E402
+import secretstore  # noqa: E402
 import voucher  # noqa: E402
 
 # Only the local dev transport reads these - production runs under Passenger,
@@ -103,7 +105,12 @@ def load_env() -> dict:
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
-    for k in list(PROVIDER_KEYS.values()) + ["CLERK_PROVIDER", "CLERK_MODEL"]:
+    for k in list(PROVIDER_KEYS.values()) + [
+        "CLERK_PROVIDER", "CLERK_MODEL",
+        "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_REDIRECT_URI",
+        "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
+        "BUINEE_SECRET_KEY",
+    ]:
         if os.environ.get(k):
             cfg[k] = os.environ[k]
     return cfg
@@ -174,6 +181,63 @@ def _cookie(handler, name: str) -> str | None:
 
 def session_token(handler) -> str | None:
     return _cookie(handler, COOKIE_NAME)
+
+
+def live_mailbox(user_id: int, cfg: dict) -> tuple[dict, dict]:
+    """A user's connection plus usable, current credentials.
+
+    Everything that touches a mailbox goes through here rather than trusting
+    what was stored at connect time: OAuth access tokens last about an hour,
+    so this refreshes when they're close to expiring and re-encrypts the
+    result. A refresh the provider rejects means the grant is gone for good
+    (revoked, password changed, admin removed the app), so the connection is
+    dropped - the UI should say "not connected", not fail forever.
+    """
+    conn = db.get_mailbox_connection(user_id)
+    if not conn:
+        raise mailbox.MailboxError("No mailbox is connected.")
+    try:
+        creds = secretstore.decrypt(cfg, conn["credentials_enc"])
+    except secretstore.SecretsUnavailable as exc:
+        raise mailbox.MailboxError(str(exc)) from exc
+
+    try:
+        fresh = mailbox.refresh(cfg, conn["provider"], creds)
+    except mailbox.MailboxError:
+        db.delete_mailbox_connection(user_id)
+        raise mailbox.MailboxError(
+            "The mailbox connection has expired or been revoked. "
+            "Connect it again to carry on."
+        )
+    if fresh:
+        db.update_mailbox_credentials(user_id, secretstore.encrypt(cfg, fresh))
+        creds = fresh
+    return conn, creds
+
+
+def public_mailbox(user_id: int, cfg: dict) -> dict:
+    """What the dashboard is told about someone's mailbox. Never credentials."""
+    conn = db.get_mailbox_connection(user_id)
+    return {
+        # Which providers this deployment can actually offer. An empty list
+        # is a different situation from "you haven't connected yet", and the
+        # UI says so rather than showing buttons that can't work.
+        "providers": [
+            {"id": p, "label": mailbox.LABELS[p]} for p in mailbox.available(cfg)
+        ],
+        # Credentials are refused rather than stored in the clear, so the UI
+        # needs to explain why connecting is unavailable.
+        "secrets_ready": secretstore.is_ready(cfg),
+        "secrets_problem": secretstore.why_unavailable(cfg),
+        "connected": bool(conn),
+        "account": {
+            "provider": conn["provider"],
+            "label": mailbox.LABELS.get(conn["provider"], conn["provider"]),
+            "email": conn["account_email"],
+            "name": conn["account_name"],
+            "connected_at": conn["connected_at"],
+        } if conn else None,
+    }
 
 
 def current_user(handler) -> dict | None:
@@ -449,6 +513,11 @@ class RouteHandlerMixin:
     def _json(self, obj, code=200, extra_headers=None):
         self._send(code, json.dumps(obj).encode(), "application/json", extra_headers)
 
+    def _redirect(self, location: str):
+        """Browser-facing redirect - used by the OAuth round trip, which is a
+        navigation rather than a fetch, so it can't answer in JSON."""
+        self._send(302, b"", "text/plain; charset=utf-8", [("Location", location)])
+
     def _body(self, max_len: int = 20000) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if length > max_len:
@@ -524,6 +593,44 @@ class RouteHandlerMixin:
             q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
             return self._json({"companies": db.find_companies_by_name(q)})
 
+        if path == "/api/mailbox/status":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json(public_mailbox(user["id"], load_env()))
+
+        if path == "/api/mailbox/messages":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            try:
+                conn, creds = live_mailbox(user["id"], load_env())
+                msgs = mailbox.list_recent(load_env(), conn, creds)
+            except mailbox.MailboxError as exc:
+                return self._json({"error": str(exc)}, 400)
+            return self._json({"messages": msgs})
+
+        if path == "/api/mailbox/connect":
+            # A browser navigation, not a fetch - it ends at the provider's
+            # sign-in page, so failures answer in redirects rather than JSON
+            # the user would never see.
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._redirect("/login.html")
+            cfg = load_env()
+            provider = parse_qs(urlparse(self.path).query).get("provider", [""])[0]
+            if provider not in mailbox.OAUTH or not mailbox.is_configured(cfg, provider):
+                return self._redirect("/dashboard.html?mailbox=unconfigured")
+            if not secretstore.is_ready(cfg):
+                return self._redirect("/dashboard.html?mailbox=nokey")
+            state = db.new_oauth_state(user["id"], provider)
+            return self._redirect(
+                mailbox.authorize_url(cfg, provider, state, login_hint=user["email"])
+            )
+
+        if path == "/api/mailbox/callback":
+            return self._handle_mailbox_callback()
+
         if path == "/api/plans":
             # Public and unauthenticated on purpose - pricing is marketing
             # copy, and the landing page's pricing section and register.html
@@ -571,6 +678,8 @@ class RouteHandlerMixin:
         path = self.path.split("?")[0]
         handlers = {
             "/api/demo": self._handle_demo,
+            "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
+            "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
             "/api/register": self._handle_register,
             "/api/join": self._handle_join,
             "/api/login": self._handle_login,
@@ -680,6 +789,99 @@ class RouteHandlerMixin:
             {"ok": True, "user": public_user(user)},
             extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
         )
+
+    def _handle_mailbox_callback(self):
+        """Where Microsoft or Google sends the browser back after consent.
+
+        Everything here ends in a redirect to the dashboard carrying a short
+        `mailbox=` code, because the person is looking at a browser tab, not
+        at a JSON response. Nothing sensitive goes in that query string.
+        """
+        params = parse_qs(urlparse(self.path).query)
+        cfg = load_env()
+
+        # The user can decline, or the provider can refuse (admin consent
+        # required, app not approved in that tenant, unverified app). Either
+        # way it arrives as ?error= rather than a code.
+        if params.get("error"):
+            return self._redirect("/dashboard.html?mailbox=denied")
+
+        # State is checked before anything else is trusted: it proves this
+        # callback belongs to a connect this browser started, it carries the
+        # provider so that isn't taken from the query string, and it's spent
+        # on read so a replay finds nothing.
+        spent = db.consume_oauth_state(params.get("state", [""])[0])
+        if not spent:
+            return self._redirect("/dashboard.html?mailbox=badstate")
+        user_id, provider = spent
+
+        # The state says which user asked, but the cookie says who is
+        # actually driving this browser. If they disagree, someone is being
+        # walked through a callback that isn't theirs - refuse rather than
+        # attach a mailbox to whichever account happens to be signed in.
+        user = current_user(self)
+        if not user or user["id"] != user_id or user["status"] != "approved":
+            return self._redirect("/dashboard.html?mailbox=badstate")
+
+        code = params.get("code", [""])[0]
+        if not code:
+            return self._redirect("/dashboard.html?mailbox=denied")
+
+        try:
+            connection = mailbox.exchange_code(cfg, provider, code)
+            enc = secretstore.encrypt(cfg, connection["credentials"])
+        except mailbox.MailboxError:
+            return self._redirect("/dashboard.html?mailbox=failed")
+        except secretstore.SecretsUnavailable:
+            # Credentials are never written in the clear - better to lose the
+            # connection attempt than to store a token unprotected.
+            return self._redirect("/dashboard.html?mailbox=nokey")
+
+        db.save_mailbox_connection(user["id"], user["company_id"], connection, enc)
+        # Not written to the activity log: that table hangs off a voucher
+        # (voucher_events.voucher_id is NOT NULL), and connecting a mailbox
+        # isn't an event about one.
+        return self._redirect("/dashboard.html?mailbox=connected")
+
+    def _handle_mailbox_connect_imap(self):
+        """IMAP has no consent screen, so it's a form post rather than a
+        redirect. The details are proven by logging in before anything is
+        stored - credentials that don't work never reach the database."""
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        cfg = load_env()
+        if not secretstore.is_ready(cfg):
+            return self._json({"error": secretstore.why_unavailable(cfg)}, 400)
+        try:
+            port = int(req.get("port") or 993)
+        except (TypeError, ValueError):
+            port = 993
+        try:
+            connection = mailbox.connect_imap(
+                str(req.get("host") or ""),
+                port,
+                str(req.get("email") or ""),
+                str(req.get("password") or ""),
+            )
+            enc = secretstore.encrypt(cfg, connection["credentials"])
+        except mailbox.MailboxError as exc:
+            return self._json({"error": str(exc)}, 400)
+        except secretstore.SecretsUnavailable as exc:
+            return self._json({"error": str(exc)}, 400)
+        db.save_mailbox_connection(user["id"], user["company_id"], connection, enc)
+        return self._json({"ok": True, "mailbox": public_mailbox(user["id"], cfg)})
+
+    def _handle_mailbox_disconnect(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        db.delete_mailbox_connection(user["id"])
+        return self._json({"ok": True, "mailbox": public_mailbox(user["id"], load_env())})
 
     def _handle_join(self):
         if rate_limited(f"auth:{client_ip(self)}", max_hits=20, window=600):

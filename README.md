@@ -712,6 +712,159 @@ payment letter, editing/deleting a voucher.
 
 ---
 
+## Connecting a mailbox
+
+The old `outlook-agent` read Outlook through a local Windows COM bridge —
+one machine, Outlook Classic open, no way to serve a company that just
+signed up. `mailbox.py` replaces it with three ways in, behind one
+interface:
+
+| Provider | How | What it costs to enable |
+|---|---|---|
+| `microsoft` | Graph, OAuth | An Azure app registration |
+| `google` | Gmail API, OAuth | A Google Cloud client **plus verification** — see below |
+| `imap` | Direct IMAP | Nothing — works as soon as a key is set |
+
+**IMAP is the one that covers most customers**: company mail on cPanel,
+Zoho, Fastmail, Yahoo, and Gmail itself via an app password. No consent
+screen, no vendor queue. The trade is that it holds a password rather than a
+revocable token, which is what forced the encryption below.
+
+**Gmail is not symmetrical with Outlook.** Google classifies `gmail.modify`
+as a *restricted* scope: a production app needs verification plus an annual
+third-party security assessment (CASA), and is capped at a handful of test
+users until that clears. The code is ready; the queue is Google's. Confirm
+the current policy before committing to a timeline.
+
+Decisions worth knowing before changing anything here:
+
+- **Delegated permissions, not application permissions.** Each person
+  consents to their own mailbox. Buinee never asks a tenant admin for
+  blanket read access across an organisation, and there's no code path that
+  would use it if one were granted. `mailbox_connections` is keyed by
+  `user_id` for the same reason — a supervisor can see *that* someone
+  connected a mailbox, never read it through them.
+- **Multitenant registration**, so any Microsoft 365 organisation can
+  consent without being registered in Buinee's directory first. That's why
+  the authority is `/common` rather than a fixed tenant id.
+- **`Mail.ReadWrite`, not `Mail.Send`.** The agent can triage an inbox and
+  put a draft in the person's own Drafts folder; sending stays something
+  they do themselves. Adding `Mail.Send` later forces every already-connected
+  user to re-consent, so it's a deliberate omission, not an oversight.
+
+### Credentials are encrypted at rest, or not stored at all
+
+`secretstore.py` (Fernet, from `cryptography`) encrypts whatever a provider
+needs to keep — a refresh token, or an IMAP password — into
+`mailbox_connections.credentials_enc`. Host, port and address stay readable:
+they're settings, not secrets, and the UI needs them without a key.
+
+**It fails closed.** With `BUINEE_SECRET_KEY` unset or invalid, connecting a
+mailbox is refused outright and the dashboard says why. Falling back to
+plaintext would be the one behaviour nobody notices and everybody regrets.
+
+    pip install cryptography
+    python -c "import secretstore; print(secretstore.generate_key())"
+
+What this protects against: someone who ends up with a copy of
+`storage/ledgerline.db` — a stray backup, a misconfigured File Manager, the
+wrong attachment on a support ticket — and no copy of the key. It does *not*
+protect against someone who has the server, since the key is on it. That's
+the honest limit of any key-on-the-same-box scheme, and it's still worth
+having, because database files travel far more easily than servers do.
+Rotating the key makes existing connections unreadable; people reconnect, so
+don't rotate it casually.
+
+### Creating the Azure app registration
+
+Done once, by the platform owner, in the Azure portal — the values it
+produces go in `.env`/cPanel env vars, never in the repo.
+
+1. [portal.azure.com](https://portal.azure.com) → **Microsoft Entra ID** →
+   **App registrations** → **New registration**.
+2. Name it (`Buinee`). Under **Supported account types** pick **Accounts in
+   any organizational directory (Any Microsoft Entra ID tenant) and personal
+   Microsoft accounts** — that's what this deployment is registered as, and
+   it's the audience `/common` in `mailbox.py` is the endpoint for. Anything
+   single-tenant works only for your own directory and rejects every
+   customer.
+
+   The narrower **Any Entra ID tenant** (org accounts only) is also valid,
+   but then the authority should be `/organizations` rather than `/common`,
+   or people signing in with a personal account get through the picker and
+   fail afterwards. Including personal accounts means a sole trader on
+   Outlook.com or Hotmail can connect — which pairs with the Solo tiers —
+   but also that someone at a company can attach a personal mailbox to a
+   work workspace. That's a policy question, not a technical one.
+3. **Redirect URI**: platform **Web**, value
+   `https://buinee.app/api/mailbox/callback`. Add
+   `http://localhost:8080/api/mailbox/callback` as a second Web redirect URI
+   for local dev — `http` is allowed for `localhost` only. These must match
+   `AZURE_REDIRECT_URI` character for character.
+4. **Register**, then copy the **Application (client) ID** from Overview.
+   That one is not a secret.
+5. **Certificates & secrets** → **New client secret**. Copy the **Value**
+   immediately — Azure shows it once and only ever displays the Secret ID
+   afterwards. Note the expiry date; the connection breaks when it lapses.
+6. **API permissions** → **Add a permission** → **Microsoft Graph** →
+   **Delegated permissions** → add `offline_access`, `User.Read`,
+   `Mail.ReadWrite`. `offline_access` is the one that returns a refresh
+   token; without it every connection dies about an hour after it's made.
+7. Put the two values in `.env` (or cPanel's env var fields):
+   `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, plus `AZURE_REDIRECT_URI`.
+   Restart the app from the Python Selector.
+
+Some tenants require an administrator to approve a third-party app before
+staff can consent for themselves. That surfaces as a "needs admin approval"
+screen at sign-in and comes back as `?mailbox=denied` — it's the customer's
+IT department to resolve, not a bug here.
+
+**Google** is the same shape: a Google Cloud project → OAuth consent screen →
+credentials → **Web application** client, the same
+`https://buinee.app/api/mailbox/callback` redirect, and
+`GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET`/`GOOGLE_REDIRECT_URI`.
+`access_type=offline` and `prompt=consent` are both set in `mailbox.py`
+because Google only returns a refresh token when they are — without it the
+connection silently dies within the hour.
+
+**IMAP** needs no registration at all. The person supplies server, port,
+address and password; `mailbox.connect_imap` proves them by logging in
+before anything is stored, so credentials that don't work never reach the
+database.
+
+### The flow
+
+`GET /api/mailbox/connect?provider=…` mints a single-use state row and
+redirects to the provider. `GET /api/mailbox/callback` checks the state
+**before trusting anything else**, and checks it against the session cookie
+too: the state says which user asked, the cookie says who is actually
+driving the browser, and if they disagree the callback is refused rather
+than attaching a mailbox to whoever happens to be signed in. The state also
+*carries the provider*, so the callback never takes that from a query
+parameter. States are spent on read (deleted as they're consumed) so a
+replayed callback finds nothing, and expire after ten minutes.
+
+`server.live_mailbox()` is the only way anything reaches a mailbox: it
+decrypts the stored credentials, refreshes when an access token is within
+two minutes of expiring, re-encrypts the result, rotates the refresh token
+when the provider returns a new one, and **deletes the connection outright**
+if a refresh is rejected — a revoked grant should read as "not connected",
+not fail forever.
+
+Disconnecting deletes Buinee's copy. For the OAuth providers the consent
+still exists until the person removes it at
+[myapps.microsoft.com](https://myapps.microsoft.com) or
+[myaccount.google.com/permissions](https://myaccount.google.com/permissions),
+which the confirm dialog names.
+
+**Not built yet**: anything that *acts on* the mail. `mailbox.list_recent`
+returns the latest inbox headers in one shape across all three providers
+(`GET /api/mailbox/messages`), but no triage, ranking or drafting runs
+against it — the Overview's "Needs your reply first" card and the
+Automations view are still placeholders.
+
+---
+
 ## Where this came from
 
 Buinee replaces two earlier single-client, single-tenant builds at

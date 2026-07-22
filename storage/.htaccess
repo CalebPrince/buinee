@@ -1,0 +1,23 @@
+# The database lives here. Nothing in this directory should ever be served
+# over HTTP.
+#
+# This exists because it was found the hard way: on cPanel/Passenger, Apache
+# serves real files out of the app root itself before Passenger ever sees the
+# request, so https://<site>/storage/ledgerline.db was downloadable - user
+# records, password hashes, live session tokens, the lot.
+#
+# This is a seatbelt, not the fix. The fix is that the application root
+# should sit OUTSIDE public_html, so there is no URL that maps here at all.
+# Keep both: if the app is ever moved, this file costs nothing; if this file
+# is ever lost, the layout still protects it.
+
+# Apache 2.4
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

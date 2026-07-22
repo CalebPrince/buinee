@@ -1,2 +1,6 @@
 openpyxl
+
+# Encrypts stored mailbox credentials (secretstore.py). Without it, connecting
+# a mailbox is refused rather than storing a password or token in the clear —
+# everything else in the app runs fine.
 cryptography

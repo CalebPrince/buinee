@@ -3,7 +3,9 @@
 *.key
 
 # Data
-storage/
+# Keep runtime data ignored, but ship Apache's deny rule for this directory.
+storage/*
+!storage/.htaccess
 *.sqlite
 *.db
 

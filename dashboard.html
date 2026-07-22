@@ -109,6 +109,48 @@
   .src-ico { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 700; color: #fff; background: var(--ink-4); }
   .src-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .src-soon { margin-left: auto; flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); background: var(--surface-2); padding: 2px 6px; border-radius: 20px; }
+  .src-soon.live { color: var(--good); background: var(--good-soft); }
+  .source.connected .src-ico { background: var(--teal); }
+  .src-action {
+    display: block; width: 100%; margin: 2px 0 0; padding: 7px 8px; border: none;
+    border-radius: 8px; background: transparent; color: var(--teal); cursor: pointer;
+    font-family: inherit; font-size: 12.5px; font-weight: 600; text-align: left;
+  }
+  .src-action:hover { background: var(--surface-2); }
+  .src-action:disabled { color: var(--ink-4); cursor: default; background: transparent; }
+  .src-note { margin: 4px 8px 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-4); }
+
+  /* IMAP details - the one provider with no consent screen to send you to */
+  .imap-back {
+    position: fixed; inset: 0; z-index: 90; background: rgba(16,22,25,.55);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .imap-back.open { display: flex; }
+  .imap-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); width: 100%; max-width: 430px; padding: 24px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .imap-card h3 { margin: 0 0 6px; font-size: 18px; }
+  .imap-card .sub { font-size: 13px; color: var(--ink-3); margin-bottom: 16px; }
+  .imap-card label {
+    display: flex; flex-direction: column; gap: 5px; font-size: 12.5px;
+    font-weight: 600; color: var(--ink-2); margin-bottom: 11px;
+  }
+  .imap-card input {
+    padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line-strong);
+    background: var(--paper); color: var(--ink); font-weight: 400;
+    font-family: inherit; font-size: 14px;
+  }
+  .imap-card input:focus { border-color: var(--teal); outline: none; }
+  .imap-row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+  .imap-card .hint { font-size: 11.5px; font-weight: 400; color: var(--ink-4); }
+  .imap-actions { display: flex; gap: 9px; justify-content: flex-end; margin-top: 6px; }
+  .imap-err {
+    display: none; font-size: 13px; padding: 9px 12px; border-radius: 9px;
+    background: var(--bad-soft); color: var(--bad); margin-bottom: 12px;
+  }
+  .imap-err.show { display: block; }
   .dot { width: 7px; height: 7px; border-radius: 50%; margin-left: auto; flex: none; }
   .dot.off { background: var(--ink-4); box-shadow: 0 0 0 3px var(--surface-2); }
   .dot.live { background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
@@ -334,11 +376,16 @@
 
     <div class="sources">
       <div class="nav-label eyebrow" style="padding:2px 8px 8px">Connected</div>
-      <div class="source">
-        <div class="src-ico">✉</div>
-        <span class="src-name">Email inbox</span>
-        <span class="src-soon">Coming soon</span>
+      <div class="source" id="mailboxSource" title="Email inbox">
+        <div class="src-ico" id="mailboxIco">✉</div>
+        <span class="src-name" id="mailboxName">Email inbox</span>
+        <span class="src-soon" id="mailboxState">…</span>
       </div>
+      <div id="mailboxChoices"></div>
+      <button class="src-action" id="mailboxDisconnect" onclick="disconnectMailbox()" hidden>
+        Disconnect
+      </button>
+      <p class="src-note" id="mailboxNote" hidden></p>
     </div>
 
     <div class="rail-foot">
@@ -567,6 +614,35 @@
   </div>
 </div>
 
+<div class="imap-back" id="imapBack">
+  <div class="imap-card" role="dialog" aria-modal="true" aria-labelledby="imapTitle">
+    <h3 id="imapTitle">Connect a mailbox</h3>
+    <p class="sub">Works with company mail, Zoho, Fastmail, Yahoo — anything that speaks IMAP.</p>
+    <div class="imap-err" id="imapError"></div>
+    <form onsubmit="return submitImap(event)">
+      <label>Email address
+        <input type="email" id="imapEmail" required autocomplete="email" placeholder="you@company.com">
+      </label>
+      <div class="imap-row">
+        <label>IMAP server
+          <input type="text" id="imapHost" required autocomplete="off" placeholder="mail.company.com">
+        </label>
+        <label>Port
+          <input type="number" id="imapPort" value="993" min="1" max="65535">
+        </label>
+      </div>
+      <label>Password
+        <input type="password" id="imapPassword" required autocomplete="off" placeholder="Mailbox password">
+        <span class="hint">If the account uses two-factor authentication, create an app password for Buinee instead of using your normal one.</span>
+      </label>
+      <div class="imap-actions">
+        <button class="btn" type="button" onclick="closeImap()">Cancel</button>
+        <button class="btn primary" type="submit" id="imapSubmit">Connect</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   function toggleTheme() {
     const root = document.documentElement;
@@ -724,6 +800,8 @@
     `).join('');
 
     renderChatLog();
+    showMailboxResult();
+    loadMailbox();
     checkChatAvailable();
     checkChatUsage();
     renderActivity();
@@ -732,6 +810,170 @@
     document.getElementById('loading').style.display = 'none';
     go('overview');
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== 'overview');
+  }
+
+  // ------------------------------------------------------- connected mailbox
+
+  // What the OAuth round trip can come back saying. The callback redirects
+  // here with one of these rather than rendering its own page, so the person
+  // lands back in the dashboard either way.
+  const MAILBOX_RESULTS = {
+    connected: ['ok', 'Mailbox connected.'],
+    denied: ['warn', "Microsoft didn't grant access — the sign-in was cancelled, or your IT administrator has to approve Buinee for your organisation first."],
+    failed: ['warn', "Couldn't finish connecting to Microsoft. Try again."],
+    badstate: ['warn', 'That sign-in link had expired or belonged to another session. Start the connection again.'],
+    unconfigured: ['warn', 'That mail provider isn\'t set up on this deployment yet.'],
+    nokey: ['warn', 'Mailbox credentials can\'t be stored safely on this deployment yet, so the connection was refused.'],
+  };
+
+  function showMailboxResult() {
+    const code = new URLSearchParams(location.search).get('mailbox');
+    if (!code) return;
+    const hit = MAILBOX_RESULTS[code];
+    if (hit) alert(hit[1]);
+    // Strip it so a refresh doesn't repeat the message.
+    const url = new URL(location);
+    url.searchParams.delete('mailbox');
+    history.replaceState(null, '', url);
+  }
+
+  // Where to send someone to withdraw the permission at the provider's end,
+  // since disconnecting here only forgets our copy.
+  const REVOKE_AT = {
+    microsoft: 'myapps.microsoft.com',
+    google: 'myaccount.google.com/permissions',
+  };
+
+  async function loadMailbox() {
+    const state = document.getElementById('mailboxState');
+    const name = document.getElementById('mailboxName');
+    const choices = document.getElementById('mailboxChoices');
+    const disconnectBtn = document.getElementById('mailboxDisconnect');
+    const note = document.getElementById('mailboxNote');
+    let data;
+    try {
+      const res = await fetch('/api/mailbox/status', { credentials: 'same-origin' });
+      if (!res.ok) return;
+      data = await res.json();
+    } catch { return; }
+
+    document.getElementById('mailboxSource').classList.toggle('connected', !!data.connected);
+    disconnectBtn.hidden = !data.connected;
+    choices.innerHTML = '';
+    note.hidden = true;
+
+    if (data.connected) {
+      state.textContent = 'Connected';
+      state.classList.add('live');
+      name.textContent = data.account.email || 'Email inbox';
+      document.getElementById('mailboxSource').title =
+        `${data.account.label} · ${data.account.email}`;
+      return;
+    }
+
+    state.classList.remove('live');
+    name.textContent = 'Email inbox';
+
+    // Credentials are refused rather than stored unprotected, so this is a
+    // deployment problem the person at the dashboard can't fix - explain it
+    // instead of offering buttons that will fail.
+    if (!data.secrets_ready) {
+      state.textContent = 'Not set up';
+      note.hidden = false;
+      note.textContent = data.secrets_problem;
+      return;
+    }
+    if (!data.providers.length) {
+      state.textContent = 'Not set up';
+      note.hidden = false;
+      note.textContent = 'No mail provider is configured on this deployment yet.';
+      return;
+    }
+
+    state.textContent = 'Not connected';
+    for (const p of data.providers) {
+      const btn = document.createElement('button');
+      btn.className = 'src-action';
+      btn.textContent = 'Connect ' + p.label;
+      btn.onclick = () => connectMailbox(p.id);
+      choices.appendChild(btn);
+    }
+  }
+
+  function connectMailbox(provider) {
+    if (provider === 'imap') { openImap(); return; }
+    // A full navigation, not a fetch: it hands the browser to the provider's
+    // sign-in page, which will not run inside an XHR.
+    location.href = '/api/mailbox/connect?provider=' + encodeURIComponent(provider);
+  }
+
+  function openImap() {
+    document.getElementById('imapError').classList.remove('show');
+    document.getElementById('imapBack').classList.add('open');
+    document.getElementById('imapEmail').focus();
+  }
+
+  function closeImap() {
+    document.getElementById('imapBack').classList.remove('open');
+    document.getElementById('imapPassword').value = '';
+  }
+
+  async function submitImap(ev) {
+    ev.preventDefault();
+    const err = document.getElementById('imapError');
+    const btn = document.getElementById('imapSubmit');
+    err.classList.remove('show');
+    btn.disabled = true; btn.textContent = 'Checking…';
+    try {
+      const res = await fetch('/api/mailbox/connect-imap', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('imapEmail').value,
+          host: document.getElementById('imapHost').value,
+          port: document.getElementById('imapPort').value,
+          password: document.getElementById('imapPassword').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        err.textContent = data.error || 'Could not connect.';
+        err.classList.add('show');
+        return false;
+      }
+      closeImap();
+      await loadMailbox();
+    } catch {
+      err.textContent = 'Could not reach the server.';
+      err.classList.add('show');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Connect';
+    }
+    return false;
+  }
+
+  async function disconnectMailbox() {
+    let where = '';
+    try {
+      const res = await fetch('/api/mailbox/status', { credentials: 'same-origin' });
+      const data = await res.json();
+      where = REVOKE_AT[(data.account || {}).provider] || '';
+    } catch {}
+    const tail = where
+      ? ` To withdraw the permission at the provider's end too, remove Buinee at ${where}.`
+      : ' The stored password is deleted.';
+    if (!confirm('Disconnect this mailbox? Buinee stops reading it straight away.' + tail)) return;
+    const btn = document.getElementById('mailboxDisconnect');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/mailbox/disconnect', { method: 'POST', credentials: 'same-origin' });
+      if (!res.ok) { alert('Could not disconnect.'); return; }
+      await loadMailbox();
+    } catch {
+      alert('Could not reach the server.');
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   async function checkChatAvailable() {

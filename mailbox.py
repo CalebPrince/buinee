@@ -1,0 +1,414 @@
+"""Connecting somebody's mailbox, whoever hosts it.
+
+Three ways in, one shape out:
+
+  - **microsoft** - Graph, OAuth authorization code flow. Multitenant, so any
+    Microsoft 365 organisation can consent without being registered here
+    first.
+  - **google** - Gmail API, same flow, different endpoints. Note that Google
+    treats Gmail scopes as *restricted*: a production app needs verification
+    plus an annual security assessment, and is capped at a handful of test
+    users until that clears. The code works the moment those are done; the
+    queue is Google's, not ours.
+  - **imap** - anything else. Company mail on cPanel, Zoho, Fastmail, Yahoo,
+    or Gmail via an app password. No vendor approval, no consent screen, but
+    it means holding a password rather than a revocable token - which is why
+    nothing here stores a credential unless secretstore has a working key.
+
+Not called `providers.py` - that name is already taken by the AI model
+providers, and confusing the two would be easy.
+
+Every provider exposes the same three things to the rest of the app:
+
+    connect_*(...)        -> CONNECTION dict, ready to store
+    refresh(cfg, creds)   -> fresh creds, or None if nothing needed doing
+    list_recent(...)      -> [{id, subject, from, received, unread}]
+
+Stdlib only apart from the encryption, which lives in secretstore.
+"""
+
+from __future__ import annotations
+
+import email.header
+import email.utils
+import imaplib
+import json
+import ssl
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+EXPIRY_SKEW_SECONDS = 120
+
+PROVIDERS = ("microsoft", "google", "imap")
+
+LABELS = {
+    "microsoft": "Outlook / Microsoft 365",
+    "google": "Gmail / Google Workspace",
+    "imap": "Other mailbox (IMAP)",
+}
+
+
+class MailboxError(Exception):
+    """A user-facing mailbox problem - not configured, denied, expired."""
+
+
+# --------------------------------------------------------------- OAuth shared
+#
+# Microsoft and Google differ in endpoints, scope names and one query
+# parameter each; everything else about the dance is identical, so it lives
+# once here rather than twice.
+
+OAUTH = {
+    "microsoft": {
+        # /common is the audience the app registration is set to: any Entra ID
+        # tenant *and* personal Microsoft accounts. If that's ever narrowed to
+        # organisations only, this has to become /organizations - otherwise a
+        # personal account gets through the account picker and fails after.
+        "authorize": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        "token": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        # offline_access is what makes a refresh token come back; without it
+        # the connection quietly dies about an hour after it's made.
+        "scopes": ["offline_access", "User.Read", "Mail.ReadWrite"],
+        "client_id_key": "AZURE_CLIENT_ID",
+        "client_secret_key": "AZURE_CLIENT_SECRET",
+        # Someone already signed in to the wrong account would otherwise be
+        # connected silently, with no way to tell.
+        "extra_authorize": {"prompt": "select_account"},
+    },
+    "google": {
+        "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token": "https://oauth2.googleapis.com/token",
+        "scopes": [
+            "https://www.googleapis.com/auth/gmail.modify",
+            "https://www.googleapis.com/auth/userinfo.email",
+        ],
+        "client_id_key": "GOOGLE_OAUTH_CLIENT_ID",
+        "client_secret_key": "GOOGLE_OAUTH_CLIENT_SECRET",
+        # Google only returns a refresh token on the first consent unless
+        # both of these are set - and a connection with no refresh token is
+        # one that breaks within the hour.
+        "extra_authorize": {"access_type": "offline", "prompt": "consent"},
+    },
+}
+
+REDIRECT_KEYS = {
+    "microsoft": "AZURE_REDIRECT_URI",
+    "google": "GOOGLE_REDIRECT_URI",
+}
+
+
+def is_configured(cfg: dict, provider: str) -> bool:
+    """Whether this deployment can offer this provider at all."""
+    if provider == "imap":
+        return True  # nothing to register with anyone
+    spec = OAUTH.get(provider)
+    if not spec:
+        return False
+    return bool(cfg.get(spec["client_id_key"], "").strip()
+                and cfg.get(spec["client_secret_key"], "").strip())
+
+
+def available(cfg: dict) -> list[str]:
+    return [p for p in PROVIDERS if is_configured(cfg, p)]
+
+
+def redirect_uri(cfg: dict, provider: str) -> str:
+    """Must match the registered redirect character for character - hence
+    configuration, not something derived from the request's Host header,
+    which is attacker-supplied."""
+    return cfg.get(REDIRECT_KEYS.get(provider, ""), "").strip()
+
+
+def authorize_url(cfg: dict, provider: str, state: str, *, login_hint: str = "") -> str:
+    spec = OAUTH[provider]
+    params = {
+        "client_id": cfg[spec["client_id_key"]].strip(),
+        "response_type": "code",
+        "redirect_uri": redirect_uri(cfg, provider),
+        "scope": " ".join(spec["scopes"]),
+        "state": state,
+        **spec["extra_authorize"],
+    }
+    if login_hint:
+        params["login_hint"] = login_hint
+    return spec["authorize"] + "?" + urllib.parse.urlencode(params)
+
+
+def _post_form(url: str, form: dict, what: str) -> dict:
+    req = urllib.request.Request(
+        url,
+        data=urllib.parse.urlencode(form).encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            # error_description is a paragraph with a correlation id in it -
+            # useful in a log, far too much for a dashboard banner.
+            detail = (json.loads(exc.read().decode("utf-8")) or {}).get("error") or ""
+        except Exception:
+            pass
+        raise MailboxError(f"{what} was rejected ({detail or exc.code}). Try again.") from exc
+    except urllib.error.URLError as exc:
+        raise MailboxError(f"Could not reach the mail provider to {what.lower()}.") from exc
+
+
+def _api_get(access_token: str, url: str, params: dict | None = None) -> dict:
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(
+        url, headers={"Authorization": f"Bearer {access_token}"}, method="GET"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise MailboxError("The mailbox connection has expired.") from exc
+        if exc.code == 403:
+            raise MailboxError(
+                "The mail provider refused that request - the connection may "
+                "not have the permissions it needs. Reconnecting asks for "
+                "them again."
+            ) from exc
+        raise MailboxError(f"The mail provider returned an error ({exc.code}).") from exc
+    except urllib.error.URLError as exc:
+        raise MailboxError("Could not reach the mail provider.") from exc
+
+
+def exchange_code(cfg: dict, provider: str, code: str) -> dict:
+    """Swap the one-time callback code for tokens, and identify the account.
+
+    Returns the CONNECTION dict the caller stores: non-secret metadata plus a
+    `credentials` dict that gets encrypted before it touches the database.
+    """
+    spec = OAUTH[provider]
+    payload = _post_form(spec["token"], {
+        "client_id": cfg[spec["client_id_key"]].strip(),
+        "client_secret": cfg[spec["client_secret_key"]].strip(),
+        "code": code,
+        "redirect_uri": redirect_uri(cfg, provider),
+        "grant_type": "authorization_code",
+    }, "The sign-in")
+
+    if not payload.get("refresh_token"):
+        raise MailboxError(
+            "No refresh token came back, so the connection wouldn't survive "
+            "the hour. Check the app registration's offline access settings, "
+            "then remove this app from your account and connect again."
+        )
+
+    access = payload.get("access_token") or ""
+    who = _whoami(provider, access)
+    return {
+        "provider": provider,
+        "account_email": who["email"],
+        "account_name": who["name"],
+        "imap_host": "",
+        "imap_port": 0,
+        "scopes": payload.get("scope") or " ".join(spec["scopes"]),
+        "credentials": {
+            "refresh_token": payload["refresh_token"],
+            "access_token": access,
+            "expires_at": time.time() + float(payload.get("expires_in") or 3600),
+        },
+    }
+
+
+def _whoami(provider: str, access_token: str) -> dict:
+    if provider == "microsoft":
+        me = _api_get(access_token, "https://graph.microsoft.com/v1.0/me")
+        return {
+            # mail is null on some accounts; userPrincipalName is reliable.
+            "email": me.get("mail") or me.get("userPrincipalName") or "",
+            "name": me.get("displayName") or "",
+        }
+    me = _api_get(access_token, "https://gmail.googleapis.com/gmail/v1/users/me/profile")
+    return {"email": me.get("emailAddress") or "", "name": ""}
+
+
+def refresh(cfg: dict, provider: str, creds: dict) -> dict | None:
+    """Renew the access token if it's close to expiring.
+
+    Returns updated credentials, or None when the current ones are still
+    good. Raises MailboxError if the grant is gone for good - revoked,
+    password changed, admin removed the app - which the caller treats as a
+    disconnection rather than a retryable failure.
+    """
+    if provider == "imap":
+        return None  # a password doesn't expire on a timer
+    if creds.get("access_token") and creds.get("expires_at", 0) - EXPIRY_SKEW_SECONDS > time.time():
+        return None
+    spec = OAUTH[provider]
+    payload = _post_form(spec["token"], {
+        "client_id": cfg[spec["client_id_key"]].strip(),
+        "client_secret": cfg[spec["client_secret_key"]].strip(),
+        "refresh_token": creds["refresh_token"],
+        "grant_type": "refresh_token",
+    }, "The mailbox connection")
+    return {
+        # Providers rotate refresh tokens sometimes and not others; keep the
+        # new one when offered, keep the old one when not.
+        "refresh_token": payload.get("refresh_token") or creds["refresh_token"],
+        "access_token": payload.get("access_token") or "",
+        "expires_at": time.time() + float(payload.get("expires_in") or 3600),
+    }
+
+
+# ---------------------------------------------------------------------- IMAP
+
+
+def _imap_connect(host: str, port: int, username: str, password: str) -> imaplib.IMAP4_SSL:
+    try:
+        conn = imaplib.IMAP4_SSL(host, port or 993, timeout=20,
+                                 ssl_context=ssl.create_default_context())
+    except (OSError, ssl.SSLError) as exc:
+        raise MailboxError(
+            f"Couldn't reach {host} on port {port or 993}. Check the server "
+            "address and port."
+        ) from exc
+    try:
+        conn.login(username, password)
+    except imaplib.IMAP4.error as exc:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+        raise MailboxError(
+            "That address and password were refused by the mail server. If "
+            "the account uses two-factor authentication, you'll need an app "
+            "password rather than the normal one."
+        ) from exc
+    return conn
+
+
+def connect_imap(host: str, port: int, username: str, password: str) -> dict:
+    """Verify IMAP details by actually logging in, then hand back a
+    CONNECTION dict. Credentials that don't work never reach the database."""
+    host = host.strip()
+    username = username.strip()
+    if not host or not username or not password:
+        raise MailboxError("Server, email address and password are all needed.")
+    conn = _imap_connect(host, port, username, password)
+    try:
+        conn.logout()
+    except Exception:
+        pass
+    return {
+        "provider": "imap",
+        "account_email": username,
+        "account_name": "",
+        "imap_host": host,
+        "imap_port": port or 993,
+        "scopes": "imap",
+        "credentials": {"password": password},
+    }
+
+
+def _decode_header(raw: str) -> str:
+    """MIME-encoded headers (=?UTF-8?B?...?=) turned back into text."""
+    if not raw:
+        return ""
+    out = []
+    for chunk, enc in email.header.decode_header(raw):
+        if isinstance(chunk, bytes):
+            try:
+                out.append(chunk.decode(enc or "utf-8", errors="replace"))
+            except LookupError:
+                out.append(chunk.decode("utf-8", errors="replace"))
+        else:
+            out.append(chunk)
+    return "".join(out).strip()
+
+
+# ------------------------------------------------------------------- reading
+
+
+def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10) -> list[dict]:
+    """The most recent messages, in one shape whoever hosts the mailbox.
+
+    Headers only - subject, sender, date, unread. Nothing here downloads
+    message bodies; that belongs with the triage work that reads them, not
+    with the connection that proves the mailbox is reachable.
+    """
+    provider = connection["provider"]
+    if provider == "microsoft":
+        data = _api_get(
+            creds["access_token"],
+            "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages",
+            {"$top": limit, "$select": "subject,from,receivedDateTime,isRead",
+             "$orderby": "receivedDateTime desc"},
+        )
+        out = []
+        for m in data.get("value", []):
+            sender = (m.get("from") or {}).get("emailAddress") or {}
+            out.append({
+                "id": m.get("id", ""),
+                "subject": m.get("subject") or "(no subject)",
+                "from": sender.get("address") or sender.get("name") or "",
+                "received": m.get("receivedDateTime") or "",
+                "unread": not m.get("isRead", True),
+            })
+        return out
+
+    if provider == "google":
+        listing = _api_get(
+            creds["access_token"],
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+            {"maxResults": limit, "labelIds": "INBOX"},
+        )
+        out = []
+        for ref in listing.get("messages", [])[:limit]:
+            m = _api_get(
+                creds["access_token"],
+                f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{ref['id']}",
+                {"format": "metadata", "metadataHeaders": "Subject,From,Date"},
+            )
+            headers = {h["name"].lower(): h["value"]
+                       for h in (m.get("payload") or {}).get("headers", [])}
+            out.append({
+                "id": m.get("id", ""),
+                "subject": headers.get("subject") or "(no subject)",
+                "from": headers.get("from") or "",
+                "received": headers.get("date") or "",
+                "unread": "UNREAD" in (m.get("labelIds") or []),
+            })
+        return out
+
+    conn = _imap_connect(connection["imap_host"], connection["imap_port"],
+                         connection["account_email"], creds["password"])
+    try:
+        conn.select("INBOX", readonly=True)
+        typ, data = conn.search(None, "ALL")
+        if typ != "OK":
+            return []
+        ids = data[0].split()[-limit:][::-1]  # newest first
+        unread = set()
+        typ, undata = conn.search(None, "UNSEEN")
+        if typ == "OK":
+            unread = set(undata[0].split())
+        out = []
+        for mid in ids:
+            typ, fetched = conn.fetch(mid, "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])")
+            if typ != "OK" or not fetched or not isinstance(fetched[0], tuple):
+                continue
+            msg = email.message_from_bytes(fetched[0][1])
+            out.append({
+                "id": mid.decode(),
+                "subject": _decode_header(msg.get("Subject", "")) or "(no subject)",
+                "from": _decode_header(msg.get("From", "")),
+                "received": msg.get("Date", ""),
+                "unread": mid in unread,
+            })
+        return out
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
