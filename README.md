@@ -310,7 +310,11 @@ switched client-side with no page reload:
   unread inbox mail; team-plan users see unread team messages. Counts refresh
   every 30 seconds and link directly
   to the relevant work area. Opening Team chat marks its incoming-message count
-  seen for that user.
+  seen for that conversation and user. Team chat sends a presence heartbeat with
+  the notification refresh: members active within 75 seconds show a green dot;
+  offline members show a red dot and an explicit note that they will see the
+  new-message alert when they return. Unread counts also appear beside the exact
+  group or direct conversation, and the browser tab shows the total open count.
 - **Vouchers** — prepare, submit, approve/reject. See
   [Vouchers](#vouchers) below.
 - **Flagged** — every voucher visible to this person where `voucher.py`'s

@@ -792,6 +792,7 @@ class RouteHandlerMixin:
             user = current_user(self)
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
+            db.touch_presence(user["id"])
             return self._json({"notifications": db.notification_summary(user)})
 
         if path == "/api/team-chat":
@@ -1516,7 +1517,12 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
-        db.mark_team_messages_seen(user)
+        try:
+            recipient_raw = self._body().get("recipient_id")
+            recipient_id = int(recipient_raw) if recipient_raw not in (None, "", "group") else None
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad conversation."}, 400)
+        db.mark_team_messages_seen(user, recipient_id)
         return self._json({"ok": True})
 
     def _handle_team_file_to_library(self):

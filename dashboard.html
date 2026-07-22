@@ -494,11 +494,14 @@
   .team-chat-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0,1fr); }
   .team-chat-members { min-height: 0; overflow-y: auto; padding: 12px; border-right: 1px solid var(--line); background: var(--surface); }
   .team-chat-members .eyebrow { display: block; padding: 2px 7px 9px; }
-  .team-member { width: 100%; display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 9px; align-items: center; padding: 8px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); text-align: left; }
+  .team-member { width: 100%; display: grid; grid-template-columns: 30px minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 8px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); text-align: left; }
   .team-member:hover { background: var(--surface-2); }
   .team-member.on { background: var(--teal-soft); color: var(--teal-deep); }
-  .team-member-avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--surface-3); color: var(--ink-2); font-size: 9px; font-weight: 800; }
+  .team-member-avatar { position: relative; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--surface-3); color: var(--ink-2); font-size: 9px; font-weight: 800; }
   .team-member.on .team-member-avatar { background: var(--teal); color: #fff; }
+  .presence-dot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid var(--surface); border-radius: 50%; background: var(--bad); }
+  .presence-dot.online { background: var(--good); }
+  .team-member-unread { min-width: 19px; height: 19px; margin-left: auto; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: var(--ochre); color: #fff; font: 700 9px var(--mono); }
   .team-member-copy { min-width: 0; }
   .team-member-copy b, .team-member-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .team-member-copy b { font-size: 11.5px; }
@@ -1334,6 +1337,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       if (!res.ok) return;
       notificationCounts = { ...(data.notifications || {}), unread_email: notificationCounts.unread_email || 0 };
       renderAttentionCenter();
+      if (teamChatAvailable) refreshTeamPresence();
     } catch { /* Existing workspace remains usable if alerts cannot load. */ }
   }
 
@@ -1347,6 +1351,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (n.team_messages && teamChatAvailable) items.push({ count: n.team_messages, title: 'New team messages', copy: 'Read messages sent since your last visit', view: 'teamchat' });
     const box = document.getElementById('attentionCenter');
     const total = items.reduce((sum, item) => sum + item.count, 0);
+    document.title = total ? `(${total}) Buinee — Needs attention` : 'Buinee — Dashboard';
     box.hidden = false;
     box.innerHTML = `<div class="attention-head"><h2>${total ? 'Needs your attention' : 'You’re up to date'}</h2><span>${total ? `${total} open ${total === 1 ? 'item' : 'items'}` : 'Nothing is waiting on you'}</span></div>
       ${items.length ? `<div class="attention-list">${items.map(item => `<button class="attention-item" type="button" onclick="go('${item.view}')"><span class="attention-count">${item.count}</span><span class="attention-copy"><b>${item.title}</b><span>${item.copy}</span></span><span class="attention-arrow">›</span></button>`).join('')}</div>` : '<div class="attention-clear">New approvals, returned work, and team messages will appear here first.</div>'}`;
@@ -1356,10 +1361,19 @@ Do not promise a payment date unless it has already been approved."></textarea>
   }
 
   async function markTeamMessagesSeen() {
-    notificationCounts.team_messages = 0;
+    const key = teamChatRecipient === null ? 'group' : String(teamChatRecipient);
+    const conversations = { ...(notificationCounts.team_conversations || {}) };
+    delete conversations[key];
+    notificationCounts.team_conversations = conversations;
+    notificationCounts.team_messages = Object.values(conversations).reduce((sum, count) => sum + Number(count || 0), 0);
     renderAttentionCenter();
+    renderTeamChatMembers();
     try {
-      await fetch('/api/team-chat/seen', { method: 'POST', credentials: 'same-origin' });
+      await fetch('/api/team-chat/seen', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient_id: teamChatRecipient }),
+      });
     } catch { /* The next refresh restores the count if marking fails. */ }
   }
 
@@ -1466,6 +1480,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
         teamMessages = data.messages || [];
       }
       renderTeamMessages();
+      if (location.hash === '#teamchat') markTeamMessagesSeen();
     } catch (error) {
       if (!teamMessages.length) document.getElementById('teamChatMessages').innerHTML = `<div class="empty"><h4>${escapeHtml(error.message || 'Could not load team chat.')}</h4></div>`;
     }
@@ -1507,15 +1522,32 @@ Do not promise a payment date unless it has already been approved."></textarea>
     const box = document.getElementById('teamChatMembers');
     if (!box) return;
     const people = teamMembers.filter(member => member.id !== myId);
+    const unread = notificationCounts.team_conversations || {};
     box.innerHTML = `<span class="eyebrow">Conversations</span>
       <button class="team-member${teamChatRecipient === null ? ' on' : ''}" type="button" onclick="selectTeamConversation(null)">
-        <span class="team-member-avatar">ALL</span><span class="team-member-copy"><b>Whole team</b><span>${teamMembers.length} approved ${teamMembers.length === 1 ? 'member' : 'members'}</span></span>
+        <span class="team-member-avatar">ALL</span><span class="team-member-copy"><b>Whole team</b><span>${teamMembers.length} approved ${teamMembers.length === 1 ? 'member' : 'members'}</span></span>${unread.group ? `<span class="team-member-unread">${unread.group}</span>` : ''}
       </button>${people.map(member => {
         const role = (ROLE_INFO[member.role] || {}).label || member.role;
+        const online = isTeamMemberOnline(member);
         return `<button class="team-member${teamChatRecipient === member.id ? ' on' : ''}" type="button" onclick="selectTeamConversation(${member.id})">
-          <span class="team-member-avatar">${escapeHtml(initials(member.name))}</span><span class="team-member-copy"><b>${escapeHtml(member.name)}</b><span>${escapeHtml(role)}</span></span>
+          <span class="team-member-avatar">${escapeHtml(initials(member.name))}<i class="presence-dot${online ? ' online' : ''}" title="${online ? 'Online' : 'Offline'}"></i></span><span class="team-member-copy"><b>${escapeHtml(member.name)}</b><span>${online ? 'Online' : 'Offline'} · ${escapeHtml(role)}</span></span>${unread[String(member.id)] ? `<span class="team-member-unread">${unread[String(member.id)]}</span>` : ''}
         </button>`;
       }).join('')}`;
+  }
+
+  function isTeamMemberOnline(member) {
+    return member.id === myId || (Number(member.last_active || 0) > Date.now() / 1000 - 75);
+  }
+
+  async function refreshTeamPresence() {
+    try {
+      const res = await fetch('/api/company/team', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) return;
+      teamMembers = data.team || teamMembers;
+      renderTeamChatMembers();
+      updateTeamConversationChrome();
+    } catch { /* Presence will retry with the next notification refresh. */ }
   }
 
   function selectTeamConversation(recipientId) {
@@ -1528,12 +1560,14 @@ Do not promise a payment date unless it has already been approved."></textarea>
     updateTeamConversationChrome();
     document.getElementById('teamChatMessages').innerHTML = '<div class="empty"><h4>Loading conversation…</h4></div>';
     loadTeamMessages();
+    markTeamMessagesSeen();
   }
 
   function updateTeamConversationChrome() {
     const member = teamMembers.find(item => item.id === teamChatRecipient);
+    const online = member && isTeamMemberOnline(member);
     document.getElementById('teamChatSubtitle').textContent = member
-      ? `Direct message with ${member.name} · private to both of you`
+      ? `Direct message with ${member.name} · ${online ? 'Online' : 'Offline — they’ll get a new-message alert when they return'}`
       : `${teamChatCompanyName} · approved members only`;
     document.getElementById('teamChatInput').placeholder = member ? `Message ${member.name}…` : 'Message your team…';
     document.getElementById('teamChatNote').textContent = member

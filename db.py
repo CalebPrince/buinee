@@ -1105,8 +1105,11 @@ def list_pending(company_id: int) -> list[dict]:
 def list_team(company_id: int) -> list[dict]:
     with _cursor() as conn:
         rows = conn.execute(
-            """SELECT id, name, email, role, status, created_at FROM users
-               WHERE company_id = ? AND status = 'approved' ORDER BY created_at""",
+            """SELECT u.id, u.name, u.email, u.role, u.status, u.created_at,
+                      COALESCE(s.state_value, 0) AS last_active
+               FROM users u LEFT JOIN user_notification_state s
+                 ON s.user_id = u.id AND s.state_key = 'presence'
+               WHERE u.company_id = ? AND u.status = 'approved' ORDER BY u.created_at""",
             (company_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -1678,17 +1681,29 @@ def clear_team_conversation(company_id: int, viewer_id: int,
 def notification_summary(user: dict) -> dict:
     user_id, company_id, role = user["id"], user["company_id"], user["role"]
     with _cursor() as conn:
-        state = conn.execute(
+        seen_rows = conn.execute(
+            """SELECT state_key, state_value FROM user_notification_state
+               WHERE user_id = ? AND state_key LIKE 'team_seen:%'""",
+            (user_id,),
+        ).fetchall()
+        seen = {row["state_key"].split(":", 1)[1]: row["state_value"] for row in seen_rows}
+        legacy_seen_row = conn.execute(
             "SELECT state_value FROM user_notification_state WHERE user_id = ? AND state_key = 'team_seen'",
             (user_id,),
         ).fetchone()
-        team_seen = state["state_value"] if state else 0
-        unread_team = conn.execute(
-            """SELECT COUNT(*) AS n FROM team_messages
-               WHERE company_id = ? AND id > ? AND sender_id != ?
+        legacy_seen = legacy_seen_row["state_value"] if legacy_seen_row else 0
+        messages = conn.execute(
+            """SELECT id, sender_id, recipient_id FROM team_messages
+               WHERE company_id = ? AND sender_id != ?
                  AND (recipient_id IS NULL OR recipient_id = ?)""",
-            (company_id, team_seen, user_id, user_id),
-        ).fetchone()["n"]
+            (company_id, user_id, user_id),
+        ).fetchall()
+        unread_conversations: dict[str, int] = {}
+        for message in messages:
+            conversation = "group" if message["recipient_id"] is None else str(message["sender_id"])
+            if message["id"] > seen.get(conversation, legacy_seen):
+                unread_conversations[conversation] = unread_conversations.get(conversation, 0) + 1
+        unread_team = sum(unread_conversations.values())
         pending = 0
         if role == "finance_supervisor":
             pending = conn.execute(
@@ -1707,24 +1722,44 @@ def notification_summary(user: dict) -> dict:
                WHERE company_id = ? AND created_by = ? AND status = 'rejected'""",
             (company_id, user_id),
         ).fetchone()["n"]
-    return {"team_messages": unread_team, "pending_users": pending,
+    return {"team_messages": unread_team, "team_conversations": unread_conversations,
+            "pending_users": pending,
             "awaiting_approval": awaiting, "rejected_vouchers": rejected}
 
 
-def mark_team_messages_seen(user: dict) -> None:
+def mark_team_messages_seen(user: dict, recipient_id: int | None = None) -> None:
+    conversation = "group" if recipient_id is None else str(recipient_id)
     with _cursor() as conn:
-        row = conn.execute(
-            """SELECT COALESCE(MAX(id), 0) AS last_id FROM team_messages
-               WHERE company_id = ? AND sender_id != ?
-                 AND (recipient_id IS NULL OR recipient_id = ?)""",
-            (user["company_id"], user["id"], user["id"]),
-        ).fetchone()
+        if recipient_id is None:
+            row = conn.execute(
+                """SELECT COALESCE(MAX(id), 0) AS last_id FROM team_messages
+                   WHERE company_id = ? AND sender_id != ? AND recipient_id IS NULL""",
+                (user["company_id"], user["id"]),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """SELECT COALESCE(MAX(id), 0) AS last_id FROM team_messages
+                   WHERE company_id = ? AND sender_id = ? AND recipient_id = ?""",
+                (user["company_id"], recipient_id, user["id"]),
+            ).fetchone()
         conn.execute(
             """INSERT INTO user_notification_state (user_id, state_key, state_value, updated_at)
-               VALUES (?, 'team_seen', ?, ?)
+               VALUES (?, ?, ?, ?)
                ON CONFLICT(user_id, state_key) DO UPDATE SET
                  state_value = excluded.state_value, updated_at = excluded.updated_at""",
-            (user["id"], row["last_id"], time.time()),
+            (user["id"], f"team_seen:{conversation}", row["last_id"], time.time()),
+        )
+
+
+def touch_presence(user_id: int) -> None:
+    now = int(time.time())
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO user_notification_state (user_id, state_key, state_value, updated_at)
+               VALUES (?, 'presence', ?, ?)
+               ON CONFLICT(user_id, state_key) DO UPDATE SET
+                 state_value = excluded.state_value, updated_at = excluded.updated_at""",
+            (user_id, now, time.time()),
         )
 
 
