@@ -241,6 +241,42 @@
   .mail-refresh { border: 0; background: none; color: var(--teal); font: inherit; font-weight: 700; padding: 2px 0; }
   .mail-refresh:hover { color: var(--teal-deep); }
 
+  /* Triage is a work queue, not a second decorative inbox card. */
+  .triage-view { padding: 0; max-width: none; }
+  .triage-shell { display: grid; grid-template-columns: 360px minmax(0, 1fr); min-height: 100%; }
+  .triage-queue { min-width: 0; background: var(--surface); border-right: 1px solid var(--line); }
+  .triage-tools { display: flex; align-items: center; gap: 6px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .triage-tools .eyebrow { margin-right: auto; }
+  .triage-chip { border: 1px solid var(--line); border-radius: 20px; padding: 5px 10px; background: var(--surface); color: var(--ink-3); font-size: 11.5px; font-weight: 700; }
+  .triage-chip:hover { border-color: var(--teal); color: var(--teal); }
+  .triage-chip.on { border-color: transparent; background: var(--teal); color: #fff; }
+  .triage-list { display: flex; flex-direction: column; }
+  .triage-row { position: relative; display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; width: 100%; padding: 13px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; }
+  .triage-row:hover { background: var(--surface-2); }
+  .triage-row.selected { background: var(--teal-soft); }
+  .triage-row.unread::before { content: ""; position: absolute; inset: 9px auto 9px 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--ochre); }
+  .triage-avatar { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-3); color: var(--ink-2); font-size: 11px; font-weight: 800; }
+  .triage-row.unread .triage-avatar { background: var(--ochre-soft); color: var(--ochre); }
+  .triage-row-main { min-width: 0; }
+  .triage-row-top { display: flex; align-items: baseline; gap: 8px; }
+  .triage-row-from, .triage-row-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .triage-row-from { flex: 1; font-size: 12.5px; font-weight: 650; }
+  .triage-row-time { flex: none; font: 10.5px var(--mono); color: var(--ink-4); }
+  .triage-row-subject { margin-top: 3px; font-size: 12px; color: var(--ink-3); }
+  .triage-desk { min-width: 0; background: var(--paper); padding: 30px; }
+  .triage-desk-inner { max-width: 720px; margin: 0 auto; }
+  .triage-desk h1 { font: 600 24px/1.25 var(--serif); margin-bottom: 8px; }
+  .triage-meta { color: var(--ink-3); font-size: 12.5px; padding-bottom: 17px; border-bottom: 1px solid var(--line); }
+  .triage-known { margin-top: 20px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .triage-known h3 { font: 600 14px var(--serif); margin-bottom: 5px; }
+  .triage-known p { color: var(--ink-3); font-size: 12.5px; }
+  .triage-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  .ada-starters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 14px; }
+  .ada-starter { padding: 11px 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink-3); text-align: left; font-size: 11.5px; line-height: 1.4; }
+  .ada-starter b { display: block; margin-bottom: 2px; color: var(--ink); font-size: 12.5px; }
+  .ada-starter:hover { border-color: var(--ochre); background: var(--ochre-soft); color: var(--ochre); }
+
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 8px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
   .row:last-child { border-bottom: none; }
   .row .who2 { display: flex; flex-direction: column; min-width: 0; }
@@ -337,6 +373,10 @@
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; }
     .rail { display: none; }
+    .triage-shell { grid-template-columns: 1fr; }
+    .triage-queue { border-right: 0; }
+    .triage-desk { min-height: 360px; padding: 22px 18px; }
+    .ada-starters { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -373,9 +413,14 @@
         Flagged
         <span class="count" id="flaggedNavCount" style="display:none"></span>
       </button>
+      <button class="nav-item" data-view="triage" onclick="go('triage')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+        Triage
+        <span class="count" id="triageNavCount" style="display:none"></span>
+      </button>
       <button class="nav-item" data-view="chat" onclick="go('chat')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Chat
+        Ask Ada
       </button>
       <button class="nav-item" data-view="automations" onclick="go('automations')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -508,6 +553,26 @@
       </div>
     </section>
 
+    <!-- ===== TRIAGE ===== -->
+    <section class="view triage-view" data-view="triage" id="viewTriage" hidden>
+      <div class="triage-shell">
+        <div class="triage-queue">
+          <div class="triage-tools">
+            <span class="eyebrow" id="triageCount">Inbox</span>
+            <button class="triage-chip on" type="button" data-mail-filter="all" onclick="setTriageFilter('all')">All</button>
+            <button class="triage-chip" type="button" data-mail-filter="unread" onclick="setTriageFilter('unread')">Unread</button>
+            <button class="mail-refresh" type="button" onclick="loadTriage(true)">Refresh</button>
+          </div>
+          <div class="triage-list" id="triageList">
+            <div class="empty"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></div><h4>Open Triage</h4><p>Your latest mailbox headers will appear here.</p></div>
+          </div>
+        </div>
+        <div class="triage-desk" id="triageDesk">
+          <div class="empty"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><h4>Choose a message</h4><p>Buinee will show what is known from the connected mailbox without changing it.</p></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== FLAGGED ===== -->
     <section class="view" data-view="flagged" id="viewFlagged" hidden>
       <div class="hello">
@@ -522,15 +587,20 @@
       </div>
     </section>
 
-    <!-- ===== CHAT ===== -->
+    <!-- ===== ASK ADA ===== -->
     <section class="view" data-view="chat" id="viewChat" hidden>
       <div class="hello">
         <div>
-          <h1>Chat</h1>
-          <p>Ask anything about the business — grounded in your real vouchers where it can be, honest about the rest. Attach a document (invoice, letter, contract) for an assessment.</p>
+          <h1>Ask Ada</h1>
+          <p>Your finance and back-office assistant, grounded in the vouchers you can see. Attach a document for Ada to assess it directly.</p>
         </div>
       </div>
       <div class="plan-banner" id="chatUsageBanner" hidden></div>
+      <div class="ada-starters" id="adaStarters">
+        <button class="ada-starter" type="button" onclick="primeAda('What needs my attention in the current voucher queue?')"><b>What needs attention?</b>Review visible vouchers and flags</button>
+        <button class="ada-starter" type="button" onclick="primeAda('Summarize the vouchers currently awaiting approval.')"><b>Summarize approvals</b>Turn the waiting queue into a brief</button>
+        <button class="ada-starter" type="button" onclick="primeAda('Help me draft a professional payment follow-up. Ask me for any facts you need first.')"><b>Draft a follow-up</b>Start with the facts, then the wording</button>
+      </div>
       <div class="card full chat-card">
         <div class="chat-log" id="chatLog"></div>
         <div class="chat-attach" id="chatAttachChip" hidden></div>
@@ -539,7 +609,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
           <input type="file" id="chatFile" accept=".txt,.md,.csv" hidden onchange="attachChatFile(event)">
-          <textarea id="chatInput" placeholder="Ask a question, or attach a document and ask about it…" rows="1"></textarea>
+          <textarea id="chatInput" placeholder="Ask Ada a question, or attach a document…" rows="1"></textarea>
           <button class="btn primary" type="submit">Send</button>
         </form>
       </div>
@@ -698,8 +768,8 @@
   };
 
   const CRUMB_NAMES = {
-    overview: 'Overview', team: 'Team', vouchers: 'Vouchers',
-    flagged: 'Flagged', chat: 'Chat', automations: 'Automations',
+    overview: 'Overview', team: 'Team', vouchers: 'Vouchers', triage: 'Triage',
+    flagged: 'Flagged', chat: 'Ask Ada', automations: 'Automations',
     activity: 'Activity', instructions: 'Instructions',
   };
   const STATUS_INFO = {
@@ -709,11 +779,13 @@
     rejected: { label: 'Rejected', cls: 'bad' },
   };
   let myId = null, myRole = null, allVouchers = [], chatHistory = [], pendingAttachment = null;
+  let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
 
   function go(view) {
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === view));
     document.getElementById('crumbView').textContent = CRUMB_NAMES[view] || 'Overview';
+    if (view === 'triage' && !triageMessages.length) loadTriage();
   }
 
   function initials(name) {
@@ -892,6 +964,106 @@
     } catch {
       body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Couldn’t reach your inbox</h4><p>Check the connection and refresh this page.</p></div>`;
     }
+  }
+
+  async function loadTriage(force = false) {
+    const list = document.getElementById('triageList');
+    if (!list) return;
+    if (!force && triageMessages.length) {
+      renderTriage();
+      return;
+    }
+    list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Reading your inbox…</h4><p>Loading the latest message headers.</p></div>`;
+    try {
+      const res = await fetch('/api/mailbox/messages', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) {
+        list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Inbox unavailable</h4><p>${escapeHtml(data.error || 'Reconnect your mailbox and try again.')}</p></div>`;
+        return;
+      }
+      triageMessages = Array.isArray(data.messages) ? data.messages : [];
+      selectedTriageId = triageMessages.some(m => m.id === selectedTriageId) ? selectedTriageId : null;
+      renderTriage();
+    } catch {
+      list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Couldn’t reach your inbox</h4><p>Check the mailbox connection and try again.</p></div>`;
+    }
+  }
+
+  function setTriageFilter(filter) {
+    triageFilter = filter === 'unread' ? 'unread' : 'all';
+    document.querySelectorAll('[data-mail-filter]').forEach(btn =>
+      btn.classList.toggle('on', btn.dataset.mailFilter === triageFilter));
+    renderTriage();
+  }
+
+  function renderTriage() {
+    const list = document.getElementById('triageList');
+    const count = document.getElementById('triageCount');
+    const unread = triageMessages.filter(m => m.unread).length;
+    const badge = document.getElementById('triageNavCount');
+    if (badge) {
+      badge.style.display = unread ? 'inline-block' : 'none';
+      badge.textContent = unread;
+    }
+    count.textContent = `${triageMessages.length} recent · ${unread} unread`;
+    const visible = triageFilter === 'unread'
+      ? triageMessages.filter(m => m.unread)
+      : triageMessages;
+    if (!visible.length) {
+      list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>${triageFilter === 'unread' ? 'No unread mail' : 'Inbox is clear'}</h4><p>${triageFilter === 'unread' ? 'Switch to All to see recent messages.' : 'The provider returned no recent messages.'}</p></div>`;
+      return;
+    }
+    list.innerHTML = visible.map((m, index) => `
+      <button class="triage-row${m.unread ? ' unread' : ''}${String(m.id) === selectedTriageId ? ' selected' : ''}" type="button" onclick="selectVisibleTriage(${index})">
+        <span class="triage-avatar">${escapeHtml(initials(mailboxSender(m.from)))}</span>
+        <span class="triage-row-main">
+          <span class="triage-row-top"><span class="triage-row-from">${escapeHtml(mailboxSender(m.from))}</span><time class="triage-row-time">${escapeHtml(mailboxWhen(m.received))}</time></span>
+          <span class="triage-row-subject">${escapeHtml(m.subject || '(no subject)')}</span>
+        </span>
+      </button>`).join('');
+  }
+
+  function selectVisibleTriage(index) {
+    const visible = triageFilter === 'unread'
+      ? triageMessages.filter(m => m.unread)
+      : triageMessages;
+    const m = visible[index];
+    if (m) selectTriage(String(m.id));
+  }
+
+  function selectTriage(id) {
+    selectedTriageId = String(id);
+    renderTriage();
+    const m = triageMessages.find(item => String(item.id) === selectedTriageId);
+    if (!m) return;
+    const sender = mailboxSender(m.from);
+    document.getElementById('triageDesk').innerHTML = `
+      <div class="triage-desk-inner">
+        <div class="eyebrow">${m.unread ? 'Unread message' : 'Recent message'}</div>
+        <h1>${escapeHtml(m.subject || '(no subject)')}</h1>
+        <div class="triage-meta">From <b>${escapeHtml(sender)}</b>${m.received ? ` · ${escapeHtml(new Date(m.received).toLocaleString())}` : ''}</div>
+        <div class="triage-known">
+          <h3>What Buinee knows so far</h3>
+          <p>The connected mailbox currently provides this message’s header. Body-aware summaries, reply detection, and drafts will appear here once semantic triage is enabled.</p>
+        </div>
+        <div class="triage-actions">
+          <button class="btn primary" type="button" onclick="askAdaAboutTriage()">Ask Ada about this</button>
+          <button class="btn" type="button" onclick="loadTriage(true)">Refresh inbox</button>
+        </div>
+      </div>`;
+  }
+
+  function primeAda(prompt) {
+    go('chat');
+    const input = document.getElementById('chatInput');
+    input.value = prompt;
+    input.focus();
+  }
+
+  function askAdaAboutTriage() {
+    const m = triageMessages.find(item => String(item.id) === selectedTriageId);
+    if (!m) return;
+    primeAda(`I have an email from ${mailboxSender(m.from)} with the subject “${m.subject || '(no subject)'}”. You cannot see its body yet. Help me decide what facts to check before I respond, and do not invent its contents.`);
   }
 
   // What the OAuth round trip can come back saying. The callback redirects
@@ -1431,7 +1603,7 @@
   function renderChatLog() {
     const box = document.getElementById('chatLog');
     if (!chatHistory.length) {
-      box.innerHTML = '<div class="empty"><h4>Ask anything about the business</h4><p>Grounded in your real vouchers where it can be — nothing invented, nothing claimed it can\'t do.</p></div>';
+      box.innerHTML = '<div class="empty"><h4>Ask Ada about the work in front of you</h4><p>Grounded in your visible vouchers and any document you attach — nothing invented, nothing claimed she can\'t do.</p></div>';
       return;
     }
     box.innerHTML = chatHistory.map(m => `

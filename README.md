@@ -291,7 +291,7 @@ are fully separate front doors.
 Rebuilt to match the sidebar-rail + topbar layout used across the other
 Prince Caleb agent dashboards (`outlook-agent`/`excel-agent`'s
 Clerk/Gridwise consoles) — same skeleton, Buinee's own teal/ochre
-tokens instead of their slate/amber or emerald/iris ones. Eight views,
+tokens instead of their slate/amber or emerald/iris ones. Nine views,
 switched client-side with no page reload:
 
 - **Overview** — greeting, KPI tiles, and card(s) for "My vouchers" (and
@@ -299,15 +299,9 @@ switched client-side with no page reload:
   number shown is real, drawn from `/api/vouchers`, never an invented demo
   stat — the reference dashboards are sales prototypes and use fabricated
   activity/metrics; this is a real product, so nothing here is illustrative.
-  Deliberate exceptions, styled identically to how `outlook-agent` handles
-  its own not-yet-connected mailbox: "Emails triaged", "Replies drafted",
-  "Issues flagged" and "Est. time saved" all show "—" with "Waiting for
-  first sync", plus a "Needs your reply first" card with the same honest
-  empty state (and, unlike the reference dashboard, no "Connect Outlook"
-  button that would click through to nothing real). These numbers genuinely
-  can't exist yet — honest about being blocked, not fabricated to look
-  alive, and not wired to anything until [real email connection](#whats-genuinely-missing-dont-assume-it-exists)
-  is actually built.
+  The inbox card is live and renders the latest ten headers, unread first.
+  Semantic-only metrics such as emails triaged and replies drafted remain
+  "—" and explicitly say that their workflow is not enabled yet.
 - **Vouchers** — prepare, submit, approve/reject. See
   [Vouchers](#vouchers) below.
 - **Flagged** — every voucher visible to this person where `voucher.py`'s
@@ -315,7 +309,12 @@ switched client-side with no page reload:
   look (a fallback FX rate, a net payable that doesn't reconcile, etc.) -
   real data already computed for the Vouchers view, just filtered and
   surfaced on its own page. Nav item carries a live count badge.
-- **Chat** — an authenticated version of the landing page's demo agent. A
+- **Triage** — a live split-pane work queue based on the connected mailbox:
+  All/Unread filters, unread count, sender, subject, received time and a
+  detail desk. It is deliberately header-only and read-only. Selecting a
+  message can pass the known sender and subject into Ask Ada, with an explicit
+  instruction not to invent the unseen body.
+- **Ask Ada** — an authenticated version of the landing page's demo agent. A
   general assistant for the person's finance/back-office work - any business
   question, not a voucher-lookup tool - grounded in their real, role-scoped
   vouchers for factual claims (`build_voucher_digest`/`build_chat_system` in
@@ -333,7 +332,7 @@ switched client-side with no page reload:
   by its own code comment stores keys in browser `localStorage` and flags
   itself as an insecure prototype pattern not meant for production.
 - **Automations** — honest empty state, not a stub hiding real toggles:
-  automations need a connected inbox first, which doesn't exist yet. The
+  the mailbox connection exists, but body-aware triage and actions do not. The
   intended scope isn't invoice-only - once built, it's meant to triage the
   whole inbox the way `outlook-agent` already does (correspondence, drafts,
   flagging anything accounting-relevant), not just extract invoices.
