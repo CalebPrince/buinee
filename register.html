@@ -185,6 +185,17 @@
   .picked.open { display: flex; }
   .picked button { border: none; background: none; color: var(--teal-deep); font-weight: 600; cursor: pointer; font-size: 13px; }
 
+  /* "a workspace already goes by that name - which is this?" */
+  .clash {
+    display: none; flex-direction: column; gap: 10px; padding: 13px;
+    border: 1px solid var(--warn); border-radius: 9px; background: var(--warn-soft);
+  }
+  .clash.show { display: flex; }
+  .clash .t { font-size: 13.5px; font-weight: 600; color: var(--warn); }
+  .clash .s { font-size: 12.5px; color: var(--ink-2); }
+  .clash .btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .clash .btnrow .btn { flex: 1; min-width: 150px; }
+
   .note { margin: 0; font-size: 12.5px; color: var(--ink-3); }
   .msg { font-size: 13.5px; padding: 10px 13px; border-radius: 9px; display: none; }
   .msg.show { display: block; }
@@ -193,6 +204,32 @@
 
   .foot-link { text-align: center; font-size: 13.5px; color: var(--ink-3); padding: 0 28px 26px; }
   .foot-link a { color: var(--teal); font-weight: 600; text-decoration: none; }
+
+  /* the tier picked on the landing page, carried into the form */
+  .plan-chip {
+    display: none; align-items: flex-start; gap: 11px; padding: 12px 13px;
+    border: 1px solid var(--teal); border-radius: 9px; background: var(--teal-soft);
+  }
+  .plan-chip.show { display: flex; }
+  .plan-chip svg { width: 17px; height: 17px; flex: none; margin-top: 3px; color: var(--teal-deep); }
+  .plan-chip .t { font-size: 13.5px; font-weight: 600; color: var(--teal-deep); }
+  .plan-chip .s { font-size: 12.5px; color: var(--teal-deep); opacity: .85; font-weight: 400; }
+  .plan-chip a { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--teal-deep); white-space: nowrap; }
+
+  /* shown instead of the form when nobody has picked a tier yet */
+  .gate { padding: 40px 28px; text-align: center; display: none; }
+  .gate.show { display: block; }
+  .gate .ic {
+    width: 52px; height: 52px; border-radius: 50%; background: var(--teal-soft); color: var(--teal);
+    display: grid; place-items: center; margin: 0 auto 16px;
+  }
+  .gate h2 { font-family: var(--serif); font-size: 21px; margin-bottom: 10px; }
+  .gate p { font-size: 14.5px; color: var(--ink-2); margin: 0 auto 20px; max-width: 34ch; }
+  .gate .alt { font-size: 13px; color: var(--ink-3); margin-top: 18px; }
+  .gate .alt button {
+    border: none; background: none; padding: 0; font: inherit; font-weight: 600;
+    color: var(--teal); cursor: pointer;
+  }
 
   .pending-screen { padding: 40px 28px; text-align: center; display: none; }
   .pending-screen.show { display: block; }
@@ -268,6 +305,15 @@
       <p id="pendingText">Your request to join has been sent. A supervisor at your company needs to approve it before you can sign in.</p>
     </div>
 
+    <div id="gateScreen" class="gate">
+      <div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+      <h2>Choose a plan first</h2>
+      <p>Registering a company starts with picking the tier it runs on — how many people it covers, and whether the AI assistant is included.</p>
+      <a class="btn primary" href="/index.html#pricing">See the plans</a>
+      <p class="alt">Joining a company that's already here?
+        <button type="button" onclick="showMode('join')">Join instead</button> — no plan needed, you inherit theirs.</p>
+    </div>
+
     <div id="formArea">
       <div class="card-head">
         <span class="eyebrow">Get started</span>
@@ -283,13 +329,31 @@
       <!-- ---------------- register ---------------- -->
       <form id="registerForm" onsubmit="return submitRegister(event)">
         <div class="msg error" id="registerError"></div>
-        <label>Company name
+        <div class="clash" id="clash">
+          <div>
+            <div class="t" id="clashTitle"></div>
+            <div class="s" id="clashText"></div>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="button" id="clashJoin">That's my company — ask to join</button>
+            <button class="btn ghost" type="button" id="clashKeep">Different company — keep going</button>
+          </div>
+        </div>
+        <div class="plan-chip" id="planChip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>
+            <div class="t" id="planChipName"></div>
+            <div class="s" id="planChipDetail"></div>
+          </div>
+          <a href="/index.html#pricing">Change</a>
+        </div>
+        <label id="regCompanyLabel"><span id="regCompanyCaption">Company name</span>
           <input type="text" id="regCompany" required autocomplete="organization" placeholder="e.g. Coastal Logistics Ltd">
         </label>
         <label>Your name
           <input type="text" id="regName" required autocomplete="name" placeholder="e.g. Ama Boateng">
         </label>
-        <label>Your role
+        <label id="regRoleLabel">Your role
           <select id="regRole" required>
             <option value="finance_supervisor" selected>Supervisor — I oversee the workspace</option>
             <option value="senior_accountant">Approver — approves and signs</option>
@@ -303,7 +367,7 @@
           <input type="password" id="regPassword" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
         </label>
         <button class="btn primary" type="submit" id="regSubmit">Register company</button>
-        <p class="note">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
+        <p class="note" id="regNote">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
       </form>
 
       <!-- ---------------- join ---------------- -->
@@ -355,16 +419,78 @@
     root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
   }
 
+  // The tier is chosen on the landing page and arrives as ?plan=<id>. Without a
+  // real one there's nothing to register a company onto, so the form stays out
+  // of reach and the gate sends people back to pricing. Joining an existing
+  // company is exempt - that company already has a plan.
+  let chosenPlan = null;
+
   function showMode(mode) {
+    const gated = mode === 'register' && !chosenPlan;
+    document.getElementById('gateScreen').classList.toggle('show', gated);
+    document.getElementById('formArea').style.display = gated ? 'none' : '';
     document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
     document.getElementById('tabJoin').classList.toggle('active', mode === 'join');
-    document.getElementById('registerForm').classList.toggle('active', mode === 'register');
+    document.getElementById('registerForm').classList.toggle('active', mode === 'register' && !gated);
     document.getElementById('joinForm').classList.toggle('active', mode === 'join');
     const url = new URL(location);
     if (mode === 'join') url.searchParams.set('join', '1'); else url.searchParams.delete('join');
     history.replaceState(null, '', url);
   }
-  showMode(new URLSearchParams(location.search).get('join') ? 'join' : 'register');
+
+  function describePlan(p) {
+    const seats = p.audience === 'individual' ? 'just you' : `up to ${p.user_limit} people`;
+    const price = p.price > 0 ? `${p.currency} ${Number(p.price).toLocaleString()}/month` : 'Free';
+    const chat = !p.chat_enabled ? 'no AI assistant'
+      : (p.chat_monthly_limit === null || p.chat_monthly_limit === undefined)
+        ? 'AI assistant, unlimited'
+        : `AI assistant, ${p.chat_monthly_limit} messages a month`;
+    return `${price} · ${seats} · ${chat}`;
+  }
+
+  // A solo plan has no company and no colleagues, so the two questions that
+  // only make sense alongside other people are dropped: the workspace is
+  // named after them unless they say otherwise, and there's no role to pick
+  // when you're the one preparing and approving your own work.
+  function applySoloShape() {
+    const solo = chosenPlan && chosenPlan.audience === 'individual';
+    document.querySelector('.card-head h1').textContent = solo ? 'Set up your workspace' : 'Set up Buinee';
+    document.querySelector('.card-head p').textContent = solo
+      ? "Yours alone — nobody else can see it or join it."
+      : "Register your company, or join one that's already here.";
+    document.getElementById('tabRegister').textContent = solo ? 'Work on your own' : 'Register your company';
+    document.getElementById('regCompanyCaption').textContent = solo ? 'Workspace name (optional)' : 'Company name';
+    document.getElementById('regCompany').required = !solo;
+    document.getElementById('regCompany').placeholder = solo
+      ? 'Defaults to your own name' : 'e.g. Coastal Logistics Ltd';
+    document.getElementById('regCompany').autocomplete = solo ? 'off' : 'organization';
+    document.getElementById('regRoleLabel').style.display = solo ? 'none' : '';
+    document.getElementById('regEmail').placeholder = solo ? 'you@example.com' : 'you@company.com';
+    document.getElementById('regSubmit').textContent = solo ? 'Create my workspace' : 'Register company';
+    document.getElementById('regNote').textContent = solo
+      ? 'You prepare and approve your own vouchers. If you later need colleagues in here, ask us to move you onto a team plan — nothing gets set up twice.'
+      : 'Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.';
+  }
+
+  async function boot() {
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get('plan');
+    if (wanted) {
+      try {
+        const res = await fetch('/api/plans', { credentials: 'same-origin' });
+        const data = await res.json();
+        chosenPlan = (data.plans || []).find(p => String(p.id) === wanted) || null;
+      } catch { chosenPlan = null; }
+    }
+    if (chosenPlan) {
+      document.getElementById('planChipName').textContent = `${chosenPlan.name} plan`;
+      document.getElementById('planChipDetail').textContent = describePlan(chosenPlan);
+      document.getElementById('planChip').classList.add('show');
+    }
+    applySoloShape();
+    showMode(params.get('join') ? 'join' : 'register');
+  }
+  boot();
 
   function showMsg(id, text) {
     const el = document.getElementById(id);
@@ -372,11 +498,51 @@
     el.classList.toggle('show', !!text);
   }
 
+  // Set once the person has confirmed the name collision really is a
+  // different business, so the next submit goes through instead of asking
+  // the same question again. Scoped to the name they confirmed: editing the
+  // field afterwards clears it, otherwise a second, different clash would
+  // sail straight through on the back of the first answer.
+  let allowDuplicateName = false;
+  document.getElementById('regCompany').addEventListener('input', () => {
+    allowDuplicateName = false;
+    document.getElementById('clash').classList.remove('show');
+  });
+
+  // Deliberately says nothing about the existing workspace beyond the name
+  // it already answers to in the join picker - not its plan, not its size.
+  function showClash(company) {
+    document.getElementById('clashTitle').textContent =
+      `A workspace called "${company.name}" is already here.`;
+    document.getElementById('clashText').textContent =
+      "If that's your company, ask to join it rather than starting a second one — whoever set it up approves the request, and you land in the same workspace as them. If it's a different business that happens to share the name, carry on.";
+    document.getElementById('clash').classList.add('show');
+
+    document.getElementById('clashJoin').onclick = () => {
+      document.getElementById('clash').classList.remove('show');
+      // Carry across what they already typed - retyping it to land in the
+      // same place would be the software's fault, not theirs.
+      document.getElementById('joinName').value = document.getElementById('regName').value;
+      document.getElementById('joinEmail').value = document.getElementById('regEmail').value;
+      document.getElementById('joinPassword').value = document.getElementById('regPassword').value;
+      showMode('join');
+      pickCompany(company);
+    };
+    document.getElementById('clashKeep').onclick = () => {
+      allowDuplicateName = true;
+      document.getElementById('clash').classList.remove('show');
+      document.getElementById('registerForm').requestSubmit();
+    };
+  }
+
   async function submitRegister(ev) {
     ev.preventDefault();
     showMsg('registerError', '');
+    document.getElementById('clash').classList.remove('show');
+    if (!chosenPlan) { showMode('register'); return false; }
     const btn = document.getElementById('regSubmit');
-    btn.disabled = true; btn.textContent = 'Registering…';
+    const idleLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Setting up…';
     try {
       const res = await fetch('/api/register', {
         method: 'POST', credentials: 'same-origin',
@@ -387,15 +553,21 @@
           email: document.getElementById('regEmail').value,
           password: document.getElementById('regPassword').value,
           role: document.getElementById('regRole').value,
+          plan_id: chosenPlan.id,
+          allow_duplicate_name: allowDuplicateName,
         }),
       });
       const data = await res.json();
+      if (res.status === 409 && data.duplicate_name && data.company) {
+        showClash(data.company);
+        return false;
+      }
       if (!res.ok) { showMsg('registerError', data.error || 'Something went wrong.'); return false; }
       location.href = '/dashboard.html';
     } catch {
       showMsg('registerError', 'Could not reach the server.');
     } finally {
-      btn.disabled = false; btn.textContent = 'Register company';
+      btn.disabled = false; btn.textContent = idleLabel;
     }
     return false;
   }

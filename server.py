@@ -188,6 +188,7 @@ def public_user(user: dict) -> dict:
         "price": plan["price"],
         "currency": plan["currency"],
         "user_limit": plan["user_limit"],
+        "audience": plan["audience"],
     }
     company["user_count"] = db.company_user_count(user["company_id"])
     return {
@@ -522,6 +523,12 @@ class RouteHandlerMixin:
             q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
             return self._json({"companies": db.find_companies_by_name(q)})
 
+        if path == "/api/plans":
+            # Public and unauthenticated on purpose - pricing is marketing
+            # copy, and the landing page's pricing section and register.html
+            # both need the real, current tiers rather than hardcoded copies.
+            return self._json({"plans": db.list_plans()})
+
         if path == "/api/admin/me":
             admin = current_admin(self)
             if not admin:
@@ -643,13 +650,28 @@ class RouteHandlerMixin:
         except Exception:
             return self._json({"error": "Bad request."}, 400)
         try:
+            plan_id = int(req["plan_id"]) if req.get("plan_id") is not None else None
+        except (TypeError, ValueError):
+            plan_id = None
+        try:
             user = db.register_company(
                 str(req.get("company_name") or ""),
                 str(req.get("name") or ""),
                 str(req.get("email") or ""),
                 str(req.get("password") or ""),
                 str(req.get("role") or ""),
+                plan_id=plan_id,
+                allow_duplicate_name=bool(req.get("allow_duplicate_name")),
             )
+        except db.DuplicateCompanyError as exc:
+            # Not a failure so much as a question - the form asks whether this
+            # is the same company (join it) or a different one with the same
+            # name (register anyway), and sends the answer back.
+            return self._json({
+                "error": str(exc),
+                "duplicate_name": True,
+                "company": exc.company,
+            }, 409)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         token = db.create_session(user["id"])
@@ -1009,6 +1031,7 @@ class RouteHandlerMixin:
                 int(req.get("user_limit") or 0),
                 chat_enabled=bool(req.get("chat_enabled")),
                 chat_monthly_limit=chat_limit,
+                audience=str(req.get("audience") or "team"),
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)

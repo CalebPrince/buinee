@@ -399,28 +399,62 @@ Preparer: Team nav item and its KPIs correctly don't appear).
 
 ## Pricing tiers
 
-Three decisions were made explicitly with the project owner before building
+Four decisions were made explicitly with the project owner before building
 this: **Paystack** as the eventual payment processor (not wired up yet -
 see below), a **free tier that unlocks more users on paid plans** rather
-than a hard paywall at registration, and **demo pricing** to be replaced
-with real numbers later.
+than a hard paywall at registration, **demo pricing** to be replaced
+with real numbers later, and tiers sold to **two different buyers** — a
+company registering for its members, and one person working alone.
 
 **`plans`** (`db.py`): `name`, `price`, `currency`, `user_limit`,
-`sort_order`, `is_default`. Seeded once, on first `init_db()`, with:
+`sort_order`, `is_default`, `audience`. Seeded once, on first `init_db()`,
+with:
 
-| Plan | Price | Users included |
-|---|---|---|
-| Free (default) | GHS 0 | 3 |
-| Starter | GHS 50/mo | 10 |
-| Growth | GHS 150/mo | 30 |
+| Plan | Sold to | Price | Users included |
+|---|---|---|---|
+| Solo Free | individual | GHS 0 | 1 |
+| Solo Pro | individual | GHS 25/mo | 1 |
+| Free (default) | team | GHS 0 | 3 |
+| Starter | team | GHS 50/mo | 10 |
+| Growth | team | GHS 150/mo | 30 |
 
 These are placeholders, not real prices — `admin-plans.html` (Command
 Center → Plans) exists specifically so they can be edited, or new tiers
-added, without touching code. Every company gets `plan_id` pointing at
-whichever plan was `is_default` at the moment they registered (existing
-companies were backfilled to it via an idempotent migration in `init_db()`
-— `ALTER TABLE companies ADD COLUMN plan_id` only runs if the column isn't
-already there, then any `NULL` plan_id gets set to the default).
+added, without touching code. Every company gets `plan_id` pointing at the
+tier chosen on the landing page (see [Pricing is the way
+in](#pricing-is-the-way-in) below), falling back to whichever plan is
+`is_default` (existing companies were backfilled to it via an idempotent
+migration in `init_db()` — `ALTER TABLE companies ADD COLUMN plan_id` only
+runs if the column isn't already there, then any `NULL` plan_id gets set to
+the default).
+
+**`audience`** splits *a company registering for its members* from *one
+person working alone* — `'team'` or `'individual'`. It's deliberately thin:
+an individual plan is a **1-seat plan**, and `can_add_user` was already the
+thing that stops a second person joining, so almost nothing new enforces it.
+What does follow from being alone is handled at registration
+(`db.register_company`): the workspace is named after the person unless they
+typed a name of their own, and they hold Supervisor whatever role the form
+sent, because every other role needs somebody else present to approve the
+work.
+
+Solo workspaces **are** listed in the join picker (`find_companies_by_name`).
+Someone who started alone and then hired is exactly the case that picker has
+to serve — hiding them would only push the new colleague into registering a
+duplicate company under the same name. See [Growing out of a solo
+plan](#growing-out-of-a-solo-plan).
+
+Audience is fixed at creation, not editable: flipping a team plan to
+individual would strand every company already on it above the seat cap, and
+widening an individual plan past one seat would quietly turn someone's
+personal workspace into a joinable company. `create_plan` refuses an
+individual plan with anything but 1 seat; `update_plan` refuses to widen
+one. Databases predating the split get `audience='team'` on every existing
+row (the honest default — everything before this was sold to a company) plus
+the two Solo tiers, seeded only if no individual plan exists yet, so an owner
+who reprices them keeps their edits. Verified on a copy of the live database:
+3 existing plans classified as team, 2 solo added, 5 companies and 12 users
+untouched, re-running `init_db()` twice more added nothing.
 
 **Enforcement** (`db.can_add_user`, count of `status='approved'` users
 against the company's plan `user_limit`) sits at both places a user can
@@ -441,9 +475,16 @@ Where this is surfaced:
 - **`admin-plans.html`** — the only place plans get created or edited
   (`/api/admin/plans`, `/api/admin/plans/create`, `/api/admin/plans/update`,
   all platform-admin only). Inline edit per card, plus an "add a new tier"
-  form. A banner states plainly that the prices are demo values.
+  form, where "Sold to" picks the audience and locks the seat count to 1 for
+  an individual tier rather than leaving a way to get rejected. Cards carry
+  an Individual/Team badge; the seat field is disabled on individual tiers.
+  A banner states plainly that the prices are demo values.
+- **`index.html` `#pricing`** — the public, unauthenticated pricing section
+  every registration now starts from (see below).
 - **`admin-companies.html`** — each company's card shows its plan name and
-  `used/limit`, with an "— at limit" note once it's reached.
+  `used/limit`, with an "— at limit" note once it's reached. Solo workspaces
+  show "(one person)" instead of a seat count, and gain a "needs a team plan"
+  flag once somebody is waiting to join one.
 - **`admin.html` Overview** — the condensed recent-signups cards show
   `used/limit` in place of a bare count.
 - **`dashboard.html` Team view** — a Supervisor sees a plan banner
@@ -464,6 +505,94 @@ Where this is surfaced:
   right back, all without touching any of the 4 existing users. A company
   cannot change its own plan — this is Command Center-only, same as
   creating/editing the tiers themselves.
+
+### Pricing is the way in
+
+Registration is **gated behind choosing a tier**. `index.html` has a public
+`#pricing` section rendered from `/api/plans` (unauthenticated on purpose —
+pricing is marketing copy, and the landing page should never drift from what
+the Command Center actually charges), split by `audience` behind a
+*Just me / My team* toggle. Team is shown first; the toggle hides itself
+entirely if the owner only sells to one audience, rather than offering an
+empty tab. The cheapest **paid** tier in whichever group is showing gets the
+"Most popular" flag — a rule rather than a hardcoded plan id, so it stays
+correct however the tiers are repriced.
+
+Each card links to `/register.html?plan=<id>`. Every other route to the
+register page now points at `#pricing` instead — the nav button, the hero
+CTA, the in-hero "Approve & sign", the closing CTA, and both links on
+`login.html`. Landing on `register.html` **without** a valid `?plan=`
+replaces the form with a gate screen pointing back at pricing; a bogus id
+gates identically, since the plan is validated against `/api/plans` rather
+than trusted. Joining an existing company is deliberately exempt (that
+company already has a tier), so the gate offers "Join instead", and
+`?join=1` still works directly.
+
+With a valid tier, a chip above the form confirms what was chosen and
+`plan_id` rides along on `/api/register`. On an **individual** tier the form
+drops the two questions that only make sense alongside other people: the
+company field becomes an optional "Workspace name" and the role picker
+disappears. Note the gate is a **UI** rule — `db.register_company`
+deliberately falls back to the default plan rather than failing a whole
+registration over a missing or bad `plan_id`, on the grounds that a broken
+link shouldn't cost a signup.
+
+### Growing out of a solo plan
+
+A workspace that starts as one person and then hires is a first-class path,
+not an edge case. What happens when the second person turns up:
+
+1. **They find it.** Solo workspaces are listed in the join picker like any
+   other, so the colleague searches the name and requests to join.
+2. **The request lands as `pending`.** No seat check runs when a request is
+   *created* — only when one is approved — so the request reaches the owner
+   rather than being refused at the door.
+3. **The owner can't approve it yet**, and is told exactly why:
+   `db._at_limit_message` speaks differently to a solo workspace ("covers
+   just one person… has to move onto a team plan") than to a team at its cap
+   ("already at that limit… needs to be upgraded"). The dashboard's plan
+   banner says the same thing, and only mentions it once someone is actually
+   waiting — a solo workspace is permanently "1 of 1 users", so counting
+   seats at someone working alone would just be nagging.
+4. **You move them.** `admin-companies.html` flags the company as *"N waiting
+   to join, needs a team plan"* (`needs_team_plan` — an individual plan with
+   pending requests), and the existing Change plan dropdown does the move.
+   Deliberately not automatic: Solo Pro → Starter doubles what they pay, and
+   Solo Pro → team Free would cut their bill *and* silently take away the AI
+   assistant. Nothing changes what someone is billed without a human
+   deciding.
+5. **They approve, and nothing else moved.** Same never-removes-anyone rule
+   as every other plan change.
+
+**Duplicate names are caught at registration**, which is what made the above
+reachable. Registering a name a workspace already answers to (case- and
+whitespace-insensitive) raises `DuplicateCompanyError` — an `AuthError`
+subclass carrying the existing company — which `/api/register` returns as a
+**409** with `{duplicate_name, company}`. The form turns that into a
+question rather than an error: *That's my company — ask to join* (switches
+to the join tab with the company pre-picked and the name/email/password
+already typed carried across) or *Different company — keep going* (re-sends
+with `allow_duplicate_name: true`). That confirmation is scoped to the name
+that was confirmed — editing the field clears it, so a second, different
+clash still gets asked about.
+
+This closed a pre-existing gap that had nothing to do with solo plans:
+registering an existing company's exact name used to silently create a
+*second* company with the same name on the door, quietly splitting a team
+across two workspaces.
+
+**Known gap**: once someone confirms "different company", two workspaces
+genuinely do share a name, and the join picker shows two identical rows with
+no way to tell them apart. Disambiguating them would mean exposing something
+about a company (its supervisor, its size) to someone who isn't in it yet,
+which the picker deliberately never does — so this is left as-is.
+
+**Fixed along the way**: `init_db()` crashed on any brand-new database —
+`_seed_default_plans` inserts `chat_enabled`/`chat_monthly_limit`, but those
+columns are only added by `_migrate_plan_chat_gating`, which ran *after* it.
+Existing deployments survived only because their database predated the
+migration; a fresh Render disk would not have booted. The migrations now run
+before the seed.
 
 **Not built**: any actual Paystack integration — no checkout flow, no
 webhooks, no subscription lifecycle (trial, renewal, failed payment,

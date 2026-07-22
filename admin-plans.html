@@ -117,6 +117,10 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     padding: 3px 8px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep);
   }
+  .badge-aud {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: 3px 8px; border-radius: 20px; background: var(--surface-2); color: var(--ink-3);
+  }
   .plan-price { font-family: var(--mono); font-size: 26px; font-weight: 700; margin-top: 8px; }
   .plan-price .cur { font-size: 14px; color: var(--ink-3); font-weight: 600; margin-right: 3px; }
   .plan-limit { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
@@ -230,6 +234,12 @@
             <div class="msg error" id="createError"></div>
             <div class="msg ok" id="createOk"></div>
             <form onsubmit="return submitCreate(event)">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:10px">Sold to
+                <select id="newAudience" onchange="audienceChanged()" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
+                  <option value="team" selected>A team — a company registering for its members</option>
+                  <option value="individual">An individual — one person working alone</option>
+                </select>
+              </label>
               <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
                 <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2)">Name
                   <input type="text" id="newName" required placeholder="e.g. Pro" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
@@ -314,10 +324,15 @@
       <div class="plan-card">
         <div class="plan-head">
           <span class="name">${escapeHtml(p.name)}</span>
-          ${p.is_default ? '<span class="badge-default">Default</span>' : ''}
+          <span style="display:flex;gap:6px;align-items:center">
+            <span class="badge-aud">${p.audience === 'individual' ? 'Individual' : 'Team'}</span>
+            ${p.is_default ? '<span class="badge-default">Default</span>' : ''}
+          </span>
         </div>
         <div class="plan-price"><span class="cur">${escapeHtml(p.currency)}</span>${p.price}<span style="font-size:13px;color:var(--ink-3);font-weight:500"> /mo</span></div>
-        <div class="plan-limit">Up to <b>${p.user_limit}</b> user${p.user_limit === 1 ? '' : 's'}</div>
+        <div class="plan-limit">${p.audience === 'individual'
+            ? 'One person, their own workspace'
+            : `Up to <b>${p.user_limit}</b> user${p.user_limit === 1 ? '' : 's'}`}</div>
         <div class="plan-limit">${p.chat_enabled
             ? `Chat: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
             : 'Chat: <b>not included</b>'}</div>
@@ -338,7 +353,8 @@
             </label>
           </div>
           <label>User limit
-            <input type="number" id="editLimit-${p.id}" value="${p.user_limit}" min="1">
+            <input type="number" id="editLimit-${p.id}" value="${p.user_limit}" min="1"
+              ${p.audience === 'individual' ? 'disabled title="An individual plan always covers exactly one person."' : ''}>
           </label>
           <label style="flex-direction:row;align-items:center;gap:7px">
             <input type="checkbox" id="editChatEnabled-${p.id}" ${p.chat_enabled ? 'checked' : ''} style="width:auto">
@@ -390,6 +406,17 @@
     }
   }
 
+  // An individual plan is a one-seat plan by definition (db.create_plan
+  // refuses anything else), so the field is filled in and locked rather than
+  // left as a way to get rejected.
+  function audienceChanged() {
+    const solo = document.getElementById('newAudience').value === 'individual';
+    const limit = document.getElementById('newLimit');
+    limit.disabled = solo;
+    limit.value = solo ? 1 : '';
+    limit.title = solo ? 'An individual plan always covers exactly one person.' : '';
+  }
+
   async function submitCreate(ev) {
     ev.preventDefault();
     const errBox = document.getElementById('createError');
@@ -409,6 +436,7 @@
           user_limit: document.getElementById('newLimit').value,
           chat_enabled: document.getElementById('newChatEnabled').checked,
           chat_monthly_limit: document.getElementById('newChatLimit').value || null,
+          audience: document.getElementById('newAudience').value,
         }),
       });
       const data = await res.json();
@@ -421,6 +449,8 @@
       document.getElementById('newCurrency').value = 'GHS';
       document.getElementById('newChatEnabled').checked = false;
       document.getElementById('newChatLimit').value = '';
+      document.getElementById('newAudience').value = 'team';
+      audienceChanged();
       await loadPlans();
     } catch {
       errBox.textContent = 'Could not reach the server.';

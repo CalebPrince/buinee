@@ -785,10 +785,22 @@
   function renderPlanBanner(company) {
     const banner = document.getElementById('planBanner');
     const atLimit = company.user_count >= company.plan.user_limit;
+    const solo = company.plan.audience === 'individual';
     banner.classList.toggle('at-limit', atLimit);
+    const plan = `<b>${escapeHtml(company.plan.name)} plan</b>`;
+    // A solo workspace is always "at the limit" by design, so counting seats
+    // at someone working alone would just be nagging. It only becomes news
+    // once somebody has actually asked to join.
+    if (solo) {
+      const waiting = document.querySelectorAll('#pendingRows .row[id^="pending-"]').length;
+      banner.innerHTML = waiting
+        ? `<span>${plan} — covers just you, so ${waiting === 1 ? 'this request' : 'these requests'} can't be approved yet. Ask us to move you onto a team plan and everything already in here stays exactly as it is.</span>`
+        : `<span>${plan} — your own workspace. Ask us for a team plan when you need colleagues in here.</span>`;
+      return;
+    }
     banner.innerHTML = atLimit
-      ? `<span><b>${escapeHtml(company.plan.name)} plan</b> — ${company.user_count} of ${company.plan.user_limit} users used. At the limit — approving anyone new needs a plan upgrade first.</span>`
-      : `<span><b>${escapeHtml(company.plan.name)} plan</b> — ${company.user_count} of ${company.plan.user_limit} users used.</span>`;
+      ? `<span>${plan} — ${company.user_count} of ${company.plan.user_limit} users used. At the limit — approving anyone new needs a plan upgrade first.</span>`
+      : `<span>${plan} — ${company.user_count} of ${company.plan.user_limit} users used.</span>`;
   }
 
   async function loadTeam(companyName) {

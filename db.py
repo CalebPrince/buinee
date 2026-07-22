@@ -41,6 +41,15 @@ ROOT = Path(__file__).parent
 DB_FILE = ROOT / "storage" / "ledgerline.db"
 
 ROLES = ("account_assistant", "senior_accountant", "finance_supervisor")
+
+# Who a plan is sold to. A company registering for its members buys a 'team'
+# plan; one person working alone buys an 'individual' one. The only mechanical
+# difference is seats (an individual plan is a 1-seat plan, which can_add_user
+# already enforces) plus two consequences that fall out of being alone: the
+# workspace stays out of the public join search (see find_companies_by_name)
+# and its owner holds Supervisor, since there's nobody else to approve their
+# work.
+PLAN_AUDIENCES = ("individual", "team")
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60  # 30 days
 
 PBKDF2_ITERATIONS = 260_000
@@ -48,6 +57,23 @@ PBKDF2_ITERATIONS = 260_000
 
 class AuthError(ValueError):
     """A user-facing auth problem (bad password, name taken, etc)."""
+
+
+class DuplicateCompanyError(AuthError):
+    """Registration hit a workspace that already goes by that name.
+
+    Not an outright rejection - two genuinely different businesses can share
+    a name, and only the person typing it knows which case this is. Carries
+    the existing company so the caller can offer the choice: ask to join that
+    one, or say it's a different company and carry on. An AuthError subclass
+    so callers that only care about "registration failed" still catch it.
+    """
+
+    def __init__(self, company: dict):
+        self.company = company
+        super().__init__(
+            f"A workspace called \"{company['name']}\" is already here."
+        )
 
 
 def _connect() -> sqlite3.Connection:
@@ -205,30 +231,66 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_voucher_events_company ON voucher_events(company_id);
             """
         )
+        # Chat gating first: the plans CREATE TABLE above predates those two
+        # columns, so on a brand-new database they only exist once this has
+        # run - and _seed_default_plans inserts into them. Its backfill is a
+        # no-op here because there are no rows to backfill yet.
+        _migrate_plan_chat_gating(conn)
+        _migrate_plan_audience(conn)
         _seed_default_plans(conn)
+        _seed_individual_plans(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
-        _migrate_plan_chat_gating(conn)
+
+
+# Demo pricing - deliberately placeholder numbers, meant to be edited from the
+# Command Center's Plans page before any real billing happens.
+# chat_monthly_limit is NULL for unlimited.
+_TEAM_SEEDS = (
+    # name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit
+    ("Free", 0, 3, 10, 1, 0, None),
+    ("Starter", 50, 10, 11, 0, 1, 200),
+    ("Growth", 150, 30, 12, 0, 1, None),
+)
+_INDIVIDUAL_SEEDS = (
+    ("Solo Free", 0, 1, 0, 0, 0, None),
+    ("Solo Pro", 25, 1, 1, 0, 1, 200),
+)
+
+
+def _insert_seed_plans(conn: sqlite3.Connection, seeds, audience: str) -> None:
+    now = time.time()
+    for name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit in seeds:
+        conn.execute(
+            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
+                                   chat_enabled, chat_monthly_limit, audience, created_at)
+               VALUES (?, ?, 'GHS', ?, ?, ?, ?, ?, ?, ?)""",
+            (name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit,
+             audience, now),
+        )
 
 
 def _seed_default_plans(conn: sqlite3.Connection) -> None:
     if conn.execute("SELECT COUNT(*) AS n FROM plans").fetchone()["n"] > 0:
         return
-    now = time.time()
-    # Demo pricing - deliberately placeholder numbers, meant to be edited from
-    # the Command Center's Plans page before any real billing happens.
-    # chat_monthly_limit is NULL for unlimited.
-    for name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit in (
-        ("Free", 0, 3, 0, 1, 0, None),
-        ("Starter", 50, 10, 1, 0, 1, 200),
-        ("Growth", 150, 30, 2, 0, 1, None),
-    ):
-        conn.execute(
-            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
-                                   chat_enabled, chat_monthly_limit, created_at)
-               VALUES (?, ?, 'GHS', ?, ?, ?, ?, ?, ?)""",
-            (name, price, user_limit, sort_order, is_default, chat_enabled, chat_limit, now),
-        )
+    _insert_seed_plans(conn, _INDIVIDUAL_SEEDS, "individual")
+    _insert_seed_plans(conn, _TEAM_SEEDS, "team")
+
+
+def _seed_individual_plans(conn: sqlite3.Connection) -> None:
+    """Give databases that predate the individual/team split something to sell
+    individuals, without touching the team plans already there.
+
+    Only fires when there isn't a single individual plan yet, so an owner who
+    reprices or renames these keeps their edits. Plans can't be deleted (there
+    is no delete_plan), so this can't resurrect one that was removed on
+    purpose.
+    """
+    n = conn.execute(
+        "SELECT COUNT(*) AS n FROM plans WHERE audience = 'individual'"
+    ).fetchone()["n"]
+    if n == 0:
+        _insert_seed_plans(conn, _INDIVIDUAL_SEEDS, "individual")
 
 
 def _migrate_plan_chat_gating(conn: sqlite3.Connection) -> None:
@@ -245,6 +307,17 @@ def _migrate_plan_chat_gating(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE plans SET chat_enabled = 0 WHERE name = 'Free'")
         conn.execute("UPDATE plans SET chat_enabled = 1, chat_monthly_limit = 200 WHERE name = 'Starter'")
         conn.execute("UPDATE plans SET chat_enabled = 1, chat_monthly_limit = NULL WHERE name = 'Growth'")
+
+
+def _migrate_plan_audience(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(plans)").fetchall()]
+    if "audience" not in cols:
+        # Everything that existed before this split was sold to a company for
+        # its members, so 'team' is the honest default for old rows - and for
+        # any plan created without saying otherwise.
+        conn.execute(
+            "ALTER TABLE plans ADD COLUMN audience TEXT NOT NULL DEFAULT 'team'"
+        )
 
 
 def _migrate_company_plan_id(conn: sqlite3.Connection) -> None:
@@ -288,6 +361,13 @@ def _new_salt() -> bytes:
 def find_companies_by_name(query: str, limit: int = 8) -> list[dict]:
     """Loose name search for the 'join a company' picker. Name only -
     nothing else about the company is exposed to someone who isn't in it yet.
+
+    Workspaces on an individual plan are listed here too. Someone who started
+    out alone and then hired is the exact case this picker has to serve: the
+    colleague finds the workspace by name, requests to join, and the request
+    sits pending until the workspace is moved onto a team plan. Hiding them
+    would only push that colleague into registering a duplicate company under
+    the same name.
     """
     query = query.strip()
     if not query:
@@ -298,6 +378,24 @@ def find_companies_by_name(query: str, limit: int = 8) -> list[dict]:
             (f"%{query}%", limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def find_company_by_exact_name(name: str) -> dict | None:
+    """The workspace that already answers to this exact name, if any.
+
+    Case- and whitespace-insensitive, because "coastal logistics ltd" and
+    "Coastal Logistics Ltd" are the same company to everyone except SQL.
+    """
+    name = " ".join(name.split())
+    if not name:
+        return None
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT id, name FROM companies WHERE LOWER(TRIM(name)) = LOWER(?) "
+            "ORDER BY created_at LIMIT 1",
+            (name,),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def get_company(company_id: int) -> dict | None:
@@ -388,7 +486,8 @@ def has_approved_supervisor(company_id: int) -> bool:
     return row is not None
 
 
-def register_company(company_name: str, name: str, email: str, password: str, role: str) -> dict:
+def register_company(company_name: str, name: str, email: str, password: str, role: str,
+                      plan_id: int | None = None, allow_duplicate_name: bool = False) -> dict:
     """Create a company and its first user, in whatever role they actually hold.
 
     Not assumed to be Supervisor just because they're the one setting
@@ -396,33 +495,56 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
     behalf and get only their own limited access. Whatever role is chosen,
     this account is approved immediately: there's nobody else at a brand-new
     company who could approve it.
+
+    `plan_id` is the tier chosen on the landing page's pricing section before
+    ever reaching this form - falls back to whichever plan is_default if
+    omitted or not a real plan, rather than failing the whole registration
+    over a bad/missing plan id.
+
+    On an individual plan there is no company and no colleagues: the workspace
+    is named after the person unless they gave it a name of their own, and
+    they hold Supervisor whatever the caller asked for, because every other
+    role depends on somebody else being there to approve the work.
+
+    Registering a name a workspace already answers to raises
+    `DuplicateCompanyError` rather than silently creating a second one - that
+    is how a team ends up split across two workspaces with the same name on
+    the door. It's a question, not a verdict: `allow_duplicate_name=True` is
+    the caller saying the person confirmed it really is a different business.
     """
     company_name = company_name.strip()
     name = name.strip()
     email = email.strip().lower()
 
+    plan = (get_plan(plan_id) if plan_id is not None else None) or get_default_plan()
+    solo = plan["audience"] == "individual"
+
+    if len(name) < 2:
+        raise AuthError("Your name is too short.")
+    if solo:
+        company_name = company_name or name
+        role = "finance_supervisor"
     if len(company_name) < 2:
         raise AuthError("Company name is too short.")
     if role not in ROLES:
         raise AuthError("Not a valid role.")
-    if len(name) < 2:
-        raise AuthError("Your name is too short.")
     if "@" not in email:
         raise AuthError("That doesn't look like an email address.")
     if len(password) < 8:
         raise AuthError("Password must be at least 8 characters.")
     if get_user_by_email(email):
         raise AuthError("An account with that email already exists.")
+    if not allow_duplicate_name:
+        existing = find_company_by_exact_name(company_name)
+        if existing:
+            raise DuplicateCompanyError(existing)
 
     salt = _new_salt()
     now = time.time()
     with _cursor() as conn:
-        default_plan_id = conn.execute(
-            "SELECT id FROM plans WHERE is_default = 1 LIMIT 1"
-        ).fetchone()["id"]
         cur = conn.execute(
             "INSERT INTO companies (name, plan_id, created_at) VALUES (?, ?, ?)",
-            (company_name, default_plan_id, now),
+            (company_name, plan["id"], now),
         )
         company_id = cur.lastrowid
         cur = conn.execute(
@@ -439,8 +561,18 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
 # ------------------------------------------------------------------ plans
 
 def list_plans() -> list[dict]:
+    """Individual tiers first, then team tiers, each in its own sort_order.
+
+    Grouping here rather than only in the UI keeps the two consistent: a
+    database that predates the split has its solo plans sharing sort_order
+    numbers with the team plans they were added alongside, so ordering on
+    sort_order alone would interleave them.
+    """
     with _cursor() as conn:
-        rows = conn.execute("SELECT * FROM plans ORDER BY sort_order").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM plans "
+            "ORDER BY CASE audience WHEN 'individual' THEN 0 ELSE 1 END, sort_order"
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -457,11 +589,16 @@ def get_default_plan() -> dict:
 
 
 def create_plan(name: str, price: float, currency: str, user_limit: int,
-                 chat_enabled: bool = False, chat_monthly_limit: int | None = None) -> dict:
+                 chat_enabled: bool = False, chat_monthly_limit: int | None = None,
+                 audience: str = "team") -> dict:
     name = name.strip()
     currency = currency.strip().upper() or "GHS"
     if len(name) < 2:
         raise AuthError("Plan name is too short.")
+    if audience not in PLAN_AUDIENCES:
+        raise AuthError("A plan is sold either to an individual or to a team.")
+    if audience == "individual" and user_limit != 1:
+        raise AuthError("An individual plan covers exactly 1 person.")
     if user_limit < 1:
         raise AuthError("A plan needs to allow at least 1 user.")
     if price < 0:
@@ -472,10 +609,10 @@ def create_plan(name: str, price: float, currency: str, user_limit: int,
         next_sort = conn.execute("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM plans").fetchone()["n"]
         cur = conn.execute(
             """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
-                                   chat_enabled, chat_monthly_limit, created_at)
-               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)""",
+                                   chat_enabled, chat_monthly_limit, audience, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
             (name, price, currency, user_limit, next_sort,
-             int(bool(chat_enabled)), chat_monthly_limit, time.time()),
+             int(bool(chat_enabled)), chat_monthly_limit, audience, time.time()),
         )
         plan_id = cur.lastrowid
     return get_plan(plan_id)
@@ -495,6 +632,12 @@ def update_plan(plan_id: int, name: str | None = None, price: float | None = Non
     new_price = plan["price"] if price is None else price
     new_currency = (currency.strip().upper() if currency and currency.strip() else plan["currency"])
     new_limit = plan["user_limit"] if user_limit is None else user_limit
+    # Audience is fixed at creation. Flipping a team plan to individual would
+    # strand every company already on it above the seat cap, and widening an
+    # individual plan past one seat would quietly turn someone's personal
+    # workspace into a joinable company - so the seat count is what's held.
+    if plan["audience"] == "individual" and new_limit != 1:
+        raise AuthError("An individual plan covers exactly 1 person.")
     new_chat_enabled = plan["chat_enabled"] if chat_enabled is None else int(bool(chat_enabled))
     # chat_monthly_limit needs three states (leave alone / set a number /
     # explicitly clear to unlimited), so "unset" - not None - is the
@@ -535,6 +678,32 @@ def plan_for_company(company_id: int) -> dict:
 def can_add_user(company_id: int) -> bool:
     plan = plan_for_company(company_id)
     return company_user_count(company_id) < plan["user_limit"]
+
+
+def _at_limit_message(company_id: int, joining: bool) -> str:
+    """Why nobody else can be added, said the way it's actually true.
+
+    A team at its cap and a solo workspace are the same check but not the
+    same situation: the first needs a bigger plan, the second needs a
+    different kind of plan, and neither can do it themselves - moving a
+    company between plans is Command Center-only.
+    """
+    plan = plan_for_company(company_id)
+    if plan["audience"] == "individual":
+        whose = "That workspace is" if joining else "Your workspace is"
+        return (
+            f"{whose} on the {plan['name']} plan, which covers just one "
+            "person. It has to move onto a team plan before anyone else can "
+            "be added - ask us to move it across and nothing already in here "
+            "is touched."
+        )
+    seats = plan["user_limit"]
+    whose = "This company is" if joining else "Your company is"
+    return (
+        f"{whose} on the {plan['name']} plan ({seats} "
+        f"user{'' if seats == 1 else 's'}) and is already at that limit. "
+        "The plan needs to be upgraded before anyone new can be added."
+    )
 
 
 def _current_year_month() -> str:
@@ -609,12 +778,7 @@ def request_to_join(company_id: int, name: str, email: str, password: str, role:
                 "you instead of joining as one yourself."
             )
         if not can_add_user(company_id):
-            plan = plan_for_company(company_id)
-            raise AuthError(
-                f"This company is on the {plan['name']} plan ({plan['user_limit']} "
-                "users) and is already at that limit. Its plan needs to be "
-                "upgraded before anyone new can join."
-            )
+            raise AuthError(_at_limit_message(company_id, joining=True))
     status = "approved" if role == "finance_supervisor" else "pending"
 
     salt = _new_salt()
@@ -712,12 +876,7 @@ def approve_user(company_id: int, user_id: int) -> None:
         if not row:
             raise AuthError("No pending request with that id for your company.")
         if not can_add_user(company_id):
-            plan = plan_for_company(company_id)
-            raise AuthError(
-                f"Your company is on the {plan['name']} plan ({plan['user_limit']} "
-                "users) and is already at that limit. Upgrade the plan before "
-                "approving anyone new."
-            )
+            raise AuthError(_at_limit_message(company_id, joining=False))
         conn.execute("UPDATE users SET status = 'approved' WHERE id = ?", (user_id,))
 
 
@@ -869,7 +1028,7 @@ def list_companies_with_stats() -> list[dict]:
     with _cursor() as conn:
         companies = conn.execute(
             """SELECT c.id, c.name, c.created_at, p.id AS plan_id, p.name AS plan_name,
-                      p.user_limit AS plan_user_limit
+                      p.user_limit AS plan_user_limit, p.audience AS plan_audience
                FROM companies c JOIN plans p ON c.plan_id = p.id
                ORDER BY c.created_at""",
         ).fetchall()
@@ -895,7 +1054,16 @@ def list_companies_with_stats() -> list[dict]:
                 "supervisor": {"name": supervisor["name"], "email": supervisor["email"]} if supervisor else None,
                 "team": [dict(u) for u in team],
                 "pending": [dict(u) for u in pending],
-                "plan": {"id": c["plan_id"], "name": c["plan_name"], "user_limit": c["plan_user_limit"]},
+                "plan": {
+                    "id": c["plan_id"],
+                    "name": c["plan_name"],
+                    "user_limit": c["plan_user_limit"],
+                    "audience": c["plan_audience"],
+                },
+                # Someone started alone, then somebody asked to join them.
+                # They can't approve it and can't move themselves - this is
+                # the flag that says the Command Center has to act.
+                "needs_team_plan": c["plan_audience"] == "individual" and len(pending) > 0,
             })
     return out
 
