@@ -395,6 +395,13 @@ switched client-side with no page reload:
   remain Supervisor-only. The signed-in person is marked “You”. Join decisions
   require confirmation and refresh the roster, queue, empty state, seat count,
   and live nav badge together; the badge is hidden entirely at zero.
+- **Team chat** — available only when the company is on a plan whose audience
+  is `team` (enforced in both UI and API). Approved members of the same company
+  can exchange messages and up to three supported files per message. Downloads
+  are authenticated and company-scoped. “Add to Ada” copies a shared file into
+  the current user's private reference library; it does not expose another
+  user's private instructions or library. Messages are append-only and the
+  dashboard polls for new ones while Team chat is open.
 
 The rail also has the other two visual pieces from the reference dashboards:
 a prominent "New voucher" compose button (opens the Vouchers form directly,
@@ -718,8 +725,9 @@ payment letter, editing/deleting a voucher.
   loop is built (see [Vouchers](#vouchers)), but every voucher is typed by
   hand — nothing reads an invoice file and fills the form yet.
 - The payment **letter** itself doesn't exist — a voucher can be approved,
-  but nothing generates the letter that would actually go out (the invoice
-  → voucher → letter chain's last step). The template was never sent,
+  but nothing generates the signed PDF that would actually go out (the invoice
+  → voucher → letter chain's last step). The letter template and required
+  signature format have not been supplied,
   still needed from Rufus.
 - No password reset, no email verification, no "edit a teammate's role"
   UI, no removing/deactivating a user. The platform admin can change their

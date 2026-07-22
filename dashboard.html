@@ -476,6 +476,32 @@
   .ada-send:hover { background: #8e4214; }
   .ada-send svg { width: 16px; height: 16px; }
   .ada-composer-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; flex-wrap: wrap; color: var(--ink-4); font-size: 11px; }
+  .team-chat-view { padding: 0; max-width: none; overflow: hidden; }
+  .team-chat-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .team-chat-head { display: flex; align-items: center; gap: 12px; padding: 15px 22px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .team-chat-head h1 { font: 600 19px var(--serif); }
+  .team-chat-head p { margin-top: 2px; color: var(--ink-3); font-size: 11.5px; }
+  .team-chat-stream { flex: 1; min-height: 0; overflow-y: auto; padding: 22px; }
+  .team-chat-inner { width: 100%; max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .team-message { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 10px; }
+  .team-message.mine { grid-template-columns: minmax(0,1fr) 32px; }
+  .team-message.mine .team-message-avatar { grid-column: 2; }
+  .team-message.mine .team-message-content { grid-column: 1; grid-row: 1; justify-self: end; }
+  .team-message-avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--teal); color: #fff; font-size: 10px; font-weight: 800; }
+  .team-message-content { min-width: 0; max-width: 680px; }
+  .team-message-meta { margin-bottom: 4px; color: var(--ink-4); font-size: 10.5px; }
+  .team-message.mine .team-message-meta { text-align: right; }
+  .team-message-bubble { padding: 10px 13px; border: 1px solid var(--line); border-radius: 4px 13px 13px 13px; background: var(--surface); color: var(--ink-2); font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .team-message.mine .team-message-bubble { border-color: transparent; border-radius: 13px 4px 13px 13px; background: var(--teal); color: #fff; }
+  .team-files { display: flex; flex-direction: column; gap: 6px; margin-top: 7px; }
+  .team-file { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 7px; align-items: center; padding: 8px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--ink-2); }
+  .team-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 700; }
+  .team-chat-compose { border-top: 1px solid var(--line); padding: 13px 20px 16px; background: var(--surface); }
+  .team-chat-compose-inner { max-width: 820px; margin: 0 auto; }
+  .team-chat-file-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+  .team-chat-box { display: flex; align-items: flex-end; gap: 8px; padding: 8px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); }
+  .team-chat-box textarea { flex: 1; min-width: 0; max-height: 120px; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink); font: 13px/1.5 var(--sans); }
+  .team-chat-note { margin-top: 7px; color: var(--ink-4); font-size: 10.5px; }
   .typing { display: flex; align-items: center; gap: 5px; padding: 4px 2px; }
   .typing i { width: 7px; height: 7px; border-radius: 50%; display: block; background: var(--ochre); animation: blink 1.3s ease-in-out infinite; }
   .typing i:nth-child(2) { animation-delay: .18s; }
@@ -515,6 +541,11 @@
     .ada-composer { padding: 12px 14px 16px; }
     .ada-starters { grid-template-columns: 1fr; }
     .ada-msg .bub { max-width: calc(100% - 39px); }
+    .team-chat-head { padding: 13px 16px; }
+    .team-chat-stream { padding: 17px 13px; }
+    .team-chat-compose { padding: 11px 12px 14px; }
+    .team-file { grid-template-columns: minmax(0,1fr) auto; }
+    .team-file .add-ada { grid-column: 1 / -1; }
     .auto { grid-template-columns: 42px minmax(0, 1fr) auto; align-items: start; }
     .auto-when { grid-column: 2; text-align: left; }
     .auto-actions { grid-column: 3; grid-row: 1 / span 2; align-self: center; flex-direction: column-reverse; }
@@ -576,6 +607,10 @@
       <button class="nav-item" data-view="chat" onclick="go('chat')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         Ask Ada
+      </button>
+      <button class="nav-item" id="teamChatNav" data-view="teamchat" onclick="go('teamchat')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+        Team chat
       </button>
       <button class="nav-item" data-view="automations" onclick="go('automations')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -792,6 +827,32 @@
               <span>Ada never sends mail on her own — every reply waits for you.</span>
               <span>Grounded in your workspace · Enter to send</span>
             </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== TEAM CHAT ===== -->
+    <section class="view team-chat-view" data-view="teamchat" id="viewTeamChat" hidden>
+      <div class="team-chat-shell">
+        <div class="team-chat-head">
+          <div><h1>Team chat</h1><p id="teamChatSubtitle">Your department’s shared conversation and files</p></div>
+        </div>
+        <div class="team-chat-stream" id="teamChatStream">
+          <div class="team-chat-inner" id="teamChatMessages"><div class="empty"><h4>Loading conversation…</h4></div></div>
+        </div>
+        <form class="team-chat-compose" onsubmit="return sendTeamMessage(event)">
+          <div class="team-chat-compose-inner">
+            <div class="team-chat-file-row" id="teamChatFileRow"></div>
+            <div class="team-chat-box">
+              <button class="icobtn" type="button" onclick="document.getElementById('teamChatFile').click()" title="Share files" aria-label="Share files" style="width:32px;height:32px;flex:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <input type="file" id="teamChatFile" accept=".docx,.xlsx,.pptx,.rtf,.txt,.md,.csv,.json,.xml,.html,.htm,.pdf,.png,.jpg,.jpeg,.webp,.gif" multiple hidden onchange="attachTeamFiles(event)">
+              <textarea id="teamChatInput" rows="1" placeholder="Message your team…" oninput="autoGrowChat(this)" onkeydown="teamChatKey(event)"></textarea>
+              <button class="ada-send" id="teamChatSend" type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
+            </div>
+            <div class="team-chat-note">Files are visible to this company’s approved team members. Add a shared file to your private Ada library when you want Ada to use it.</div>
           </div>
         </form>
       </div>
@@ -1046,7 +1107,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   const CRUMB_NAMES = {
     overview: 'Overview', team: 'Team', vouchers: 'Vouchers', triage: 'Triage',
-    flagged: 'Flagged', fix: 'To fix', chat: 'Ask Ada', automations: 'Automations',
+    flagged: 'Flagged', fix: 'To fix', chat: 'Ask Ada', teamchat: 'Team chat', automations: 'Automations',
     activity: 'Activity', instructions: 'Instructions',
   };
   const STATUS_INFO = {
@@ -1060,10 +1121,12 @@ Do not promise a payment date unless it has already been approved."></textarea>
   let automationStates = {};
   let activityEvents = [], activityFilter = 'all';
   let fixFilter = 'all';
+  let teamChatAvailable = false, teamMessages = [], pendingTeamFiles = [];
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
-    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)) {
+    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)
+        || (view === 'teamchat' && !teamChatAvailable)) {
       view = 'overview';
     }
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
@@ -1127,11 +1190,17 @@ Do not promise a payment date unless it has already been approved."></textarea>
     myId = me.id;
     myRole = me.role;
     myName = me.name;
+    teamChatAvailable = me.company.plan.audience === 'team';
 
     document.getElementById('crumbCompany').textContent = me.company.name;
     document.getElementById('rolePill').textContent = info.label;
     document.getElementById('whoAv').textContent = initials(me.name);
     document.getElementById('whoAv').title = me.name;
+    if (teamChatAvailable) {
+      document.getElementById('teamChatNav').style.display = 'flex';
+      document.getElementById('teamChatSubtitle').textContent = `${me.company.name} · approved members only`;
+      loadTeamMessages();
+    }
 
     document.getElementById('greeting').textContent = `Welcome, ${me.name.split(' ')[0]}.`;
     document.getElementById('roleBlurb').textContent = `${info.blurb} ${info.sees}`;
@@ -1289,6 +1358,130 @@ Do not promise a payment date unless it has already been approved."></textarea>
   document.querySelectorAll('[data-auto-run]').forEach(button => button.addEventListener('click', () => {
     runAutomationNow(button.dataset.autoRun, button);
   }));
+
+  // -------------------------------------------------------------- team chat
+
+  async function loadTeamMessages(incremental = false) {
+    if (!teamChatAvailable) return;
+    const after = incremental && teamMessages.length ? teamMessages[teamMessages.length - 1].id : 0;
+    try {
+      const res = await fetch(`/api/team-chat${after ? `?after=${after}` : ''}`, { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load team chat.');
+      if (incremental) {
+        const known = new Set(teamMessages.map(message => message.id));
+        teamMessages.push(...(data.messages || []).filter(message => !known.has(message.id)));
+      } else {
+        teamMessages = data.messages || [];
+      }
+      renderTeamMessages();
+    } catch (error) {
+      if (!teamMessages.length) document.getElementById('teamChatMessages').innerHTML = `<div class="empty"><h4>${escapeHtml(error.message || 'Could not load team chat.')}</h4></div>`;
+    }
+  }
+
+  function renderTeamMessages() {
+    const box = document.getElementById('teamChatMessages');
+    const stream = document.getElementById('teamChatStream');
+    const nearBottom = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 100;
+    if (!teamMessages.length) {
+      box.innerHTML = '<div class="empty"><h4>Start the conversation</h4><p>Messages and files shared here are visible only to approved members of this company.</p></div>';
+      return;
+    }
+    box.innerHTML = teamMessages.map(message => {
+      const mine = message.sender_id === myId;
+      const role = (ROLE_INFO[message.sender_role] || {}).label || message.sender_role;
+      const files = (message.files || []).map(file => `
+        <div class="team-file">
+          <span class="team-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)} · ${formatFileSize(file.size_bytes)}</span>
+          <a class="btn sm" href="/api/team-chat/file?id=${file.id}" download>Download</a>
+          <button class="btn sm add-ada" type="button" onclick="addTeamFileToAda(${file.id}, this)">Add to Ada</button>
+        </div>`).join('');
+      return `<article class="team-message${mine ? ' mine' : ''}">
+        <div class="team-message-avatar">${escapeHtml(initials(message.sender_name))}</div>
+        <div class="team-message-content">
+          <div class="team-message-meta">${escapeHtml(message.sender_name)} · ${escapeHtml(role)} · ${escapeHtml(new Date(message.created_at * 1000).toLocaleString())}</div>
+          ${message.body ? `<div class="team-message-bubble">${escapeHtml(message.body)}</div>` : ''}
+          ${files ? `<div class="team-files">${files}</div>` : ''}
+        </div>
+      </article>`;
+    }).join('');
+    if (nearBottom || teamMessages.length <= 100) stream.scrollTop = stream.scrollHeight;
+  }
+
+  function teamChatKey(ev) {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      ev.target.closest('form').requestSubmit();
+    }
+  }
+
+  async function attachTeamFiles(ev) {
+    const available = Math.max(0, 3 - pendingTeamFiles.length);
+    const files = [...ev.target.files].slice(0, available);
+    ev.target.value = '';
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) { alert(`${file.name} is larger than 5 MB.`); continue; }
+      const mediaType = referenceMediaType(file);
+      const isText = ['text/plain', 'text/markdown', 'text/csv', 'application/json',
+        'application/xml', 'text/xml', 'text/html', 'application/rtf', 'text/rtf'].includes(mediaType);
+      try {
+        const content = await readReferenceFile(file, isText);
+        const payload = { name: file.name, media_type: mediaType, size: file.size };
+        if (isText) payload.text = content;
+        else payload.data = content.includes(',') ? content.split(',', 2)[1] : '';
+        pendingTeamFiles.push(payload);
+      } catch (error) { alert(error.message || `Could not read ${file.name}.`); }
+    }
+    renderTeamFileChips();
+  }
+
+  function renderTeamFileChips() {
+    document.getElementById('teamChatFileRow').innerHTML = pendingTeamFiles.map((file, index) => `
+      <span class="ada-attach-chip">${escapeHtml(file.name)}<button type="button" onclick="pendingTeamFiles.splice(${index},1);renderTeamFileChips()" aria-label="Remove ${escapeHtml(file.name)}">×</button></span>
+    `).join('');
+  }
+
+  async function sendTeamMessage(ev) {
+    ev.preventDefault();
+    const input = document.getElementById('teamChatInput');
+    const message = input.value.trim();
+    if (!message && !pendingTeamFiles.length) return false;
+    const button = document.getElementById('teamChatSend');
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/team-chat/send', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, files: pendingTeamFiles }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send that message.');
+      teamMessages.push(data.message);
+      input.value = ''; autoGrowChat(input);
+      pendingTeamFiles = []; renderTeamFileChips(); renderTeamMessages();
+    } catch (error) { alert(error.message || 'Could not reach the server.'); }
+    finally { button.disabled = false; }
+    return false;
+  }
+
+  async function addTeamFileToAda(fileId, button) {
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/team-chat/add-to-library', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_id: fileId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not add that file.');
+      button.textContent = 'Added to Ada';
+      await loadReferenceDocuments();
+    } catch (error) { alert(error.message || 'Could not reach the server.'); button.disabled = false; }
+  }
+
+  setInterval(() => {
+    if (teamChatAvailable && location.hash === '#teamchat') loadTeamMessages(true);
+  }, 10000);
 
   // ------------------------------------------------------- connected mailbox
 

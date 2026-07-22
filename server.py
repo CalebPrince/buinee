@@ -50,7 +50,7 @@ from http.client import responses as HTTP_REASONS
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
@@ -139,6 +139,41 @@ def extract_rtf_text(value: str) -> str:
     value = value.replace("\\{", "{").replace("\\}", "}").replace("\\\\", "\\")
     value = value.replace("{", "").replace("}", "")
     return "\n".join(line.strip() for line in value.splitlines() if line.strip())[:100000]
+
+
+def normalize_document_upload(req: dict) -> dict:
+    name = Path(str(req.get("name") or "document")).name[:160]
+    media_type = str(req.get("media_type") or "").lower()
+    text_content = str(req.get("text") or "")
+    data_base64 = str(req.get("data") or "")
+    text_types = ("text/plain", "text/markdown", "text/csv", "text/html",
+                  "application/json", "application/xml", "text/xml",
+                  "application/rtf", "text/rtf")
+    if media_type in text_types:
+        kind, data_base64 = "text", ""
+        size_bytes = len(text_content.encode("utf-8"))
+        if media_type in ("application/rtf", "text/rtf"):
+            text_content = extract_rtf_text(text_content)
+        text_content = text_content[:100000]
+    elif media_type in OFFICE_MEDIA_TYPES:
+        raw = base64.b64decode(data_base64, validate=True)
+        size_bytes = len(raw)
+        kind = "text"
+        text_content = extract_office_text(raw, OFFICE_MEDIA_TYPES[media_type])
+    elif media_type == "application/pdf" or media_type.startswith("image/"):
+        kind = "pdf" if media_type == "application/pdf" else "image"
+        if media_type not in ("application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"):
+            raise ValueError("That image type is not supported.")
+        raw = base64.b64decode(data_base64, validate=True)
+        size_bytes = len(raw)
+        text_content = ""
+    else:
+        raise ValueError("Use DOCX, XLSX, PPTX, PDF, RTF, text/data files, or a supported image.")
+    if size_bytes <= 0 or size_bytes > 5 * 1024 * 1024:
+        raise ValueError("Each document must be between 1 byte and 5 MB.")
+    return {"name": name, "kind": kind, "media_type": media_type,
+            "text_content": text_content, "data_base64": data_base64,
+            "size_bytes": size_bytes}
 
 STATIC_PAGES = {
     "/": "index.html",
@@ -753,6 +788,40 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"team": db.list_team(user["company_id"])})
 
+        if path == "/api/team-chat":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            if db.plan_for_company(user["company_id"])["audience"] != "team":
+                return self._json({"error": "Team chat requires a team plan."}, 403)
+            try:
+                after = int(parse_qs(urlparse(self.path).query).get("after", ["0"])[0])
+            except ValueError:
+                after = 0
+            return self._json({"messages": db.list_team_messages(user["company_id"], after)})
+
+        if path == "/api/team-chat/file":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            if db.plan_for_company(user["company_id"])["audience"] != "team":
+                return self._json({"error": "Team chat requires a team plan."}, 403)
+            try:
+                file_id = int(parse_qs(urlparse(self.path).query).get("id", [""])[0])
+            except ValueError:
+                return self._json({"error": "Bad file id."}, 400)
+            file = db.get_team_file(user["company_id"], file_id)
+            if not file:
+                return self._json({"error": "File not found."}, 404)
+            try:
+                body = (base64.b64decode(file["data_base64"], validate=True)
+                        if file["data_base64"] else file["text_content"].encode("utf-8"))
+            except binascii.Error:
+                return self._json({"error": "Stored file is damaged."}, 500)
+            disposition = "attachment; filename*=UTF-8''" + quote(file["name"])
+            return self._send(200, body, file["media_type"] or "application/octet-stream",
+                              [("Content-Disposition", disposition)])
+
         if path == "/api/company/model-options":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -914,6 +983,8 @@ class RouteHandlerMixin:
             "/api/user/instructions": self._handle_set_user_instructions,
             "/api/user/reference-documents/upload": self._handle_reference_upload,
             "/api/user/reference-documents/delete": self._handle_reference_delete,
+            "/api/team-chat/send": self._handle_team_message,
+            "/api/team-chat/add-to-library": self._handle_team_file_to_library,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
             "/api/vouchers/review": self._handle_voucher_review,
@@ -1360,37 +1431,10 @@ class RouteHandlerMixin:
             return self._json({"error": "Not signed in."}, 401)
         try:
             req = self._body(max_len=8 * 1024 * 1024)
-            name = Path(str(req.get("name") or "document")).name[:160]
-            media_type = str(req.get("media_type") or "").lower()
-            text_content = str(req.get("text") or "")
-            data_base64 = str(req.get("data") or "")
-            text_types = ("text/plain", "text/markdown", "text/csv", "text/html",
-                          "application/json", "application/xml", "text/xml",
-                          "application/rtf", "text/rtf")
-            if media_type in text_types:
-                kind, data_base64 = "text", ""
-                size_bytes = len(text_content.encode("utf-8"))
-                if media_type in ("application/rtf", "text/rtf"):
-                    text_content = extract_rtf_text(text_content)
-                text_content = text_content[:100000]
-            elif media_type in OFFICE_MEDIA_TYPES:
-                raw = base64.b64decode(data_base64, validate=True)
-                size_bytes = len(raw)
-                kind, data_base64 = "text", ""
-                text_content = extract_office_text(raw, OFFICE_MEDIA_TYPES[media_type])
-            elif media_type == "application/pdf" or media_type.startswith("image/"):
-                kind = "pdf" if media_type == "application/pdf" else "image"
-                if media_type not in ("application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"):
-                    raise ValueError("That image type is not supported.")
-                raw = base64.b64decode(data_base64, validate=True)
-                size_bytes = len(raw)
-                text_content = ""
-            else:
-                raise ValueError("Use DOCX, XLSX, PPTX, PDF, RTF, text/data files, or a supported image.")
-            if size_bytes <= 0 or size_bytes > 5 * 1024 * 1024:
-                raise ValueError("Each reference document must be between 1 byte and 5 MB.")
+            doc = normalize_document_upload(req)
             document = db.add_reference_document(
-                user["id"], name, kind, media_type, text_content, data_base64, size_bytes,
+                user["id"], doc["name"], doc["kind"], doc["media_type"],
+                doc["text_content"], doc["data_base64"], doc["size_bytes"],
             )
         except (ValueError, binascii.Error, db.AuthError) as exc:
             return self._json({"error": str(exc) or "Could not upload that document."}, 400)
@@ -1409,6 +1453,53 @@ class RouteHandlerMixin:
         if not db.delete_reference_document(user["id"], document_id):
             return self._json({"error": "Document not found."}, 404)
         return self._json({"ok": True})
+
+    def _handle_team_message(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if db.plan_for_company(user["company_id"])["audience"] != "team":
+            return self._json({"error": "Team chat requires a team plan."}, 403)
+        if rate_limited(f"team-chat:{user['id']}", max_hits=30, window=60):
+            return self._json({"error": "Too many messages—wait a moment and try again."}, 429)
+        try:
+            req = self._body(max_len=18 * 1024 * 1024)
+            body = str(req.get("message") or "").strip()[:4000]
+            raw_files = (req.get("files") or [])[:3]
+            files = [normalize_document_upload(file) for file in raw_files]
+            if sum(file["size_bytes"] for file in files) > 10 * 1024 * 1024:
+                raise ValueError("Files in one message are limited to 10 MB total.")
+            if not body and not files:
+                raise ValueError("Write a message or attach a file.")
+            message = db.create_team_message(user["company_id"], user["id"], body, files)
+        except (ValueError, binascii.Error) as exc:
+            return self._json({"error": str(exc) or "Could not send that message."}, 400)
+        except Exception as exc:
+            print(f"  ! team message failure: {exc}")
+            return self._json({"error": "Could not send that message."}, 500)
+        return self._json({"ok": True, "message": message})
+
+    def _handle_team_file_to_library(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if db.plan_for_company(user["company_id"])["audience"] != "team":
+            return self._json({"error": "Team chat requires a team plan."}, 403)
+        try:
+            file_id = int(self._body().get("file_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        file = db.get_team_file(user["company_id"], file_id)
+        if not file:
+            return self._json({"error": "File not found."}, 404)
+        try:
+            document = db.add_reference_document(
+                user["id"], file["name"], file["kind"], file["media_type"],
+                file["text_content"], file["data_base64"], file["size_bytes"],
+            )
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "document": document})
 
     # ------------------------------------------------------------ vouchers
 
