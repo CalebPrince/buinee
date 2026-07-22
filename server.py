@@ -195,6 +195,7 @@ STATIC_PAGES = {
     "/admin-plans.html": "admin-plans.html",
     "/admin-pipeline.html": "admin-pipeline.html",
     "/admin-payments.html": "admin-payments.html",
+    "/admin-team.html": "admin-team.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -405,7 +406,12 @@ def current_admin(handler) -> dict | None:
 
 
 def public_admin(admin: dict) -> dict:
-    return {"id": admin["id"], "name": admin["name"], "email": admin["email"]}
+    return {"id": admin["id"], "name": admin["name"], "email": admin["email"],
+            "role": admin.get("role", "owner"), "status": admin.get("status", "active")}
+
+
+def admin_is_owner(admin: dict | None) -> bool:
+    return bool(admin and admin.get("role", "owner") == "owner")
 
 
 def fx() -> voucher.FxRates | None:
@@ -1062,6 +1068,15 @@ class RouteHandlerMixin:
                 "secret_key_configured": bool(ps["secret_key"]), "webhook_url": ps["webhook_url"],
                 "callback_url": ps["callback_url"]}})
 
+        if path == "/api/admin/team":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            if not admin_is_owner(admin):
+                return self._json({"error": "Only a Command Center owner can manage the back-office team."}, 403)
+            return self._json({"members": db.list_platform_admins(),
+                               "roles": list(db.PLATFORM_ADMIN_ROLES)})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1120,6 +1135,9 @@ class RouteHandlerMixin:
             "/api/admin/plans/create": self._handle_admin_create_plan,
             "/api/admin/plans/update": self._handle_admin_update_plan,
             "/api/admin/company/set-plan": self._handle_admin_set_company_plan,
+            "/api/admin/team/create": self._handle_admin_team_create,
+            "/api/admin/team/update": self._handle_admin_team_update,
+            "/api/admin/team/reset-password": self._handle_admin_team_reset_password,
         }
         handler = handlers.get(path)
         if not handler:
@@ -1948,6 +1966,53 @@ class RouteHandlerMixin:
             db.delete_company(company_id)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True})
+
+    def _owner_request(self):
+        admin = current_admin(self)
+        if not admin:
+            self._json({"error": "Not signed in."}, 401)
+            return None
+        if not admin_is_owner(admin):
+            self._json({"error": "Only a Command Center owner can manage the back-office team."}, 403)
+            return None
+        return admin
+
+    def _handle_admin_team_create(self):
+        if not self._owner_request():
+            return
+        try:
+            req = self._body()
+            member = db.create_platform_admin(str(req.get("name") or ""),
+                                               str(req.get("email") or ""),
+                                               str(req.get("password") or ""),
+                                               str(req.get("role") or ""))
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Could not add team member."}, 400)
+        return self._json({"ok": True, "member": public_admin(member)})
+
+    def _handle_admin_team_update(self):
+        admin = self._owner_request()
+        if not admin:
+            return
+        try:
+            req = self._body()
+            member = db.update_platform_admin(int(req.get("member_id")),
+                                              str(req.get("role") or ""),
+                                              str(req.get("status") or ""), admin["id"])
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Could not update team member."}, 400)
+        return self._json({"ok": True, "member": public_admin(member)})
+
+    def _handle_admin_team_reset_password(self):
+        if not self._owner_request():
+            return
+        try:
+            req = self._body()
+            db.reset_platform_admin_password(int(req.get("member_id")),
+                                             str(req.get("password") or ""))
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Could not reset password."}, 400)
         return self._json({"ok": True})
 
     def _handle_admin_update_crm_account(self):

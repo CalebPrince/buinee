@@ -127,15 +127,17 @@ def init_db() -> None:
 
             -- Platform owner identity. Deliberately unconnected to companies/
             -- users - this is not a company role, it's whoever runs Buinee
-            -- itself. There is no HTTP route that creates a row here; see
-            -- db.create_platform_admin and the README.
+            -- itself. The first owner is bootstrapped at deployment; that
+            -- owner can then add the rest of the back-office team.
             CREATE TABLE IF NOT EXISTS platform_admins (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 name          TEXT NOT NULL,
                 email         TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 salt          TEXT NOT NULL,
-                created_at    REAL NOT NULL
+                created_at    REAL NOT NULL,
+                role          TEXT NOT NULL DEFAULT 'owner',
+                status        TEXT NOT NULL DEFAULT 'active'
             );
 
             CREATE TABLE IF NOT EXISTS admin_sessions (
@@ -483,6 +485,7 @@ def init_db() -> None:
         _migrate_crm_profile_fields(conn)
         _migrate_crm_task_assignee(conn)
         _migrate_user_terms_acceptance(conn)
+        _migrate_platform_admin_roles(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -614,6 +617,14 @@ def _migrate_user_terms_acceptance(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN terms_accepted_at REAL")
     if "terms_version" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN terms_version TEXT NOT NULL DEFAULT ''")
+
+
+def _migrate_platform_admin_roles(conn: sqlite3.Connection) -> None:
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(platform_admins)").fetchall()}
+    if "role" not in cols:
+        conn.execute("ALTER TABLE platform_admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'")
+    if "status" not in cols:
+        conn.execute("ALTER TABLE platform_admins ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
 
 
 # ------------------------------------------------------------------ passwords
@@ -1289,10 +1300,8 @@ def reject_user(company_id: int, user_id: int) -> None:
 #
 # A completely separate identity from companies/users - its own table, own
 # sessions, own login page (admin-login.html). Not a company role, and there
-# is deliberately no HTTP route that creates one: the only way a row lands in
-# platform_admins is either a script run directly against the database, or
-# server.maybe_bootstrap_admin() at process startup on hosts with no shell
-# access - see README's Command Center section.
+# is initially bootstrapped directly or at process startup. After that, an
+# authenticated owner can add and manage the back-office team.
 
 def count_platform_admins() -> int:
     with _cursor() as conn:
@@ -1315,9 +1324,11 @@ def _get_admin_by_email(email: str) -> dict | None:
     return dict(row) if row else None
 
 
-def create_platform_admin(name: str, email: str, password: str) -> dict:
-    """Not exposed over HTTP anywhere - called directly, once, by whoever
-    operates this deployment. See the setup script this was created with."""
+PLATFORM_ADMIN_ROLES = ("owner", "operations", "sales", "support", "billing")
+
+
+def create_platform_admin(name: str, email: str, password: str, role: str = "owner") -> dict:
+    """Create a Command Center identity after caller authorization."""
     name = name.strip()
     email = email.strip().lower()
     if len(name) < 2:
@@ -1326,6 +1337,9 @@ def create_platform_admin(name: str, email: str, password: str) -> dict:
         raise AuthError("That doesn't look like an email address.")
     if len(password) < 8:
         raise AuthError("Password must be at least 8 characters.")
+    role = role.strip().lower()
+    if role not in PLATFORM_ADMIN_ROLES:
+        raise AuthError("Choose a valid back-office role.")
     if _get_admin_by_email(email):
         raise AuthError("A platform admin with that email already exists.")
 
@@ -1333,9 +1347,10 @@ def create_platform_admin(name: str, email: str, password: str) -> dict:
     now = time.time()
     with _cursor() as conn:
         cur = conn.execute(
-            """INSERT INTO platform_admins (name, email, password_hash, salt, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (name, email, _hash_password(password, salt), salt.hex(), now),
+            """INSERT INTO platform_admins
+               (name, email, password_hash, salt, created_at, role, status)
+               VALUES (?, ?, ?, ?, ?, ?, 'active')""",
+            (name, email, _hash_password(password, salt), salt.hex(), now, role),
         )
         admin_id = cur.lastrowid
     return _get_admin(admin_id)
@@ -1345,6 +1360,8 @@ def authenticate_admin(email: str, password: str) -> dict:
     admin = _get_admin_by_email(email)
     if not admin:
         raise AuthError("No platform admin with that email.")
+    if admin.get("status", "active") != "active":
+        raise AuthError("This back-office account is inactive.")
     salt = bytes.fromhex(admin["salt"])
     if _hash_password(password, salt) != admin["password_hash"]:
         raise AuthError("Wrong password.")
@@ -1374,7 +1391,50 @@ def get_admin_by_session(token: str | None) -> dict | None:
         admin = conn.execute(
             "SELECT * FROM platform_admins WHERE id = ?", (row["admin_id"],)
         ).fetchone()
-    return dict(admin) if admin else None
+    result = dict(admin) if admin else None
+    return result if result and result.get("status", "active") == "active" else None
+
+
+def list_platform_admins() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT id, name, email, role, status, created_at FROM platform_admins ORDER BY name"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) -> dict:
+    admin = _get_admin(admin_id)
+    if not admin:
+        raise AuthError("Team member not found.")
+    role, status = role.strip().lower(), status.strip().lower()
+    if role not in PLATFORM_ADMIN_ROLES or status not in ("active", "inactive"):
+        raise AuthError("Choose a valid role and status.")
+    if admin_id == actor_id and status != "active":
+        raise AuthError("You cannot deactivate your own account.")
+    with _cursor() as conn:
+        owners = conn.execute(
+            "SELECT COUNT(*) AS n FROM platform_admins WHERE role = 'owner' AND status = 'active'"
+        ).fetchone()["n"]
+        if admin["role"] == "owner" and admin["status"] == "active" and owners <= 1 \
+                and (role != "owner" or status != "active"):
+            raise AuthError("The Command Center must keep at least one active owner.")
+        conn.execute("UPDATE platform_admins SET role = ?, status = ? WHERE id = ?", (role, status, admin_id))
+        if status != "active":
+            conn.execute("DELETE FROM admin_sessions WHERE admin_id = ?", (admin_id,))
+    return _get_admin(admin_id)
+
+
+def reset_platform_admin_password(admin_id: int, new_password: str) -> None:
+    if not _get_admin(admin_id):
+        raise AuthError("Team member not found.")
+    if len(new_password) < 8:
+        raise AuthError("Temporary password must be at least 8 characters.")
+    salt = _new_salt()
+    with _cursor() as conn:
+        conn.execute("UPDATE platform_admins SET password_hash = ?, salt = ? WHERE id = ?",
+                     (_hash_password(new_password, salt), salt.hex(), admin_id))
+        conn.execute("DELETE FROM admin_sessions WHERE admin_id = ?", (admin_id,))
 
 
 def destroy_admin_session(token: str | None) -> None:
