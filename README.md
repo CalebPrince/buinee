@@ -359,10 +359,12 @@ switched client-side with no page reload:
 - **Instructions** separates shared governance from each person's working
   context. The company provider and briefing remain Supervisor-only; every
   approved user can save private personal instructions and a private reference
-  library (10 files, 25 MB total, 5 MB each). Text/Markdown/CSV fold into
-  prompts; PDF and supported images are passed natively to models that accept
-  them. Every document query is scoped by `user_id`, so company role does not
-  grant access to somebody else's files:
+  library (10 files, 25 MB total, 5 MB each). Text/data files and modern Office
+  formats (`.docx`, `.xlsx`, `.pptx`) are extracted to readable text on upload;
+  PDF and supported images are passed natively to models that accept them.
+  RTF is normalized to plain text. Legacy `.doc`/`.xls` files must first be
+  saved in their modern formats. Every document query is scoped by `user_id`,
+  so company role does not grant access to somebody else's files:
   - **AI provider** - a per-company preference among whichever providers
     have a key configured on this deployment (`db.set_company_model`,
     `/api/company/model-options`, `/api/company/set-model`). Falls back to

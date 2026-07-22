@@ -36,12 +36,15 @@ from __future__ import annotations
 import email.utils
 import base64
 import binascii
+import html
+import io
 import json
 import os
 import re
 import sys
 import time
 import webbrowser
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 from http.client import responses as HTTP_REASONS
 from http.cookies import SimpleCookie
@@ -66,6 +69,76 @@ PORT = int(os.environ.get("PORT", 8080))
 HOST = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
 ENV_FILE = ROOT / ".env"
 FX_FILE = ROOT / "bog-fx-rates.xlsx"
+
+OFFICE_MEDIA_TYPES = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+}
+
+
+def _xml_visible_text(blob: bytes) -> str:
+    """Extract visible OOXML text without accepting markup as instructions."""
+    source = blob.decode("utf-8", "replace")
+    values = [html.unescape(value).strip() for value in re.findall(r">([^<]+)<", source)]
+    return " ".join(value for value in values if value)
+
+
+def extract_office_text(raw: bytes, office_kind: str) -> str:
+    if office_kind == "xlsx":
+        try:
+            import openpyxl
+            book = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+            lines = []
+            for sheet in book.worksheets:
+                lines.append(f"## Sheet: {sheet.title}")
+                for row in sheet.iter_rows(values_only=True):
+                    values = [str(value) for value in row if value is not None and str(value).strip()]
+                    if values:
+                        lines.append(" | ".join(values))
+                    if sum(len(line) for line in lines) > 100000:
+                        break
+            book.close()
+            return "\n".join(lines)[:100000].strip()
+        except ImportError as exc:
+            raise ValueError("Excel reading is not installed on this server.") from exc
+        except Exception as exc:
+            raise ValueError("That Excel workbook could not be read.") from exc
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            prefix = "word/" if office_kind == "docx" else "ppt/slides/"
+            suffix = ".xml"
+            members = [item for item in archive.infolist()
+                       if item.filename.startswith(prefix) and item.filename.endswith(suffix)]
+            members.sort(key=lambda item: item.filename)
+            chunks = []
+            total_unpacked = 0
+            for item in members:
+                total_unpacked += item.file_size
+                if total_unpacked > 20 * 1024 * 1024:
+                    raise ValueError("That Office document expands beyond the safe reading limit.")
+                text = _xml_visible_text(archive.read(item))
+                if text:
+                    chunks.append(text)
+            result = "\n\n".join(chunks)[:100000].strip()
+            if not result:
+                raise ValueError("That Office document contains no readable text.")
+            return result
+    except zipfile.BadZipFile as exc:
+        raise ValueError("That Office document is damaged or uses an older binary format.") from exc
+
+
+def extract_rtf_text(value: str) -> str:
+    value = re.sub(
+        r"\\'([0-9a-fA-F]{2})",
+        lambda match: bytes.fromhex(match.group(1)).decode("cp1252", "replace"),
+        value,
+    )
+    value = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", value)
+    value = value.replace("\\{", "{").replace("\\}", "}").replace("\\\\", "\\")
+    value = value.replace("{", "").replace("}", "")
+    return "\n".join(line.strip() for line in value.splitlines() if line.strip())[:100000]
 
 STATIC_PAGES = {
     "/": "index.html",
@@ -1291,10 +1364,20 @@ class RouteHandlerMixin:
             media_type = str(req.get("media_type") or "").lower()
             text_content = str(req.get("text") or "")
             data_base64 = str(req.get("data") or "")
-            if media_type in ("text/plain", "text/markdown", "text/csv"):
+            text_types = ("text/plain", "text/markdown", "text/csv", "text/html",
+                          "application/json", "application/xml", "text/xml",
+                          "application/rtf", "text/rtf")
+            if media_type in text_types:
                 kind, data_base64 = "text", ""
                 size_bytes = len(text_content.encode("utf-8"))
+                if media_type in ("application/rtf", "text/rtf"):
+                    text_content = extract_rtf_text(text_content)
                 text_content = text_content[:100000]
+            elif media_type in OFFICE_MEDIA_TYPES:
+                raw = base64.b64decode(data_base64, validate=True)
+                size_bytes = len(raw)
+                kind, data_base64 = "text", ""
+                text_content = extract_office_text(raw, OFFICE_MEDIA_TYPES[media_type])
             elif media_type == "application/pdf" or media_type.startswith("image/"):
                 kind = "pdf" if media_type == "application/pdf" else "image"
                 if media_type not in ("application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"):
@@ -1303,7 +1386,7 @@ class RouteHandlerMixin:
                 size_bytes = len(raw)
                 text_content = ""
             else:
-                raise ValueError("Use TXT, Markdown, CSV, PDF, PNG, JPEG, WebP, or GIF.")
+                raise ValueError("Use DOCX, XLSX, PPTX, PDF, RTF, text/data files, or a supported image.")
             if size_bytes <= 0 or size_bytes > 5 * 1024 * 1024:
                 raise ValueError("Each reference document must be between 1 byte and 5 MB.")
             document = db.add_reference_document(

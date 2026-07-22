@@ -881,9 +881,9 @@ Do not promise a payment date unless it has already been approved."></textarea>
           <button class="reference-drop" type="button" onclick="document.getElementById('referenceFileInput').click()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>
             <span>Choose reference documents</span>
-            <small>TXT, Markdown, CSV, PDF, PNG, JPEG, WebP, or GIF · 5 MB each</small>
+            <small>Word, Excel, PowerPoint, PDF, RTF, text/data files, or images · 5 MB each</small>
           </button>
-          <input type="file" id="referenceFileInput" accept=".txt,.md,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif" multiple hidden onchange="uploadReferenceFiles(event)">
+          <input type="file" id="referenceFileInput" accept=".docx,.xlsx,.pptx,.rtf,.txt,.md,.csv,.json,.xml,.html,.htm,.pdf,.png,.jpg,.jpeg,.webp,.gif" multiple hidden onchange="uploadReferenceFiles(event)">
           <div class="msg-error" id="referenceErr" style="display:none; margin-top:10px"></div>
           <div class="reference-list" id="referenceList"></div>
         </div>
@@ -2135,10 +2135,14 @@ Do not promise a payment date unless it has already been approved."></textarea>
   }
 
   function referenceMediaType(file) {
-    if (file.type) return file.type;
     const ext = file.name.split('.').pop().toLowerCase();
-    return ({ txt: 'text/plain', md: 'text/markdown', csv: 'text/csv', pdf: 'application/pdf',
-      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' })[ext] || '';
+    return ({ txt: 'text/plain', md: 'text/markdown', csv: 'text/csv', json: 'application/json',
+      xml: 'application/xml', html: 'text/html', htm: 'text/html', rtf: 'application/rtf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      webp: 'image/webp', gif: 'image/gif' })[ext] || file.type || '';
   }
 
   function readReferenceFile(file, asText) {
@@ -2159,7 +2163,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
       try {
         if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than 5 MB.`);
         const mediaType = referenceMediaType(file);
-        const isText = ['text/plain', 'text/markdown', 'text/csv'].includes(mediaType);
+        const isText = ['text/plain', 'text/markdown', 'text/csv', 'application/json',
+          'application/xml', 'text/xml', 'text/html', 'application/rtf', 'text/rtf'].includes(mediaType);
         const content = await readReferenceFile(file, isText);
         const payload = { name: file.name, media_type: mediaType };
         if (isText) payload.text = content;
