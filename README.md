@@ -65,10 +65,10 @@ refactor); the WSGI transport via `wsgiref.simple_server` serving
 correctly 401ing with no cookie, and the admin/company endpoints all
 checked, with zero code differences from what Passenger will actually run.
 
-**Deployed on Namecheap Stellar Plus** — cPanel's Python Selector
-(CloudLinux) running `passenger_wsgi.py` under Phusion Passenger, i.e. the
-WSGI transport above. The socket transport is local dev only and doesn't run
-in production at all.
+**Live at [buinee.app](https://buinee.app)**, on Namecheap Stellar Plus —
+cPanel's Python Selector (CloudLinux) running `passenger_wsgi.py` under
+Phusion Passenger, i.e. the WSGI transport above. The socket transport is
+local dev only and doesn't run in production at all.
 
 Two things follow from being on ordinary cPanel hosting rather than a
 container PaaS, and both are load-bearing:
