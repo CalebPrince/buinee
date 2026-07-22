@@ -358,13 +358,20 @@
     color: var(--ink); font-size: 13.5px; font-family: inherit;
   }
 
-  .activity-row { display: flex; gap: 12px; padding: 11px 8px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .activity-toolbar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 12px 15px; border-bottom: 1px solid var(--line); }
+  .activity-toolbar .eyebrow { margin-right: auto; }
+  .activity-filter { padding: 5px 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink-3); font-size: 11px; font-weight: 700; }
+  .activity-filter.on { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .activity-row { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 15px 16px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
   .activity-row:last-child { border-bottom: none; }
-  .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--ink-4); }
-  .activity-dot.approved { background: var(--good); }
-  .activity-dot.rejected { background: var(--bad); }
-  .activity-dot.submitted { background: var(--warn); }
-  .activity-row .when { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .activity-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--surface-3); color: var(--ink-3); font-size: 11px; font-weight: 800; }
+  .activity-mark.approved { background: var(--good-soft); color: var(--good); }
+  .activity-mark.rejected { background: var(--bad-soft); color: var(--bad); }
+  .activity-mark.submitted { background: var(--warn-soft); color: var(--warn); }
+  .activity-copy { min-width: 0; line-height: 1.45; }
+  .activity-copy .document { color: var(--ink-2); overflow-wrap: anywhere; }
+  .activity-copy .note { margin-top: 5px; color: var(--bad); font-size: 12px; }
+  .activity-row .when { color: var(--ink-4); font: 10.5px var(--mono); white-space: nowrap; }
   .voucher-row { cursor: pointer; }
   .voucher-detail { padding: 14px 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
   .voucher-detail .drow { display: flex; justify-content: space-between; padding: 5px 0; }
@@ -462,6 +469,8 @@
     .auto-when { grid-column: 2; text-align: left; }
     .auto-actions { grid-column: 3; grid-row: 1 / span 2; align-self: center; flex-direction: column-reverse; }
     .auto-result { grid-column: 1 / -1; }
+    .activity-row { grid-template-columns: 30px minmax(0, 1fr); }
+    .activity-row .when { grid-column: 2; }
   }
 </style>
 
@@ -760,6 +769,14 @@
         </div>
       </div>
       <div class="card full">
+        <div class="activity-toolbar">
+          <span class="eyebrow" id="activityCount">Audit trail</span>
+          <button class="activity-filter on" type="button" data-activity-filter="all" onclick="setActivityFilter('all')">All</button>
+          <button class="activity-filter" type="button" data-activity-filter="prepared" onclick="setActivityFilter('prepared')">Prepared</button>
+          <button class="activity-filter" type="button" data-activity-filter="submitted" onclick="setActivityFilter('submitted')">Submitted</button>
+          <button class="activity-filter" type="button" data-activity-filter="approved" onclick="setActivityFilter('approved')">Approved</button>
+          <button class="activity-filter" type="button" data-activity-filter="rejected" onclick="setActivityFilter('rejected')">Rejected</button>
+        </div>
         <div class="card-b" id="activityRows"></div>
       </div>
     </section>
@@ -909,6 +926,7 @@
   let myId = null, myRole = null, myName = '', allVouchers = [], chatHistory = [], pendingAttachments = [], assistantReady = null;
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
   let automationStates = {};
+  let activityEvents = [], activityFilter = 'all';
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
@@ -1809,40 +1827,60 @@
   }
 
   const EVENT_INFO = {
-    prepared: { verb: 'prepared', cls: '' },
-    submitted: { verb: 'submitted', cls: 'submitted' },
-    approved: { verb: 'approved', cls: 'approved' },
-    rejected: { verb: 'rejected', cls: 'rejected' },
+    prepared: { verb: 'prepared', cls: '', mark: 'P' },
+    submitted: { verb: 'submitted for approval', cls: 'submitted', mark: 'S' },
+    approved: { verb: 'approved', cls: 'approved', mark: '✓' },
+    rejected: { verb: 'rejected', cls: 'rejected', mark: '!' },
   };
+
+  function setActivityFilter(filter) {
+    activityFilter = Object.prototype.hasOwnProperty.call(EVENT_INFO, filter) ? filter : 'all';
+    document.querySelectorAll('[data-activity-filter]').forEach(button =>
+      button.classList.toggle('on', button.dataset.activityFilter === activityFilter));
+    paintActivity();
+  }
+
+  function paintActivity() {
+    const box = document.getElementById('activityRows');
+    if (!box) return;
+    const visible = activityFilter === 'all'
+      ? activityEvents
+      : activityEvents.filter(event => event.event === activityFilter);
+    const count = document.getElementById('activityCount');
+    if (count) count.textContent = `${visible.length} ${visible.length === 1 ? 'event' : 'events'}`;
+    if (!visible.length) {
+      const label = activityFilter === 'all' ? 'activity' : activityFilter + ' activity';
+      box.innerHTML = `<div class="empty"><h4>No ${escapeHtml(label)} yet</h4><p>Matching voucher events will appear here as they happen.</p></div>`;
+      return;
+    }
+    box.innerHTML = visible.map(e => {
+      const info = EVENT_INFO[e.event] || { verb: e.event, cls: '', mark: '·' };
+      const date = new Date(e.created_at * 1000);
+      return `
+        <div class="activity-row">
+          <div class="activity-mark ${info.cls}" aria-hidden="true">${info.mark}</div>
+          <div class="activity-copy">
+            <div><b>${escapeHtml(e.actor_name)}</b> ${info.verb}</div>
+            <div class="document">${escapeHtml(e.supplier_name)} · Invoice ${escapeHtml(e.invoice_number)}</div>
+            ${e.note ? `<div class="note">Reason: ${escapeHtml(e.note)}</div>` : ''}
+          </div>
+          <time class="when" datetime="${date.toISOString()}">${escapeHtml(date.toLocaleString())}</time>
+        </div>`;
+    }).join('');
+  }
 
   async function renderActivity() {
     const box = document.getElementById('activityRows');
     if (!box) return;
-    let events;
     try {
       const res = await fetch('/api/activity', { credentials: 'same-origin' });
-      events = (await res.json()).events || [];
+      if (!res.ok) throw new Error('Activity request failed');
+      activityEvents = (await res.json()).events || [];
     } catch {
       box.innerHTML = '<div class="empty"><h4>Could not load activity.</h4></div>';
       return;
     }
-    if (!events.length) {
-      box.innerHTML = '<div class="empty"><h4>No activity yet</h4><p>Every prepare, submit, approve and reject will show up here as it happens.</p></div>';
-      return;
-    }
-    box.innerHTML = events.map(e => {
-      const info = EVENT_INFO[e.event] || { verb: e.event, cls: '' };
-      const when = new Date(e.created_at * 1000).toLocaleString();
-      return `
-        <div class="activity-row">
-          <div class="activity-dot ${info.cls}"></div>
-          <div>
-            <div><b>${escapeHtml(e.actor_name)}</b> ${info.verb} ${escapeHtml(e.supplier_name)} — ${escapeHtml(e.invoice_number)}${e.note ? `: ${escapeHtml(e.note)}` : ''}</div>
-            <div class="when">${when}</div>
-          </div>
-        </div>
-      `;
-    }).join('');
+    paintActivity();
   }
 
   // -------------------------------------------------------- instructions
