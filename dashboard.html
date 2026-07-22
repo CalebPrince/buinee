@@ -862,12 +862,25 @@
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
   const triageAnalyses = new Map();
 
-  function go(view) {
+  function go(view, { syncUrl = true, replace = false } = {}) {
+    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)
+        || (view === 'team' && myRole !== 'finance_supervisor')) {
+      view = 'overview';
+    }
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === view));
     document.getElementById('crumbView').textContent = CRUMB_NAMES[view] || 'Overview';
     if (view === 'triage' && !triageMessages.length) loadTriage();
+    if (syncUrl) {
+      const url = new URL(location.href);
+      url.hash = view;
+      history[replace ? 'replaceState' : 'pushState']({ view }, '', url);
+    }
   }
+
+  window.addEventListener('popstate', () => {
+    go(location.hash.slice(1) || 'overview', { syncUrl: false });
+  });
 
   function initials(name) {
     return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -988,8 +1001,7 @@
     loadInstructions();
 
     document.getElementById('loading').style.display = 'none';
-    go('overview');
-    document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== 'overview');
+    go(location.hash.slice(1) || 'overview', { replace: true });
   }
 
   // ------------------------------------------------------- connected mailbox
