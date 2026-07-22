@@ -34,6 +34,8 @@ explains, code computes.
 from __future__ import annotations
 
 import email.utils
+import base64
+import binascii
 import json
 import os
 import re
@@ -438,7 +440,7 @@ def run_automation(user_id: int, recipe_key: str) -> dict:
 
     items = providers.triage(
         provider, model, cfg.get(PROVIDER_KEYS[provider], ""), emails,
-        briefing=pub["company"].get("briefing", ""),
+        briefing=effective_briefing(pub),
     )
     db.increment_chat_usage(user["company_id"])
     if recipe_key == "morning_triage":
@@ -461,7 +463,8 @@ def run_automation(user_id: int, recipe_key: str) -> dict:
         provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
         "Cross-check these incoming invoices against the voucher digest. List exact matches, missing vouchers, and any conflicting supplier, reference, or amount. Do not invent a match.",
         digest, [], system=build_chat_system(pub),
-        briefing=pub["company"].get("briefing", ""), docs=docs,
+        briefing=effective_briefing(pub, include_library_text=False),
+        docs=(docs + user_reference_docs(user["id"]))[:10],
     )
     db.increment_chat_usage(user["company_id"])
     return {"headline": f"{len(invoices)} invoice(s) checked", "summary": comparison, "items": invoices}
@@ -480,6 +483,33 @@ def build_chat_system(user: dict) -> str:
         "can see in the product - do not tell them a voucher exists that "
         "isn't listed, and do not assume they can see more than this."
     )
+
+
+def effective_briefing(user: dict, include_library_text: bool = True) -> str:
+    parts = []
+    company_text = (user.get("company") or {}).get("briefing", "").strip()
+    personal_text = db.get_user_instructions(user["id"]).strip()
+    if company_text:
+        parts.append("## Company instructions\n" + company_text)
+    if personal_text:
+        parts.append("## Personal instructions for this user\n" + personal_text)
+    if include_library_text:
+        docs = db.list_reference_documents(user["id"], include_content=True)
+        text_docs = [f"### {d['name']}\n{d['text_content']}" for d in docs if d["kind"] == "text" and d["text_content"]]
+        if text_docs:
+            parts.append("## Personal reference documents\n" + "\n\n".join(text_docs)[:30000])
+    return "\n\n".join(parts)
+
+
+def user_reference_docs(user_id: int) -> list[dict]:
+    out = []
+    for doc in db.list_reference_documents(user_id, include_content=True):
+        if doc["kind"] == "text":
+            out.append({"kind": "text", "source": "library", "name": doc["name"], "text": doc["text_content"]})
+        elif doc["data_base64"]:
+            out.append({"kind": doc["kind"], "source": "library", "name": doc["name"],
+                        "media_type": doc["media_type"], "data": doc["data_base64"]})
+    return out
 
 
 # ----------------------------------------------------------- the demo itself
@@ -663,6 +693,18 @@ class RouteHandlerMixin:
                 "saved": {"provider": company["model_provider"], "model": company["model_model"] or ""},
             })
 
+        if path == "/api/user/instructions":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"briefing": db.get_user_instructions(user["id"])})
+
+        if path == "/api/user/reference-documents":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"documents": db.list_reference_documents(user["id"])})
+
         if path == "/api/company/chat-usage":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -796,6 +838,9 @@ class RouteHandlerMixin:
             "/api/company/approve": self._handle_approve,
             "/api/company/set-model": self._handle_set_company_model,
             "/api/company/briefing": self._handle_set_company_briefing,
+            "/api/user/instructions": self._handle_set_user_instructions,
+            "/api/user/reference-documents/upload": self._handle_reference_upload,
+            "/api/user/reference-documents/delete": self._handle_reference_delete,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
             "/api/vouchers/review": self._handle_voucher_review,
@@ -1094,7 +1139,7 @@ class RouteHandlerMixin:
         try:
             items = providers.triage(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
-                [email_input], briefing=pub["company"].get("briefing", ""),
+                [email_input], briefing=effective_briefing(pub),
             )
         except providers.ProviderError as exc:
             return self._json({"error": str(exc)}, 502)
@@ -1224,6 +1269,63 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "company": company})
+
+    def _handle_set_user_instructions(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=16000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        db.set_user_instructions(user["id"], str(req.get("briefing") or ""))
+        return self._json({"ok": True, "briefing": db.get_user_instructions(user["id"])})
+
+    def _handle_reference_upload(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=8 * 1024 * 1024)
+            name = Path(str(req.get("name") or "document")).name[:160]
+            media_type = str(req.get("media_type") or "").lower()
+            text_content = str(req.get("text") or "")
+            data_base64 = str(req.get("data") or "")
+            if media_type in ("text/plain", "text/markdown", "text/csv"):
+                kind, data_base64 = "text", ""
+                size_bytes = len(text_content.encode("utf-8"))
+                text_content = text_content[:100000]
+            elif media_type == "application/pdf" or media_type.startswith("image/"):
+                kind = "pdf" if media_type == "application/pdf" else "image"
+                if media_type not in ("application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"):
+                    raise ValueError("That image type is not supported.")
+                raw = base64.b64decode(data_base64, validate=True)
+                size_bytes = len(raw)
+                text_content = ""
+            else:
+                raise ValueError("Use TXT, Markdown, CSV, PDF, PNG, JPEG, WebP, or GIF.")
+            if size_bytes <= 0 or size_bytes > 5 * 1024 * 1024:
+                raise ValueError("Each reference document must be between 1 byte and 5 MB.")
+            document = db.add_reference_document(
+                user["id"], name, kind, media_type, text_content, data_base64, size_bytes,
+            )
+        except (ValueError, binascii.Error, db.AuthError) as exc:
+            return self._json({"error": str(exc) or "Could not upload that document."}, 400)
+        except Exception:
+            return self._json({"error": "Bad upload."}, 400)
+        return self._json({"ok": True, "document": document})
+
+    def _handle_reference_delete(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            document_id = int(self._body().get("document_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        if not db.delete_reference_document(user["id"], document_id):
+            return self._json({"error": "Document not found."}, 404)
+        return self._json({"ok": True})
 
     # ------------------------------------------------------------ vouchers
 
@@ -1371,7 +1473,8 @@ class RouteHandlerMixin:
             reply = providers.chat(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, digest, history, system=build_chat_system(pub),
-                briefing=pub["company"].get("briefing", ""), docs=docs or None,
+                briefing=effective_briefing(pub, include_library_text=False),
+                docs=(user_reference_docs(user["id"]) + docs) or None,
             )
         except providers.ProviderError as exc:
             return self._json({"error": str(exc)}, 502)

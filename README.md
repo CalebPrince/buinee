@@ -356,9 +356,13 @@ switched client-side with no page reload:
   a voucher and when. `list_activity`/`/api/activity`. Existing vouchers
   created before this table existed have no history, honestly - nothing was
   backfilled or invented for them.
-- **Instructions** (visible to everyone, editable by Supervisor only,
-  read-only for other roles) — two real settings that change Chat's actual
-  behaviour for the whole company:
+- **Instructions** separates shared governance from each person's working
+  context. The company provider and briefing remain Supervisor-only; every
+  approved user can save private personal instructions and a private reference
+  library (10 files, 25 MB total, 5 MB each). Text/Markdown/CSV fold into
+  prompts; PDF and supported images are passed natively to models that accept
+  them. Every document query is scoped by `user_id`, so company role does not
+  grant access to somebody else's files:
   - **AI provider** - a per-company preference among whichever providers
     have a key configured on this deployment (`db.set_company_model`,
     `/api/company/model-options`, `/api/company/set-model`). Falls back to
@@ -374,6 +378,11 @@ switched client-side with no page reload:
     at the company via `providers.with_briefing` (`db.set_company_briefing`,
     `/api/company/briefing`) - policies, terminology, tone. Cannot switch off
     Chat's grounding/safety rules, only add context on top of them.
+  - **Personal instructions and documents** - `user_instructions` and
+    `reference_documents` in SQLite, managed through `/api/user/instructions`
+    and `/api/user/reference-documents/*`. Personal instructions and text
+    references also inform mailbox triage and automations; the full private
+    library is available in Ask Ada.
 - **Team** (Supervisor only, nav item hidden otherwise) — the full
   roster and the real pending-approval queue with working Approve/Reject,
   moved off Overview into its own page. The nav item carries a live count

@@ -284,6 +284,28 @@ def init_db() -> None:
                 finished_at REAL
             );
 
+            CREATE TABLE IF NOT EXISTS user_instructions (
+                user_id     INTEGER PRIMARY KEY REFERENCES users(id),
+                briefing    TEXT NOT NULL DEFAULT '',
+                updated_at  REAL NOT NULL
+            );
+
+            -- Private reference library. Text is stored as text; PDFs/images
+            -- are base64 so they can be passed natively to supported models.
+            -- Every query is scoped by user_id: company role does not grant
+            -- access to another person's working documents.
+            CREATE TABLE IF NOT EXISTS reference_documents (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id),
+                name        TEXT NOT NULL,
+                kind        TEXT NOT NULL,
+                media_type  TEXT NOT NULL DEFAULT 'text/plain',
+                text_content TEXT NOT NULL DEFAULT '',
+                data_base64 TEXT NOT NULL DEFAULT '',
+                size_bytes  INTEGER NOT NULL,
+                created_at  REAL NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
@@ -291,6 +313,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_voucher_events_company ON voucher_events(company_id);
             CREATE INDEX IF NOT EXISTS idx_automation_due ON automation_settings(enabled, next_run_at);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_user ON automation_runs(user_id, started_at);
+            CREATE INDEX IF NOT EXISTS idx_reference_documents_user ON reference_documents(user_id, created_at);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1447,6 +1470,57 @@ def reject_voucher(company_id: int, approver_id: int, voucher_id: int, reason: s
         )
         _log_event(conn, voucher_id, company_id, approver_id, "rejected", reason, now)
     return get_voucher(voucher_id)
+
+
+def get_user_instructions(user_id: int) -> str:
+    with _cursor() as conn:
+        row = conn.execute("SELECT briefing FROM user_instructions WHERE user_id = ?", (user_id,)).fetchone()
+    return row["briefing"] if row else ""
+
+
+def set_user_instructions(user_id: int, briefing: str) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO user_instructions (user_id, briefing, updated_at) VALUES (?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET briefing = excluded.briefing,
+               updated_at = excluded.updated_at""",
+            (user_id, briefing[:12000], time.time()),
+        )
+
+
+def list_reference_documents(user_id: int, include_content: bool = False) -> list[dict]:
+    columns = "*" if include_content else "id, user_id, name, kind, media_type, size_bytes, created_at"
+    with _cursor() as conn:
+        rows = conn.execute(
+            f"SELECT {columns} FROM reference_documents WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def add_reference_document(user_id: int, name: str, kind: str, media_type: str,
+                           text_content: str, data_base64: str, size_bytes: int) -> dict:
+    with _cursor() as conn:
+        count = conn.execute("SELECT COUNT(*) AS n FROM reference_documents WHERE user_id = ?", (user_id,)).fetchone()["n"]
+        total = conn.execute("SELECT COALESCE(SUM(size_bytes), 0) AS n FROM reference_documents WHERE user_id = ?", (user_id,)).fetchone()["n"]
+        if count >= 10:
+            raise AuthError("Your reference library is limited to 10 documents.")
+        if total + size_bytes > 25 * 1024 * 1024:
+            raise AuthError("Your reference library is limited to 25 MB.")
+        cur = conn.execute(
+            """INSERT INTO reference_documents
+               (user_id, name, kind, media_type, text_content, data_base64, size_bytes, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, name[:160], kind, media_type, text_content, data_base64, size_bytes, time.time()),
+        )
+        doc_id = cur.lastrowid
+    return next(row for row in list_reference_documents(user_id) if row["id"] == doc_id)
+
+
+def delete_reference_document(user_id: int, document_id: int) -> bool:
+    with _cursor() as conn:
+        cur = conn.execute("DELETE FROM reference_documents WHERE id = ? AND user_id = ?", (document_id, user_id))
+        return cur.rowcount > 0
 
 
 def automation_states(user_id: int) -> dict[str, dict]:

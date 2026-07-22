@@ -368,6 +368,18 @@
   .instruction-example:hover { border-color: var(--teal); color: var(--teal-deep); }
   .instruction-example b { display: block; margin-bottom: 2px; color: var(--ink); font-size: 11.5px; }
   .instruction-scope { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--ink-4); font-size: 11px; line-height: 1.55; }
+  .personal-context { margin-top: 16px; }
+  .personal-context .settings-sec { padding: 19px 20px; }
+  #personalBriefingInput { width: 100%; min-height: 190px; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: 12.5px/1.7 var(--mono); resize: vertical; }
+  .reference-drop { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 22px; border: 1px dashed var(--line-strong); border-radius: 11px; background: var(--surface-2); color: var(--ink-3); text-align: center; cursor: pointer; }
+  .reference-drop:hover { border-color: var(--teal); color: var(--teal-deep); }
+  .reference-drop svg { width: 22px; height: 22px; }
+  .reference-drop small { color: var(--ink-4); }
+  .reference-list { margin-top: 12px; }
+  .reference-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .reference-row:last-child { border-bottom: 0; }
+  .reference-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 650; }
+  .reference-meta { color: var(--ink-4); font: 10.5px var(--mono); white-space: nowrap; }
   select {
     padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface);
     color: var(--ink); font-size: 13.5px; font-family: inherit;
@@ -842,15 +854,39 @@ Do not promise a payment date unless it has already been approved."></textarea>
         </div>
         <aside class="card instruction-tips">
           <h3>Useful things to include</h3>
-          <p>Supervisors can click an example to add it to the briefing, then edit the details.</p>
+          <p>Click an example to add it to your personal instructions, then replace the placeholders.</p>
           <div class="instruction-examples">
             <button class="instruction-example" type="button" onclick="addInstructionExample('approval')"><b>Approval thresholds</b>Who approves what, and at which amount.</button>
             <button class="instruction-example" type="button" onclick="addInstructionExample('documents')"><b>Required documents</b>POs, invoices, receipts, and references to check.</button>
             <button class="instruction-example" type="button" onclick="addInstructionExample('vendors')"><b>Vendor rules</b>Known senders, naming conventions, and exceptions.</button>
             <button class="instruction-example" type="button" onclick="addInstructionExample('tone')"><b>Reply style</b>How firm, formal, or concise drafts should be.</button>
           </div>
-          <div class="instruction-scope">Only a Supervisor can change company-wide instructions. Ada still grounds voucher facts in records visible to the signed-in user.</div>
+          <div class="instruction-scope">Company instructions are Supervisor-controlled. Personal instructions and documents remain private to each user. Ada still grounds voucher facts in records visible to the signed-in user.</div>
         </aside>
+      </div>
+      <div class="card full personal-context">
+        <div class="settings-sec">
+          <h3>My instructions</h3>
+          <p class="sub">Private working context for your role and responsibilities. These instructions apply only when Ada works for you, and every approved user can maintain their own.</p>
+          <form id="personalBriefingForm" onsubmit="return savePersonalBriefing(event)">
+            <textarea id="personalBriefingInput" spellcheck="true" placeholder="Example: I prepare supplier vouchers and handle follow-ups for overdue supporting documents. Keep my drafts concise and flag anything waiting more than three business days."></textarea>
+            <div class="msg-error" id="personalBriefingErr" style="display:none; margin-top:10px"></div>
+            <div class="msg-ok" id="personalBriefingOk" style="display:none; margin-top:10px"></div>
+            <button class="btn primary sm" type="submit" style="margin-top:10px">Save my instructions</button>
+          </form>
+        </div>
+        <div class="settings-sec">
+          <h3>My reference documents</h3>
+          <p class="sub">Private templates, policies, and samples Ada can use whenever she works for you. Up to 10 files and 25 MB total.</p>
+          <button class="reference-drop" type="button" onclick="document.getElementById('referenceFileInput').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>
+            <span>Choose reference documents</span>
+            <small>TXT, Markdown, CSV, PDF, PNG, JPEG, WebP, or GIF · 5 MB each</small>
+          </button>
+          <input type="file" id="referenceFileInput" accept=".txt,.md,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif" multiple hidden onchange="uploadReferenceFiles(event)">
+          <div class="msg-error" id="referenceErr" style="display:none; margin-top:10px"></div>
+          <div class="reference-list" id="referenceList"></div>
+        </div>
       </div>
     </section>
 
@@ -1930,8 +1966,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
   };
 
   function addInstructionExample(kind) {
-    const input = document.getElementById('briefingInput');
-    if (!input || input.closest('form').hidden || !INSTRUCTION_EXAMPLES[kind]) return;
+    const input = document.getElementById('personalBriefingInput');
+    if (!input || !INSTRUCTION_EXAMPLES[kind]) return;
     input.value = input.value.trim()
       ? `${input.value.trim()}\n\n${INSTRUCTION_EXAMPLES[kind]}`
       : INSTRUCTION_EXAMPLES[kind];
@@ -1957,10 +1993,6 @@ Do not promise a payment date unless it has already been approved."></textarea>
     }
 
     const isSupervisor = me.role === 'finance_supervisor';
-    document.querySelectorAll('.instruction-example').forEach(button => {
-      button.disabled = !isSupervisor;
-      button.title = isSupervisor ? 'Add this example' : 'Only a Supervisor can edit company instructions';
-    });
 
     if (isSupervisor) {
       provReadonly.hidden = true;
@@ -2002,6 +2034,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
         ? me.company.briefing
         : 'No custom instructions set yet. Only a Supervisor can add them.';
     }
+    loadPersonalContext();
   }
 
   async function saveProvider(ev) {
@@ -2059,6 +2092,118 @@ Do not promise a payment date unless it has already been approved."></textarea>
       errEl.style.display = 'block';
     }
     return false;
+  }
+
+  async function loadPersonalContext() {
+    try {
+      const instructionsRes = await fetch('/api/user/instructions', { credentials: 'same-origin' });
+      if (instructionsRes.ok) {
+        document.getElementById('personalBriefingInput').value = (await instructionsRes.json()).briefing || '';
+      }
+      await loadReferenceDocuments();
+    } catch {
+      const err = document.getElementById('referenceErr');
+      err.textContent = 'Could not load your reference library.';
+      err.style.display = 'block';
+    }
+  }
+
+  async function loadReferenceDocuments() {
+    const res = await fetch('/api/user/reference-documents', { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Could not load reference documents.');
+    renderReferenceDocuments((await res.json()).documents || []);
+  }
+
+  async function savePersonalBriefing(ev) {
+    ev.preventDefault();
+    const err = document.getElementById('personalBriefingErr');
+    const ok = document.getElementById('personalBriefingOk');
+    err.style.display = 'none'; ok.style.display = 'none';
+    try {
+      const res = await fetch('/api/user/instructions', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefing: document.getElementById('personalBriefingInput').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save.');
+      ok.textContent = 'Your instructions are saved.'; ok.style.display = 'block';
+    } catch (error) {
+      err.textContent = error.message || 'Could not reach the server.'; err.style.display = 'block';
+    }
+    return false;
+  }
+
+  function referenceMediaType(file) {
+    if (file.type) return file.type;
+    const ext = file.name.split('.').pop().toLowerCase();
+    return ({ txt: 'text/plain', md: 'text/markdown', csv: 'text/csv', pdf: 'application/pdf',
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' })[ext] || '';
+  }
+
+  function readReferenceFile(file, asText) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+      asText ? reader.readAsText(file) : reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadReferenceFiles(ev) {
+    const files = [...ev.target.files];
+    ev.target.value = '';
+    const err = document.getElementById('referenceErr');
+    err.style.display = 'none';
+    for (const file of files) {
+      try {
+        if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than 5 MB.`);
+        const mediaType = referenceMediaType(file);
+        const isText = ['text/plain', 'text/markdown', 'text/csv'].includes(mediaType);
+        const content = await readReferenceFile(file, isText);
+        const payload = { name: file.name, media_type: mediaType };
+        if (isText) payload.text = content;
+        else payload.data = content.includes(',') ? content.split(',', 2)[1] : '';
+        const res = await fetch('/api/user/reference-documents/upload', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Could not upload ${file.name}.`);
+      } catch (error) {
+        err.textContent = error.message || 'Could not upload that document.';
+        err.style.display = 'block';
+        break;
+      }
+    }
+    await loadReferenceDocuments();
+  }
+
+  function formatFileSize(bytes) {
+    return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function renderReferenceDocuments(documents) {
+    const box = document.getElementById('referenceList');
+    box.innerHTML = documents.length ? documents.map(doc => `
+      <div class="reference-row">
+        <div class="reference-name" title="${escapeHtml(doc.name)}">${escapeHtml(doc.name)}</div>
+        <span class="reference-meta">${escapeHtml(doc.kind.toUpperCase())} · ${formatFileSize(doc.size_bytes)}</span>
+        <button class="btn sm" type="button" onclick="deleteReferenceDocument(${doc.id}, '${escapeHtml(doc.name).replace(/'/g, '&#39;')}')">Remove</button>
+      </div>`).join('') : '<div class="readonly-note">No personal reference documents uploaded yet.</div>';
+  }
+
+  async function deleteReferenceDocument(documentId, name) {
+    if (!confirm(`Remove ${name} from your reference library?`)) return;
+    try {
+      const res = await fetch('/api/user/reference-documents/delete', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ document_id: documentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not remove the document.');
+      await loadReferenceDocuments();
+    } catch (error) { alert(error.message || 'Could not reach the server.'); }
   }
 
   // ------------------------------------------------------------------- chat
