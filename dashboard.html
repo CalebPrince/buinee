@@ -426,6 +426,23 @@
   @keyframes blink { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
   @media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .55; } }
 
+  /* Automation recipes read like a quiet operations schedule. */
+  .automation-intro { max-width: 650px; }
+  .automation-note { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--ochre); border-radius: 11px; background: var(--ochre-soft); color: var(--ink-2); font-size: 12.5px; line-height: 1.55; }
+  .automation-note b { color: var(--ochre); }
+  .automation-note-mark { width: 23px; height: 23px; flex: none; display: grid; place-items: center; border-radius: 7px; background: var(--ochre); color: #fff; font-size: 11px; font-weight: 800; }
+  .autos { display: flex; flex-direction: column; gap: 10px; }
+  .auto { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+  .auto-ico { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 11px; background: var(--teal-soft); color: var(--teal-deep); }
+  .auto-ico svg { width: 19px; height: 19px; }
+  .auto-copy { min-width: 0; }
+  .auto-copy .t { color: var(--ink); font-size: 14px; font-weight: 700; }
+  .auto-copy .m { max-width: 62ch; margin-top: 3px; color: var(--ink-3); font-size: 12.5px; line-height: 1.45; }
+  .auto-when { min-width: 92px; text-align: right; }
+  .auto-when .c { color: var(--ink-2); font: 11.5px var(--mono); }
+  .auto-when .l { margin-top: 3px; color: var(--ink-4); font-size: 10.5px; }
+  .auto-status { min-width: 82px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface-2); color: var(--ink-4); font-size: 10.5px; font-weight: 750; text-align: center; white-space: nowrap; }
+
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; }
     .rail { display: none; }
@@ -436,6 +453,9 @@
     .ada-composer { padding: 12px 14px 16px; }
     .ada-starters { grid-template-columns: 1fr; }
     .ada-msg .bub { max-width: calc(100% - 39px); }
+    .auto { grid-template-columns: 42px minmax(0, 1fr) auto; align-items: start; }
+    .auto-when { grid-column: 2; text-align: left; }
+    .auto-status { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
   }
 </style>
 
@@ -685,21 +705,41 @@
     <!-- ===== AUTOMATIONS ===== -->
     <section class="view" data-view="automations" id="viewAutomations" hidden>
       <div class="hello">
-        <div>
+        <div class="automation-intro">
           <h1>Automations</h1>
-          <p>Rules that act on your mail and your vouchers without you touching them — once there's a real inbox to run them against.</p>
+          <p>Recurring jobs Ada can run across your mailbox and accounting workflow. Every automation stays off until you deliberately enable it.</p>
         </div>
+        <button class="btn primary" type="button" disabled title="Custom automations are coming soon">+ New automation</button>
       </div>
-      <div class="card full">
-        <div class="card-b">
-          <div class="empty">
-            <div class="ico">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
-            </div>
-            <h4>Nothing to automate yet</h4>
-            <p>Automations need a connected inbox first. Once that's built (see "Connected" in the sidebar), the plan is to triage the whole inbox the way <code>outlook-agent</code> does today — not just invoices: sort correspondence, draft replies, and flag anything accounting-relevant (an invoice, a payment letter, a receipt) so it can become a voucher without retyping it. Nothing here is wired up yet.</p>
-          </div>
-        </div>
+      <div class="automation-note">
+        <span class="automation-note-mark">i</span>
+        <span><b>Preview only.</b> These recipes are ready for review, but scheduling and mailbox actions are not enabled yet. Nothing will run or change your mailbox from this page.</span>
+      </div>
+      <div class="autos">
+        <article class="auto">
+          <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
+          <div class="auto-copy"><div class="t">Morning triage &amp; brief</div><div class="m">Read overnight mail, categorize it, draft replies, and list what needs your attention.</div></div>
+          <div class="auto-when"><div class="c">06:30</div><div class="l">Weekdays</div></div>
+          <span class="auto-status">Coming soon</span>
+        </article>
+        <article class="auto">
+          <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="auto-copy"><div class="t">Invoice cross-check</div><div class="m">Match incoming invoices against the ledger and flag amounts, vendors, or references that do not agree.</div></div>
+          <div class="auto-when"><div class="c">On arrival</div><div class="l">Real-time</div></div>
+          <span class="auto-status">Coming soon</span>
+        </article>
+        <article class="auto">
+          <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 3 3 9-3 9 19-9Z"/></svg></div>
+          <div class="auto-copy"><div class="t">Auto-file FYI &amp; newsletters</div><div class="m">Move clearly low-priority mail out of the inbox into a Read later folder.</div></div>
+          <div class="auto-when"><div class="c">Continuous</div><div class="l">As mail arrives</div></div>
+          <span class="auto-status">Coming soon</span>
+        </article>
+        <article class="auto">
+          <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+          <div class="auto-copy"><div class="t">Weekly summary to accounting</div><div class="m">Prepare a digest of open invoices, disputes, due dates, and items waiting for approval.</div></div>
+          <div class="auto-when"><div class="c">Fri 16:00</div><div class="l">Weekly</div></div>
+          <span class="auto-status">Coming soon</span>
+        </article>
       </div>
     </section>
 
