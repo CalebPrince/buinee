@@ -308,10 +308,9 @@
 
   let lastCompanies = [];
 
-  // A solo workspace is permanently "1/1 users", so showing it as a seat
-  // count reads like a problem when it's just the plan working. What is
-  // worth shouting about is someone stuck waiting to join one, since only
-  // this page can move them onto a team plan.
+  // A solo workspace is permanently "1/1 users". Flag either somebody
+  // waiting to join or an Individual workspace that already has extra
+  // approved members, since only this page can correct the plan.
   function planSummary(c) {
     if (c.plan.audience !== 'individual') {
       const atLimit = c.approved_count >= c.plan.user_limit;
@@ -319,8 +318,9 @@
         (atLimit ? ' <span class="no-super">— at limit</span>' : '');
     }
     if (!c.needs_team_plan) return '(one person)';
-    return `(one person) <span class="no-super">— ${c.pending_count} waiting to join, ` +
-      'needs a team plan</span>';
+    const approved = c.approved_count > 1 ? `${c.approved_count} approved` : 'one approved';
+    const waiting = c.pending_count ? ` + ${c.pending_count} waiting` : '';
+    return `(${approved}${waiting}) <span class="no-super">— move to a Team tier</span>`;
   }
 
   function renderCompanies(companies) {

@@ -617,9 +617,10 @@ not an edge case. What happens when the second person turns up:
    banner says the same thing, and only mentions it once someone is actually
    waiting — a solo workspace is permanently "1 of 1 users", so counting
    seats at someone working alone would just be nagging.
-4. **You move them.** `admin-companies.html` flags the company as *"N waiting
-   to join, needs a team plan"* (`needs_team_plan` — an individual plan with
-   pending requests), and the existing Change plan dropdown does the move.
+4. **You move them.** `admin-companies.html` flags the company as needing a
+   Team tier (`needs_team_plan`) when an Individual plan has pending requests
+   **or already contains more than one approved member**. The existing Change
+   plan dropdown does the move.
    Deliberately not automatic: Solo Pro → Starter doubles what they pay, and
    Solo Pro → team Free would cut their bill *and* silently take away the AI
    assistant. Nothing changes what someone is billed without a human

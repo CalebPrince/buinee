@@ -1310,10 +1310,11 @@ def list_companies_with_stats() -> list[dict]:
                     "user_limit": c["plan_user_limit"],
                     "audience": c["plan_audience"],
                 },
-                # Someone started alone, then somebody asked to join them.
-                # They can't approve it and can't move themselves - this is
-                # the flag that says the Command Center has to act.
-                "needs_team_plan": c["plan_audience"] == "individual" and len(pending) > 0,
+                # Individual plans are single-user workspaces. Flag both a
+                # pending join and legacy/imported data that already has more
+                # than one approved member so the Command Center can correct it.
+                "needs_team_plan": c["plan_audience"] == "individual"
+                                   and (len(team) > 1 or len(pending) > 0),
             })
     return out
 

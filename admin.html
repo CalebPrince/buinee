@@ -310,7 +310,7 @@
     const planBlocks = companies.filter(company => company.needs_team_plan).length;
     const systemWarnings = [!system.demo_agent_configured, !system.fx_rates_loaded].filter(Boolean).length;
     if (pending) alerts.push({ n: pending, title: 'Pending access requests', copy: 'Across all companies', href: '/admin-companies.html' });
-    if (planBlocks) alerts.push({ n: planBlocks, title: 'Plan-blocked teams', copy: 'Requests waiting on a team plan', href: '/admin-companies.html' });
+    if (planBlocks) alerts.push({ n: planBlocks, title: 'Move to a Team tier', copy: 'Multi-user companies still on Individual', href: '/admin-companies.html' });
     if (missingSupervisors) alerts.push({ n: missingSupervisors, title: 'No supervisor assigned', copy: 'Companies without an approver', href: '/admin-companies.html' });
     if (systemWarnings) alerts.push({ n: systemWarnings, title: 'System setup warnings', copy: 'Configuration needs attention', href: '#systemRows' });
     const total = alerts.reduce((sum, alert) => sum + alert.n, 0);
