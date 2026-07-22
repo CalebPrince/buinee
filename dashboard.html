@@ -1147,24 +1147,24 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
 <div class="imap-back" id="imapBack">
   <div class="imap-card" role="dialog" aria-modal="true" aria-labelledby="imapTitle">
-    <h3 id="imapTitle">Connect a mailbox</h3>
-    <p class="sub">Works with company mail, Zoho, Fastmail, Yahoo — anything that speaks IMAP.</p>
+    <h3 id="imapTitle">Connect webmail with IMAP</h3>
+    <p class="sub">For cPanel webmail and providers such as Zoho, Fastmail and Yahoo. You can find these details under <b>Connect Devices</b> in cPanel Email Accounts.</p>
     <div class="imap-err" id="imapError"></div>
     <form onsubmit="return submitImap(event)">
       <label>Email address
         <input type="email" id="imapEmail" required autocomplete="email" placeholder="you@company.com">
       </label>
       <div class="imap-row">
-        <label>IMAP server
-          <input type="text" id="imapHost" required autocomplete="off" placeholder="mail.company.com">
+        <label>Incoming server (IMAP)
+          <input type="text" id="imapHost" required autocomplete="off" placeholder="mail.yourdomain.com">
         </label>
         <label>Port
           <input type="number" id="imapPort" value="993" min="1" max="65535">
         </label>
       </div>
       <label>Password
-        <input type="password" id="imapPassword" required autocomplete="off" placeholder="Mailbox password">
-        <span class="hint">If the account uses two-factor authentication, create an app password for Buinee instead of using your normal one.</span>
+        <input type="password" id="imapPassword" required autocomplete="off" placeholder="Mailbox or app password">
+        <span class="hint">Buinee uses encrypted SSL IMAP (usually port 993). The password is encrypted before storage. If two-factor authentication is enabled, use an app password.</span>
       </label>
       <div class="imap-actions">
         <button class="btn" type="button" onclick="closeImap()">Cancel</button>
@@ -2136,7 +2136,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
         const icon = sourceIcon(p.id);
         const detail = p.id === 'microsoft' ? 'Outlook and Microsoft 365'
           : p.id === 'google' ? 'Gmail and Google Workspace'
-          : 'Company mail, Zoho, Fastmail and more';
+          : 'cPanel webmail and other SSL IMAP inboxes';
         return `<button class="source-option" type="button" onclick="connectMailbox('${p.id}')">
           <span class="source-option-icon ${icon[1]}">${icon[0]}</span>
           <span class="source-option-copy"><b>${escapeHtml(p.label)}</b><span>${detail}</span></span>

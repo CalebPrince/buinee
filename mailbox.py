@@ -49,7 +49,7 @@ PROVIDERS = ("microsoft", "google", "imap")
 LABELS = {
     "microsoft": "Outlook / Microsoft 365",
     "google": "Gmail / Google Workspace",
-    "imap": "Other mailbox (IMAP)",
+    "imap": "Webmail / IMAP",
 }
 
 
