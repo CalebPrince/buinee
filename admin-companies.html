@@ -357,7 +357,7 @@
           <div class="plan-change" onclick="event.stopPropagation()">
             <label for="planSelect-${c.id}">Change plan</label>
             <select id="planSelect-${c.id}">
-              ${allPlans.map(p => `<option value="${p.id}" ${p.id === c.plan.id ? 'selected' : ''}>${escapeHtml(p.name)} (${p.user_limit} users) — ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}
+              ${allPlans.map(p => `<option value="${p.id}" ${p.id === c.plan.id ? 'selected' : ''}>${p.audience === 'individual' ? 'Individual' : 'Team'} — ${escapeHtml(p.name)} (${p.user_limit} ${p.user_limit === 1 ? 'user' : 'users'}) — ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}
             </select>
             <button class="btn sm" onclick="changePlan(${c.id})">Move</button>
             <span class="msg error" id="planError-${c.id}" style="display:inline-block;margin:0"></span>

@@ -547,7 +547,9 @@ Where this is surfaced:
 - **`admin-companies.html`** — each company's card shows its plan name and
   `used/limit`, with an "— at limit" note once it's reached. Solo workspaces
   show "(one person)" instead of a seat count, and gain a "needs a team plan"
-  flag once somebody is waiting to join one.
+  flag once somebody is waiting to join one or more than one member is already
+  approved. The Change plan dropdown prefixes every option with **Individual**
+  or **Team**, so similarly named tiers cannot be confused.
 - **`admin.html` Overview** — the condensed recent-signups cards show
   `used/limit` in place of a bare count.
 - **`dashboard.html` Team view** — a Supervisor sees a plan banner
