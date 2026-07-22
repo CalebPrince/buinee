@@ -928,3 +928,17 @@
 
   main();
 </script>
+<style>.admin-nav-icon{width:17px;height:17px;flex:0 0 17px;display:block}.side .nav a,.sidebar-nav a,.sidebar .nav a{display:flex;align-items:center;gap:10px}.side .nav a:before,.sidebar .nav a:before{content:none!important}</style><script>(()=>{const p={
+'/admin.html':'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+'/admin-reports.html':'<path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/>',
+'/admin-inbox.html':'<path d="M4 4h16v16H4zM4 14h4l2 3h4l2-3h4"/>',
+'/admin-companies.html':'<path d="M3 21h18M6 21V7h6v14M14 21V3h6v18"/>',
+'/admin-pipeline.html':'<path d="M4 5h16M7 12h10M10 19h4"/>',
+'/admin-payments.html':'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+'/admin-invoices.html':'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4"/>',
+'/admin-plans.html':'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7"/>',
+'/admin-team.html':'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+'/admin-activity.html':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+'/admin-errors.html':'<path d="M12 3 2 21h20L12 3zM12 9v5M12 18h.01"/>',
+'/admin-settings.html':'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',
+'/':'<path d="M14 3h7v7M10 14 21 3M21 14v7H3V3h7"/>'};document.querySelectorAll('aside nav a[href]').forEach(a=>{if(a.querySelector('svg'))return;let u=new URL(a.href,location.origin);let d=p[u.pathname];if(!d)return;let s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('class','admin-nav-icon');s.innerHTML=d;a.prepend(s)})})();</script>
