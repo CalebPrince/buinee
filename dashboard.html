@@ -893,6 +893,7 @@
       <div class="ada-chatwrap">
         <div class="ada-chat-scroll" id="chatScroll">
           <div class="ada-chat-inner">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn sm" type="button" onclick="clearAdaConversation()">Clear conversation</button></div>
             <div class="plan-banner" id="chatUsageBanner" hidden></div>
             <div class="ada-chat-log" id="chatLog"></div>
             <div class="ada-starters" id="adaStarters">
@@ -1318,6 +1319,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     myId = me.id;
     myRole = me.role;
     myName = me.name;
+    loadAdaConversation();
     teamChatAvailable = !!me.company.plan.team_chat_enabled;
     teamChatCompanyName = me.company.name;
     const savedConversation = localStorage.getItem(`buinee.teamConversation.${myId}`);
@@ -3009,6 +3011,31 @@ Do not promise a payment date unless it has already been approved."></textarea>
       .replace(/\n/g, '<br>');
   }
 
+  function adaConversationKey() {
+    return `buinee.adaConversation.${myId}`;
+  }
+
+  function loadAdaConversation() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(adaConversationKey()) || '[]');
+      chatHistory = Array.isArray(saved) ? saved.filter(item => item && ['user','assistant'].includes(item.role) && typeof item.content === 'string').slice(-50) : [];
+    } catch { chatHistory = []; }
+  }
+
+  function saveAdaConversation() {
+    if (!myId) return;
+    localStorage.setItem(adaConversationKey(), JSON.stringify(chatHistory.slice(-50)));
+  }
+
+  function clearAdaConversation() {
+    if (!confirm('Clear your conversation with Ada? This only removes your own saved Ada chat.')) return;
+    chatHistory = [];
+    pendingAttachments = [];
+    localStorage.removeItem(adaConversationKey());
+    renderChatAttachments();
+    renderChatLog();
+  }
+
   function renderChatLog() {
     const box = document.getElementById('chatLog');
     const first = (myName || '').split(/\s+/)[0] || 'there';
@@ -3073,6 +3100,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     const attachments = pendingAttachments.slice();
     const message = text || 'Please assess the attached document.';
     chatHistory.push({ role: 'user', content: message, docs: attachments.map(file => file.name) });
+    saveAdaConversation();
     input.value = '';
     autoGrowChat(input);
     pendingAttachments = [];
@@ -3095,9 +3123,11 @@ Do not promise a payment date unless it has already been approved."></textarea>
       });
       const data = await res.json();
       chatHistory.push({ role: 'assistant', content: res.ok ? data.reply : (data.error || 'Could not reach the assistant.') });
+      saveAdaConversation();
       if (res.ok || res.status === 402) checkChatUsage();
     } catch {
       chatHistory.push({ role: 'assistant', content: 'Could not reach the server.' });
+      saveAdaConversation();
     }
     renderChatLog();
     return false;
