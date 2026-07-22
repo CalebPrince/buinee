@@ -232,6 +232,7 @@ STATIC_PAGES = {
     "/admin/invoices": "admin-invoices.html",
     "/admin/login": "admin-login.html",
     "/admin/settings": "admin-settings.html",
+    "/admin/ada": "admin-ada.html",
 }
 
 LEGACY_PAGE_REDIRECTS = {
@@ -257,6 +258,7 @@ LEGACY_PAGE_REDIRECTS = {
     "/admin-invoices.html": "/admin/invoices",
     "/admin-login.html": "/admin/login",
     "/admin-settings.html": "/admin/settings",
+    "/admin-ada.html": "/admin/ada",
 }
 
 # --- public-endpoint limits ------------------------------------------------
@@ -614,6 +616,144 @@ def build_voucher_digest(vouchers: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------- admin chat digest
+#
+# Each section here mirrors the exact db call an existing role-gated GET
+# endpoint already uses (see _admin_role_request allow-lists on
+# /api/admin/{plans,pipeline,payments,activity,errors,inbox,invoices}) - a
+# Command Center role only gets a section in Ada's digest if that role can
+# already fetch the same data directly today.
+
+def _admin_companies_section(companies: list[dict]) -> str:
+    if not companies:
+        return "## Companies\nNo companies exist on the platform yet."
+    lines = [f"## Companies\n{len(companies)} compan(y/ies) on the platform:"]
+    for c in companies[:40]:
+        crm, plan, sub = c["crm"], c["plan"], c["subscription"]
+        line = (f"- {c['name']} — plan: {plan['name']}, lifecycle: {crm['lifecycle_status']}, "
+                f"team: {c['approved_count']} approved / {c['pending_count']} pending, "
+                f"subscription: {sub['subscription_status']} ({sub['payment_status']})")
+        if crm.get("relationship_owner"):
+            line += f", owner: {crm['relationship_owner']}"
+        if c.get("needs_team_plan"):
+            line += " — FLAGGED: needs a team plan"
+        lines.append(line)
+    if len(companies) > 40:
+        lines.append(f"...and {len(companies) - 40} more not listed here.")
+    return "\n".join(lines)
+
+
+def _admin_plans_section() -> str:
+    plans = db.list_plans()
+    if not plans:
+        return "## Plans\nNo plans are configured."
+    lines = ["## Plans"]
+    for p in plans:
+        lines.append(f"- {p['name']} ({p.get('audience', 'individual')}): "
+                      f"{p['currency']} {p['price']:,.2f}, up to {p['user_limit']} user(s)"
+                      + (" [default]" if p.get("is_default") else ""))
+    return "\n".join(lines)
+
+
+def _admin_payments_section() -> str:
+    payments = db.list_payments()
+    if not payments:
+        return "## Payments\nNo payments recorded yet."
+    lines = [f"## Payments\n{len(payments)} payment(s) recorded, most recent first:"]
+    for pay in payments[:20]:
+        lines.append(f"- {pay['company_name']}: {pay['currency']} {pay['amount_subunit'] / 100:,.2f}, "
+                      f"status: {pay['status']}, plan: {pay.get('plan_name', '')}")
+    if len(payments) > 20:
+        lines.append(f"...and {len(payments) - 20} more not listed here.")
+    return "\n".join(lines)
+
+
+def _admin_invoices_section() -> str:
+    invoices = db.list_admin_invoices()
+    if not invoices:
+        return "## Invoices\nNo invoices recorded yet."
+    lines = [f"## Invoices\n{len(invoices)} invoice(s), most recent first:"]
+    for inv in invoices[:20]:
+        lines.append(f"- {inv.get('invoice_number', '?')} for {inv.get('company_name', '?')}: "
+                      f"{inv.get('customer_name', '')}, total {inv.get('total', 0):,.2f}, "
+                      f"status: {inv.get('status', '')}")
+    if len(invoices) > 20:
+        lines.append(f"...and {len(invoices) - 20} more not listed here.")
+    return "\n".join(lines)
+
+
+def _admin_pipeline_section() -> str:
+    opportunities = db.list_crm_opportunities()
+    if not opportunities:
+        return "## Sales pipeline\nNo sales opportunities recorded yet."
+    lines = [f"## Sales pipeline\n{len(opportunities)} opportunity(ies):"]
+    for o in opportunities[:25]:
+        lines.append(f"- {o['name']} ({o['company_name']}): stage {o['stage']}, "
+                      f"{o['currency']} {o['value']:,.2f}, probability {o['probability']}%")
+    if len(opportunities) > 25:
+        lines.append(f"...and {len(opportunities) - 25} more not listed here.")
+    return "\n".join(lines)
+
+
+def _admin_inbox_section() -> str:
+    items = db.list_admin_inbox()
+    unread = [i for i in items if i["state"] == "unread"]
+    lines = [f"## Support inbox\n{len(items)} item(s) total, {len(unread)} unread. "
+             "Most recent unread first:"]
+    for i in unread[:20]:
+        lines.append(f"- {i['company_name']} ({i['source']}, {i['direction']}): "
+                      f"{i['subject'] or '(no subject)'}")
+    if not items:
+        lines = ["## Support inbox\nNo inbox items yet."]
+    return "\n".join(lines)
+
+
+def _admin_activity_section() -> str:
+    log = db.list_admin_activity(per_page=15)
+    rows = log["rows"]
+    if not rows:
+        return "## Recent Command Center activity\nNo activity recorded yet."
+    lines = ["## Recent Command Center activity\nMost recent first:"]
+    for r in rows:
+        lines.append(f"- {r['admin_name']} {r['action']} {r['entity_type']}"
+                      + (f" {r['entity_label']}" if r.get("entity_label") else ""))
+    return "\n".join(lines)
+
+
+def _admin_errors_section() -> str:
+    errors = db.list_application_errors(limit=20)
+    if not errors:
+        return "## Recent application errors\nNone recorded recently - the system looks healthy."
+    lines = [f"## Recent application errors\n{len(errors)} most recent:"]
+    for e in errors:
+        lines.append(f"- [{e['source']}] {e['message']}")
+    return "\n".join(lines)
+
+
+ADMIN_DIGEST_SECTIONS = {
+    "owner": (_admin_plans_section, _admin_pipeline_section, _admin_payments_section,
+              _admin_invoices_section, _admin_activity_section, _admin_errors_section),
+    "operations": (_admin_inbox_section, _admin_activity_section),
+    "sales": (_admin_pipeline_section,),
+    "support": (_admin_inbox_section, _admin_activity_section, _admin_errors_section),
+    "billing": (_admin_plans_section, _admin_payments_section, _admin_invoices_section),
+}
+
+
+def build_admin_digest(admin: dict) -> str:
+    """Plain-text platform summary for the admin chat, scoped to what this
+    admin's Command Center role can already see through other endpoints -
+    see ADMIN_DIGEST_SECTIONS and the _admin_role_request allow-lists this
+    mirrors."""
+    parts = [
+        "## Platform totals\n" + json.dumps(db.platform_stats()),
+        _admin_companies_section(db.list_companies_with_stats()),
+    ]
+    for section in ADMIN_DIGEST_SECTIONS.get(admin.get("role", "owner"), ()):
+        parts.append(section())
+    return "\n\n".join(parts)
+
+
 # Definitions stay in code while user choices/results stay in the database.
 # Adding a recipe is one registry entry plus a runner branch; existing rows and
 # clients continue to work because recipe_key is deliberately open-ended.
@@ -726,6 +866,26 @@ def build_chat_system(user: dict) -> str:
         "Everything in the digest below is already scoped to what their role "
         "can see in the product - do not tell them a voucher exists that "
         "isn't listed, and do not assume they can see more than this."
+    )
+
+
+ADMIN_ROLE_LABELS = {
+    "owner": "the Owner, with full Command Center access",
+    "operations": "Operations, handling companies and service follow-ups",
+    "sales": "Sales, running the CRM and pipeline",
+    "support": "Support, resolving customer issues",
+    "billing": "Billing, handling payments, subscriptions and plans",
+}
+
+
+def build_admin_chat_system(admin: dict) -> str:
+    label = ADMIN_ROLE_LABELS.get(admin.get("role", "owner"), admin.get("role", "owner"))
+    return (
+        providers.ADMIN_CHAT_SYSTEM
+        + f"\n\nThey are {admin['name']}, {label}. Everything in the digest "
+        "below is already scoped to what their Command Center role can see "
+        "in the product - do not tell them about data that isn't listed, and "
+        "do not assume they can see more than this."
     )
 
 
@@ -1453,6 +1613,7 @@ class RouteHandlerMixin:
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
+            "/api/admin/chat": self._handle_admin_chat,
             "/api/admin/mfa/setup": self._handle_admin_mfa_setup,
             "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
             "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
@@ -2446,6 +2607,71 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True},
                           extra_headers=[("Set-Cookie", _cookie_header(ADMIN_COOKIE_NAME, "", 0))])
+
+    def _handle_admin_chat(self):
+        """Ask Ada, for the Command Center. Grounded in a platform digest
+        scoped to this admin's role - see build_admin_digest/
+        build_admin_chat_system. Every role can chat; no plan/quota concept
+        applies here, unlike the company-facing chat - rate limiting is the
+        only cost control."""
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        if rate_limited(f"admin_chat:{admin['id']}"):
+            return self._json(
+                {"error": "Ada is busy right now. Please wait a few minutes and try again."}, 429)
+        try:
+            req = self._body(max_len=60000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+
+        message = str(req.get("message") or "").strip()[:MAX_MESSAGE]
+        if not message:
+            return self._json({"error": "Say something first."}, 400)
+
+        cfg = load_env()
+        provider = active_provider(cfg)
+        if not provider:
+            reference = report_application_error(
+                "ada.admin_chat.configuration", "No AI provider is configured",
+                context=f"admin_id={admin['id']} role={admin.get('role')}")
+            return self._json({"error": ada_unavailable(reference)}, 503)
+        model = cfg.get("CLERK_MODEL", "").strip() or providers.DEFAULT_MODELS[provider]
+
+        history = []
+        for t in (req.get("history") or [])[-MAX_HISTORY:]:
+            role = "assistant" if t.get("role") == "assistant" else "user"
+            text = str(t.get("content") or "").strip()[:1500]
+            if text:
+                history.append({"role": role, "content": text})
+
+        docs = []
+        for d in (req.get("docs") or [])[:3]:
+            text = str(d.get("text") or "").strip()[:20000]
+            if text:
+                docs.append({
+                    "kind": "text", "source": "attached",
+                    "name": str(d.get("name") or "attachment").strip()[:120],
+                    "text": text,
+                })
+
+        try:
+            reply = providers.chat(
+                provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
+                message, build_admin_digest(admin), history,
+                system=build_admin_chat_system(admin), docs=docs or None,
+            )
+        except providers.ProviderError as exc:
+            reference = report_application_error(
+                "ada.admin_chat.provider", exc, context=f"admin_id={admin['id']}")
+            return self._json({"error": ada_unavailable(reference)}, 503)
+        except Exception as exc:
+            print(f"  ! admin chat failure: {exc}")
+            reference = report_application_error(
+                "ada.admin_chat.server", exc, context=f"admin_id={admin['id']}")
+            return self._json({"error": ada_unavailable(reference)}, 500)
+
+        return self._json({"reply": reply})
 
     def _handle_admin_delete_company(self):
         admin = self._admin_role_request("owner")
