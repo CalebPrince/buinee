@@ -795,10 +795,17 @@ class RouteHandlerMixin:
             if db.plan_for_company(user["company_id"])["audience"] != "team":
                 return self._json({"error": "Team chat requires a team plan."}, 403)
             try:
-                after = int(parse_qs(urlparse(self.path).query).get("after", ["0"])[0])
+                query = parse_qs(urlparse(self.path).query)
+                after = int(query.get("after", ["0"])[0])
+                recipient_raw = query.get("recipient", ["group"])[0]
+                recipient_id = None if recipient_raw == "group" else int(recipient_raw)
             except ValueError:
-                after = 0
-            return self._json({"messages": db.list_team_messages(user["company_id"], after)})
+                return self._json({"error": "Bad conversation."}, 400)
+            return self._json({
+                "messages": db.list_team_messages(
+                    user["company_id"], user["id"], recipient_id, after
+                )
+            })
 
         if path == "/api/team-chat/file":
             user = current_user(self)
@@ -810,7 +817,7 @@ class RouteHandlerMixin:
                 file_id = int(parse_qs(urlparse(self.path).query).get("id", [""])[0])
             except ValueError:
                 return self._json({"error": "Bad file id."}, 400)
-            file = db.get_team_file(user["company_id"], file_id)
+            file = db.get_team_file(user["company_id"], user["id"], file_id)
             if not file:
                 return self._json({"error": "File not found."}, 404)
             try:
@@ -1465,14 +1472,18 @@ class RouteHandlerMixin:
         try:
             req = self._body(max_len=18 * 1024 * 1024)
             body = str(req.get("message") or "").strip()[:4000]
+            recipient_raw = req.get("recipient_id")
+            recipient_id = int(recipient_raw) if recipient_raw not in (None, "", "group") else None
             raw_files = (req.get("files") or [])[:3]
             files = [normalize_document_upload(file) for file in raw_files]
             if sum(file["size_bytes"] for file in files) > 10 * 1024 * 1024:
                 raise ValueError("Files in one message are limited to 10 MB total.")
             if not body and not files:
                 raise ValueError("Write a message or attach a file.")
-            message = db.create_team_message(user["company_id"], user["id"], body, files)
-        except (ValueError, binascii.Error) as exc:
+            message = db.create_team_message(
+                user["company_id"], user["id"], body, files, recipient_id
+            )
+        except (ValueError, binascii.Error, db.AuthError) as exc:
             return self._json({"error": str(exc) or "Could not send that message."}, 400)
         except Exception as exc:
             print(f"  ! team message failure: {exc}")
@@ -1489,7 +1500,7 @@ class RouteHandlerMixin:
             file_id = int(self._body().get("file_id"))
         except Exception:
             return self._json({"error": "Bad request."}, 400)
-        file = db.get_team_file(user["company_id"], file_id)
+        file = db.get_team_file(user["company_id"], user["id"], file_id)
         if not file:
             return self._json({"error": "File not found."}, 404)
         try:

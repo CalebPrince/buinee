@@ -310,6 +310,7 @@ def init_db() -> None:
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 company_id  INTEGER NOT NULL REFERENCES companies(id),
                 sender_id   INTEGER NOT NULL REFERENCES users(id),
+                recipient_id INTEGER REFERENCES users(id),
                 body        TEXT NOT NULL DEFAULT '',
                 created_at  REAL NOT NULL
             );
@@ -350,6 +351,7 @@ def init_db() -> None:
         _seed_individual_plans(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
+        _migrate_team_message_recipient(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -451,6 +453,12 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN model_model TEXT")
     if "briefing" not in cols:
         conn.execute("ALTER TABLE companies ADD COLUMN briefing TEXT NOT NULL DEFAULT ''")
+
+
+def _migrate_team_message_recipient(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(team_messages)").fetchall()]
+    if "recipient_id" not in cols:
+        conn.execute("ALTER TABLE team_messages ADD COLUMN recipient_id INTEGER REFERENCES users(id)")
 
 
 # ------------------------------------------------------------------ passwords
@@ -1547,12 +1555,20 @@ def delete_reference_document(user_id: int, document_id: int) -> bool:
         return cur.rowcount > 0
 
 
-def create_team_message(company_id: int, sender_id: int, body: str, files: list[dict]) -> dict:
+def create_team_message(company_id: int, sender_id: int, body: str, files: list[dict],
+                        recipient_id: int | None = None) -> dict:
     now = time.time()
     with _cursor() as conn:
+        if recipient_id is not None:
+            recipient = conn.execute(
+                "SELECT id FROM users WHERE id = ? AND company_id = ? AND status = 'approved'",
+                (recipient_id, company_id),
+            ).fetchone()
+            if not recipient or recipient_id == sender_id:
+                raise AuthError("Choose another approved team member.")
         cur = conn.execute(
-            "INSERT INTO team_messages (company_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)",
-            (company_id, sender_id, body[:4000], now),
+            "INSERT INTO team_messages (company_id, sender_id, recipient_id, body, created_at) VALUES (?, ?, ?, ?, ?)",
+            (company_id, sender_id, recipient_id, body[:4000], now),
         )
         message_id = cur.lastrowid
         for file in files[:3]:
@@ -1565,16 +1581,17 @@ def create_team_message(company_id: int, sender_id: int, body: str, files: list[
                  file["media_type"], file["text_content"], file["data_base64"],
                  file["size_bytes"], now),
             )
-    return get_team_message(company_id, message_id)
+    return get_team_message(company_id, message_id, sender_id)
 
 
-def get_team_message(company_id: int, message_id: int) -> dict | None:
+def get_team_message(company_id: int, message_id: int, viewer_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
             """SELECT m.*, u.name AS sender_name, u.role AS sender_role
                FROM team_messages m JOIN users u ON u.id = m.sender_id
-               WHERE m.company_id = ? AND m.id = ?""",
-            (company_id, message_id),
+               WHERE m.company_id = ? AND m.id = ?
+                 AND (m.recipient_id IS NULL OR m.sender_id = ? OR m.recipient_id = ?)""",
+            (company_id, message_id, viewer_id, viewer_id),
         ).fetchone()
         if not row:
             return None
@@ -1588,22 +1605,36 @@ def get_team_message(company_id: int, message_id: int) -> dict | None:
     return item
 
 
-def list_team_messages(company_id: int, after_id: int = 0, limit: int = 100) -> list[dict]:
+def list_team_messages(company_id: int, viewer_id: int, recipient_id: int | None = None,
+                       after_id: int = 0, limit: int = 100) -> list[dict]:
     with _cursor() as conn:
-        rows = conn.execute(
-            """SELECT id FROM team_messages WHERE company_id = ? AND id > ?
-               ORDER BY id DESC LIMIT ?""",
-            (company_id, after_id, limit),
-        ).fetchall()
-    return [item for item in (get_team_message(company_id, row["id"]) for row in reversed(rows)) if item]
+        if recipient_id is None:
+            rows = conn.execute(
+                """SELECT id FROM team_messages WHERE company_id = ?
+                   AND recipient_id IS NULL AND id > ? ORDER BY id DESC LIMIT ?""",
+                (company_id, after_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT id FROM team_messages WHERE company_id = ? AND id > ?
+                   AND ((sender_id = ? AND recipient_id = ?)
+                     OR (sender_id = ? AND recipient_id = ?))
+                   ORDER BY id DESC LIMIT ?""",
+                (company_id, after_id, viewer_id, recipient_id,
+                 recipient_id, viewer_id, limit),
+            ).fetchall()
+    return [item for item in (get_team_message(company_id, row["id"], viewer_id) for row in reversed(rows)) if item]
 
 
-def get_team_file(company_id: int, file_id: int, include_content: bool = True) -> dict | None:
-    columns = "*" if include_content else "id, message_id, company_id, uploader_id, name, kind, media_type, size_bytes, created_at"
+def get_team_file(company_id: int, viewer_id: int, file_id: int, include_content: bool = True) -> dict | None:
+    columns = "f.*" if include_content else "f.id, f.message_id, f.company_id, f.uploader_id, f.name, f.kind, f.media_type, f.size_bytes, f.created_at"
     with _cursor() as conn:
         row = conn.execute(
-            f"SELECT {columns} FROM team_message_files WHERE company_id = ? AND id = ?",
-            (company_id, file_id),
+            f"""SELECT {columns} FROM team_message_files f
+                JOIN team_messages m ON m.id = f.message_id
+                WHERE f.company_id = ? AND f.id = ?
+                  AND (m.recipient_id IS NULL OR m.sender_id = ? OR m.recipient_id = ?)""",
+            (company_id, file_id, viewer_id, viewer_id),
         ).fetchone()
     return dict(row) if row else None
 

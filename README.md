@@ -397,11 +397,13 @@ switched client-side with no page reload:
   and live nav badge together; the badge is hidden entirely at zero.
 - **Team chat** — available only when the company is on a plan whose audience
   is `team` (enforced in both UI and API). Approved members of the same company
-  can exchange messages and up to three supported files per message. Downloads
-  are authenticated and company-scoped. “Add to Ada” copies a shared file into
-  the current user's private reference library; it does not expose another
-  user's private instructions or library. Messages are append-only and the
-  dashboard polls for new ones while Team chat is open.
+  appear in a conversation rail and can exchange messages with the whole team
+  or privately with one selected colleague. Each message supports up to three
+  files. Downloads are authenticated and restricted to members of that group or
+  direct conversation. “Add to Ada” copies a shared file into the current user's
+  private reference library; it does not expose another user's private
+  instructions or library. Messages are append-only and the dashboard polls for
+  new ones while Team chat is open.
 
 The rail also has the other two visual pieces from the reference dashboards:
 a prominent "New voucher" compose button (opens the Vouchers form directly,
