@@ -329,6 +329,14 @@ def init_db() -> None:
                 created_at   REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS team_conversation_clears (
+                user_id       INTEGER NOT NULL REFERENCES users(id),
+                conversation  TEXT NOT NULL,
+                cleared_through_id INTEGER NOT NULL DEFAULT 0,
+                cleared_at    REAL NOT NULL,
+                PRIMARY KEY (user_id, conversation)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
@@ -1608,11 +1616,17 @@ def get_team_message(company_id: int, message_id: int, viewer_id: int) -> dict |
 def list_team_messages(company_id: int, viewer_id: int, recipient_id: int | None = None,
                        after_id: int = 0, limit: int = 100) -> list[dict]:
     with _cursor() as conn:
+        conversation = "group" if recipient_id is None else str(recipient_id)
+        clear = conn.execute(
+            "SELECT cleared_through_id FROM team_conversation_clears WHERE user_id = ? AND conversation = ?",
+            (viewer_id, conversation),
+        ).fetchone()
+        visible_after = max(after_id, clear["cleared_through_id"] if clear else 0)
         if recipient_id is None:
             rows = conn.execute(
                 """SELECT id FROM team_messages WHERE company_id = ?
                    AND recipient_id IS NULL AND id > ? ORDER BY id DESC LIMIT ?""",
-                (company_id, after_id, limit),
+                (company_id, visible_after, limit),
             ).fetchall()
         else:
             rows = conn.execute(
@@ -1620,10 +1634,37 @@ def list_team_messages(company_id: int, viewer_id: int, recipient_id: int | None
                    AND ((sender_id = ? AND recipient_id = ?)
                      OR (sender_id = ? AND recipient_id = ?))
                    ORDER BY id DESC LIMIT ?""",
-                (company_id, after_id, viewer_id, recipient_id,
+                (company_id, visible_after, viewer_id, recipient_id,
                  recipient_id, viewer_id, limit),
             ).fetchall()
     return [item for item in (get_team_message(company_id, row["id"], viewer_id) for row in reversed(rows)) if item]
+
+
+def clear_team_conversation(company_id: int, viewer_id: int,
+                            recipient_id: int | None = None) -> None:
+    conversation = "group" if recipient_id is None else str(recipient_id)
+    with _cursor() as conn:
+        if recipient_id is None:
+            row = conn.execute(
+                "SELECT COALESCE(MAX(id), 0) AS last_id FROM team_messages WHERE company_id = ? AND recipient_id IS NULL",
+                (company_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """SELECT COALESCE(MAX(id), 0) AS last_id FROM team_messages
+                   WHERE company_id = ? AND ((sender_id = ? AND recipient_id = ?)
+                     OR (sender_id = ? AND recipient_id = ?))""",
+                (company_id, viewer_id, recipient_id, recipient_id, viewer_id),
+            ).fetchone()
+        conn.execute(
+            """INSERT INTO team_conversation_clears
+                   (user_id, conversation, cleared_through_id, cleared_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(user_id, conversation) DO UPDATE SET
+                   cleared_through_id = excluded.cleared_through_id,
+                   cleared_at = excluded.cleared_at""",
+            (viewer_id, conversation, row["last_id"], time.time()),
+        )
 
 
 def get_team_file(company_id: int, viewer_id: int, file_id: int, include_content: bool = True) -> dict | None:
@@ -1633,8 +1674,16 @@ def get_team_file(company_id: int, viewer_id: int, file_id: int, include_content
             f"""SELECT {columns} FROM team_message_files f
                 JOIN team_messages m ON m.id = f.message_id
                 WHERE f.company_id = ? AND f.id = ?
-                  AND (m.recipient_id IS NULL OR m.sender_id = ? OR m.recipient_id = ?)""",
-            (company_id, file_id, viewer_id, viewer_id),
+                  AND (m.recipient_id IS NULL OR m.sender_id = ? OR m.recipient_id = ?)
+                  AND m.id > COALESCE((
+                    SELECT c.cleared_through_id FROM team_conversation_clears c
+                    WHERE c.user_id = ? AND c.conversation = CASE
+                      WHEN m.recipient_id IS NULL THEN 'group'
+                      WHEN m.sender_id = ? THEN CAST(m.recipient_id AS TEXT)
+                      ELSE CAST(m.sender_id AS TEXT)
+                    END
+                  ), 0)""",
+            (company_id, file_id, viewer_id, viewer_id, viewer_id, viewer_id),
         ).fetchone()
     return dict(row) if row else None
 

@@ -991,6 +991,7 @@ class RouteHandlerMixin:
             "/api/user/reference-documents/upload": self._handle_reference_upload,
             "/api/user/reference-documents/delete": self._handle_reference_delete,
             "/api/team-chat/send": self._handle_team_message,
+            "/api/team-chat/clear": self._handle_clear_team_conversation,
             "/api/team-chat/add-to-library": self._handle_team_file_to_library,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
@@ -1489,6 +1490,20 @@ class RouteHandlerMixin:
             print(f"  ! team message failure: {exc}")
             return self._json({"error": "Could not send that message."}, 500)
         return self._json({"ok": True, "message": message})
+
+    def _handle_clear_team_conversation(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if db.plan_for_company(user["company_id"])["audience"] != "team":
+            return self._json({"error": "Team chat requires a team plan."}, 403)
+        try:
+            recipient_raw = self._body().get("recipient_id")
+            recipient_id = int(recipient_raw) if recipient_raw not in (None, "", "group") else None
+            db.clear_team_conversation(user["company_id"], user["id"], recipient_id)
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad conversation."}, 400)
+        return self._json({"ok": True})
 
     def _handle_team_file_to_library(self):
         user = current_user(self)

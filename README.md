@@ -403,7 +403,10 @@ switched client-side with no page reload:
   direct conversation. “Add to Ada” copies a shared file into the current user's
   private reference library; it does not expose another user's private
   instructions or library. Messages are append-only and the dashboard polls for
-  new ones while Team chat is open.
+  new ones while Team chat is open. The selected conversation survives a page
+  refresh. “Clear conversation” stores a per-user visibility marker: it hides
+  existing messages only for the person clearing them and never deletes another
+  member's copy.
 
 The rail also has the other two visual pieces from the reference dashboards:
 a prominent "New voucher" compose button (opens the Vouchers form directly,

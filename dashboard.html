@@ -491,7 +491,7 @@
   .team-member-copy b { font-size: 11.5px; }
   .team-member-copy span { margin-top: 1px; color: var(--ink-4); font-size: 9.5px; }
   .team-chat-conversation { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-  .team-chat-head { display: flex; align-items: center; gap: 12px; padding: 15px 22px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .team-chat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 22px; border-bottom: 1px solid var(--line); background: var(--surface); }
   .team-chat-head h1 { font: 600 19px var(--serif); }
   .team-chat-head p { margin-top: 2px; color: var(--ink-3); font-size: 11.5px; }
   .team-chat-stream { flex: 1; min-height: 0; overflow-y: auto; padding: 22px; }
@@ -855,6 +855,7 @@
       <div class="team-chat-shell">
         <div class="team-chat-head">
           <div><h1>Team chat</h1><p id="teamChatSubtitle">Your department’s shared conversation and files</p></div>
+          <button class="btn sm" type="button" onclick="clearTeamConversation()">Clear conversation</button>
         </div>
         <div class="team-chat-body">
           <aside class="team-chat-members" id="teamChatMembers" aria-label="Team conversations">
@@ -1219,6 +1220,9 @@ Do not promise a payment date unless it has already been approved."></textarea>
     myName = me.name;
     teamChatAvailable = me.company.plan.audience === 'team';
     teamChatCompanyName = me.company.name;
+    const savedConversation = localStorage.getItem(`buinee.teamConversation.${myId}`);
+    teamChatRecipient = savedConversation && savedConversation !== 'group' ? Number(savedConversation) : null;
+    if (teamChatRecipient !== null && !Number.isInteger(teamChatRecipient)) teamChatRecipient = null;
 
     document.getElementById('crumbCompany').textContent = me.company.name;
     document.getElementById('rolePill').textContent = info.label;
@@ -1461,10 +1465,17 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   function selectTeamConversation(recipientId) {
     teamChatRecipient = recipientId === null ? null : Number(recipientId);
+    localStorage.setItem(`buinee.teamConversation.${myId}`, teamChatRecipient === null ? 'group' : String(teamChatRecipient));
     teamMessages = [];
     pendingTeamFiles = [];
     renderTeamFileChips();
     renderTeamChatMembers();
+    updateTeamConversationChrome();
+    document.getElementById('teamChatMessages').innerHTML = '<div class="empty"><h4>Loading conversation…</h4></div>';
+    loadTeamMessages();
+  }
+
+  function updateTeamConversationChrome() {
     const member = teamMembers.find(item => item.id === teamChatRecipient);
     document.getElementById('teamChatSubtitle').textContent = member
       ? `Direct message with ${member.name} · private to both of you`
@@ -1473,8 +1484,23 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.getElementById('teamChatNote').textContent = member
       ? `Files shared here are visible only to you and ${member.name}. Add one to your private Ada library when you want Ada to use it.`
       : 'Files shared here are visible to all approved team members. Add a file to your private Ada library when you want Ada to use it.';
-    document.getElementById('teamChatMessages').innerHTML = '<div class="empty"><h4>Loading conversation…</h4></div>';
-    loadTeamMessages();
+  }
+
+  async function clearTeamConversation() {
+    const member = teamMembers.find(item => item.id === teamChatRecipient);
+    const name = member ? `your conversation with ${member.name}` : 'the whole-team conversation';
+    if (!confirm(`Clear ${name} for you? Other team members will still keep their copy.`)) return;
+    try {
+      const res = await fetch('/api/team-chat/clear', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient_id: teamChatRecipient }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not clear this conversation.');
+      teamMessages = [];
+      document.getElementById('teamChatMessages').innerHTML = '<div class="empty"><h4>Conversation cleared for you</h4><p>New messages will appear here. Other members still have their copy.</p></div>';
+    } catch (error) { alert(error.message || 'Could not reach the server.'); }
   }
 
   function teamChatKey(ev) {
@@ -2092,7 +2118,13 @@ Do not promise a payment date unless it has already been approved."></textarea>
       const data = await res.json();
       const team = data.team || [];
       teamMembers = team;
+      if (teamChatRecipient !== null && !team.some(member => member.id === teamChatRecipient && member.id !== myId)) {
+        teamChatRecipient = null;
+        localStorage.setItem(`buinee.teamConversation.${myId}`, 'group');
+        loadTeamMessages();
+      }
       renderTeamChatMembers();
+      updateTeamConversationChrome();
       if (!team.length) {
         box.innerHTML = '<div class="empty"><h4>Just you so far</h4></div>';
         return 0;
