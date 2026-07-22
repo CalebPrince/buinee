@@ -1607,8 +1607,34 @@ class RouteHandlerMixin:
         message = next((m for m in messages if str(m.get("id")) == provider_message_id), None)
         if not message:
             return self._json({"error": "That email is no longer in the recent inbox list."}, 404)
-        if not (message.get("body") or "").strip():
+        attachments = message.get("attachments", [])
+        if not (message.get("body") or "").strip() and not attachments:
             return self._json({"error": "That email has no readable text body to summarize."}, 400)
+
+        docs = []
+        for meta in attachments[:3]:
+            if not meta.get("downloadable") or int(meta.get("size") or 0) > 5 * 1024 * 1024:
+                continue
+            try:
+                attached = mailbox.get_attachment(
+                    connection, creds, provider_message_id, str(meta.get("part"))
+                )
+                media_type = attached["media_type"]
+                upload = {"name": attached["name"], "media_type": media_type}
+                if media_type.startswith("text/") or media_type in ("application/json", "application/xml"):
+                    upload["text"] = attached["data"].decode("utf-8", "replace")
+                else:
+                    upload["data"] = base64.b64encode(attached["data"]).decode("ascii")
+                normalized = normalize_document_upload(upload)
+                if normalized["kind"] == "text":
+                    docs.append({"kind": "text", "source": "attached", "name": normalized["name"],
+                                 "text": normalized["text_content"]})
+                else:
+                    docs.append({"kind": normalized["kind"], "source": "attached",
+                                 "name": normalized["name"], "media_type": normalized["media_type"],
+                                 "data": normalized["data_base64"]})
+            except (mailbox.MailboxError, ValueError, UnicodeError):
+                continue
 
         from_name, from_email = email.utils.parseaddr(message.get("from") or "")
         email_input = {
@@ -1618,14 +1644,14 @@ class RouteHandlerMixin:
             "received": message.get("received") or "",
             "subject": message.get("subject") or "(no subject)",
             "attachments": [item.get("name") for item in message.get("attachments", [])],
-            "body": message["body"],
+            "body": message.get("body") or "(No message body; review the attached documents.)",
             "unread": bool(message.get("unread")),
         }
         try:
-            items = providers.triage(
-                provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
-                [email_input], briefing=effective_briefing(pub),
-            )
+            triage_fn = providers.triage_with_docs if docs else providers.triage
+            items = triage_fn(provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
+                              [email_input], briefing=effective_briefing(pub),
+                              **({"docs": docs} if docs else {}))
         except providers.ProviderError as exc:
             return self._json({"error": str(exc)}, 502)
         except Exception as exc:

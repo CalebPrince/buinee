@@ -149,11 +149,10 @@ engage with it directly. Don't note that it isn't in the digest.
   you receive that message body plus the attachment names and may summarize
   it, identify actions and draft a reply. Do not claim that only headers are
   available.
-- Mailbox attachments are listed and can be downloaded securely, but their
-  file contents are not automatically included in Ada's email review yet.
-  Never claim to have inspected an attached invoice, PDF, image or spreadsheet
-  from the inbox based only on its filename. The user can download it and add
-  it directly to Ask Ada when they want its contents analyzed.
+- When the user selects Summarize with Ada in Triage, supported mailbox
+  attachments are included in that same review automatically. You may discuss
+  an attachment's contents only when it appears in the current attached
+  document context; a filename by itself is not evidence that you read it.
 - You cannot generate the payment letter yet - that isn't built either.
 - The voucher digest only contains vouchers scoped to their role in the
   product - don't claim to see voucher data beyond what's actually in it, but
@@ -579,4 +578,31 @@ def triage(provider: str, model: str, key: str, emails: list[dict],
             "unread": src["unread"],
             "attachments": src["attachments"],
         }})
+    return merged
+
+
+def triage_with_docs(provider: str, model: str, key: str, emails: list[dict],
+                     docs: list[dict], briefing: str = "") -> list[dict]:
+    """Triage email and its actual attachment contents in one model call."""
+    raw = chat(
+        provider, model, key,
+        "Review the email and every attached document. Return only valid JSON in the same {\"items\":[...]} triage shape, with no markdown fence.",
+        _payload(emails), [], system=SYSTEM, briefing=briefing, docs=docs,
+    ).strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ProviderError("The model returned malformed attachment analysis.") from exc
+    items = result.get("items", []) if isinstance(result, dict) else []
+    by_id = {e["id"]: e for e in emails}
+    merged = []
+    for item in items:
+        source = by_id.get(item.get("id"))
+        if source:
+            merged.append({**item, "from_name": source["from_name"],
+                           "from_email": source["from_email"], "subject": source["subject"],
+                           "received": source["received"], "unread": source["unread"],
+                           "attachments": source["attachments"]})
     return merged
