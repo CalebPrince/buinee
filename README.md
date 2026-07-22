@@ -995,6 +995,21 @@ changes the mailbox. Per-email analysis and scheduled automation runs are
 deliberately read-only; they can surface issues in To fix but cannot send,
 move, delete, or mark mail as read.
 
+### Paystack payments
+
+Set `PAYSTACK_PUBLIC_KEY` and `PAYSTACK_SECRET_KEY` in cPanel Environment
+Variables, then set Paystack's webhook URL to
+`https://buinee.app/api/paystack/webhook`. The callback is
+`https://buinee.app/api/paystack/callback`. Supervisors initialize the current
+plan price from the Team dashboard; checkout is hosted by Paystack. Buinee
+verifies callback transactions and validates webhook payloads with Paystack's
+HMAC-SHA512 `x-paystack-signature` before processing `charge.success`.
+Successful delivery also requires the returned amount and currency to match
+the stored payment intent. `admin-payments.html` shows verified totals and
+recent transactions. Storage contains only safe authorization metadata such
+as channel, brand, bank, expiry, and last four digits—never full card numbers,
+CVV, authorization codes, or the Paystack secret key.
+
 ---
 
 ## Where this came from

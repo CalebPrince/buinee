@@ -231,6 +231,23 @@ def init_db() -> None:
                 updated_at        REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reference TEXT NOT NULL UNIQUE,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                plan_id INTEGER NOT NULL REFERENCES plans(id),
+                amount_subunit INTEGER NOT NULL,
+                currency TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'initialized',
+                provider_id TEXT NOT NULL DEFAULT '', customer_email TEXT NOT NULL DEFAULT '',
+                channel TEXT NOT NULL DEFAULT '', card_type TEXT NOT NULL DEFAULT '',
+                card_brand TEXT NOT NULL DEFAULT '', card_last4 TEXT NOT NULL DEFAULT '',
+                card_bank TEXT NOT NULL DEFAULT '', card_exp_month TEXT NOT NULL DEFAULT '',
+                card_exp_year TEXT NOT NULL DEFAULT '', gateway_response TEXT NOT NULL DEFAULT '',
+                paid_at TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL, updated_at REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -447,6 +464,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_crm_opportunities_stage ON crm_opportunities(stage, expected_close_date);
             CREATE INDEX IF NOT EXISTS idx_crm_interactions_company ON crm_interactions(company_id, occurred_at DESC);
             CREATE INDEX IF NOT EXISTS idx_crm_tasks_company ON crm_tasks(company_id, status, due_date);
+            CREATE INDEX IF NOT EXISTS idx_payments_company ON payments(company_id, created_at DESC);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1379,6 +1397,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM payments WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_subscriptions WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_tasks WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_interactions WHERE company_id = ?", (company_id,))
@@ -2385,6 +2404,62 @@ def save_crm_subscription(company_id: int, fields: dict) -> dict:
         )
         row = conn.execute("SELECT * FROM crm_subscriptions WHERE company_id=?", (company_id,)).fetchone()
     return dict(row)
+
+
+def create_payment_intent(company_id: int, user_id: int, plan_id: int, amount_subunit: int,
+                          currency: str, email: str, reference: str) -> dict:
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute("""INSERT INTO payments(reference,company_id,user_id,plan_id,amount_subunit,
+                     currency,customer_email,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)""",
+                     (reference, company_id, user_id, plan_id, amount_subunit, currency, email, now, now))
+        row = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
+    return dict(row)
+
+
+def record_paystack_payment(data: dict) -> dict | None:
+    reference = str(data.get("reference") or "")
+    authorization = data.get("authorization") or {}
+    customer = data.get("customer") or {}
+    with _cursor() as conn:
+        expected = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
+        if not expected:
+            return None
+        amount = int(data.get("amount") or 0)
+        currency = str(data.get("currency") or "").upper()
+        verified = str(data.get("status") or "") == "success" and amount == expected["amount_subunit"] and currency == expected["currency"]
+        status = "success" if verified else "failed"
+        conn.execute("""UPDATE payments SET status=?,provider_id=?,customer_email=?,channel=?,
+                     card_type=?,card_brand=?,card_last4=?,card_bank=?,card_exp_month=?,card_exp_year=?,
+                     gateway_response=?,paid_at=?,updated_at=? WHERE reference=?""",
+                     (status, str(data.get("id") or ""), str(customer.get("email") or expected["customer_email"]),
+                      str(data.get("channel") or ""), str(authorization.get("card_type") or ""),
+                      str(authorization.get("brand") or ""), str(authorization.get("last4") or "")[-4:],
+                      str(authorization.get("bank") or ""), str(authorization.get("exp_month") or ""),
+                      str(authorization.get("exp_year") or ""), str(data.get("gateway_response") or "")[:300],
+                      str(data.get("paid_at") or ""), time.time(), reference))
+        if verified:
+            conn.execute("""INSERT INTO crm_subscriptions(company_id,payment_status,updated_at)
+                         VALUES(?, 'current', ?) ON CONFLICT(company_id) DO UPDATE SET
+                         payment_status='current',updated_at=excluded.updated_at""",
+                         (expected["company_id"], time.time()))
+        row = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
+    return dict(row)
+
+
+def list_payments(company_id: int | None = None, limit: int = 200) -> list[dict]:
+    with _cursor() as conn:
+        where, params = ("WHERE py.company_id=?", (company_id, limit)) if company_id else ("", (limit,))
+        rows = conn.execute(f"""SELECT py.*, c.name AS company_name, p.name AS plan_name, u.name AS user_name
+                    FROM payments py JOIN companies c ON c.id=py.company_id JOIN plans p ON p.id=py.plan_id
+                    JOIN users u ON u.id=py.user_id {where} ORDER BY py.created_at DESC LIMIT ?""", params).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_payment(reference: str) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
+    return dict(row) if row else None
 
 
 def list_user_crm_tasks(user: dict) -> list[dict]:

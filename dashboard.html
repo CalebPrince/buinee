@@ -1106,6 +1106,10 @@ Do not promise a payment date unless it has already been approved."></textarea>
         </form>
       </div>
       <div class="plan-banner" id="planBanner"></div>
+      <div class="card full" id="billingCard" hidden style="margin-bottom:16px">
+        <div class="card-h"><h3>Plan payment</h3><div class="sub">Pay securely with Paystack · Buinee never receives your full card details</div></div>
+        <div class="card-b" id="billingContent"></div>
+      </div>
       <div class="grid2 team-grid" id="teamGrid">
         <div class="card">
           <div class="card-h"><h3>Team</h3><div class="sub" id="teamSub"></div></div>
@@ -1358,6 +1362,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
       kpis.push({ key: 'team', n: teamCount, l: 'Team members' });
       kpis.push({ key: 'pending', n: pendingCount, l: 'Pending requests' });
       renderPlanBanner(me.company);
+      document.getElementById('billingCard').hidden = false;
+      loadPayments(me.company);
     } else {
       document.getElementById('planBanner').hidden = true;
       document.getElementById('pendingTeamCard').hidden = true;
@@ -2336,6 +2342,13 @@ Do not promise a payment date unless it has already been approved."></textarea>
       box.style.display = 'block';
     }
   }
+
+  async function loadPayments(company) {
+    const box=document.getElementById('billingContent');
+    try{const res=await fetch('/api/payments',{credentials:'same-origin'}),data=await res.json();if(!res.ok)throw new Error(data.error||'Could not load payments.');const payments=data.payments||[],last=payments.find(p=>p.status==='success');box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap"><div><b>${escapeHtml(company.plan.name)} · ${escapeHtml(company.plan.currency)} ${Number(company.plan.price).toFixed(2)}/month</b><div style="color:var(--ink-3);font-size:12px;margin-top:3px">${last?`Last verified payment: ${escapeHtml(last.currency)} ${(last.amount_subunit/100).toFixed(2)} · ${new Date(last.paid_at||last.created_at*1000).toLocaleDateString()}`:'No verified payment recorded yet.'}</div></div><button class="btn primary sm" type="button" onclick="startPlanPayment(this)" ${!data.configured||Number(company.plan.price)<=0?'disabled':''}>${Number(company.plan.price)<=0?'No payment due':data.configured?'Pay with Paystack':'Paystack not configured'}</button></div>`;}catch(error){box.innerHTML=`<div class="msg-error" style="display:block">${escapeHtml(error.message||'Could not load billing.')}</div>`;}
+  }
+
+  async function startPlanPayment(button){button.disabled=true;button.textContent='Opening Paystack…';try{const res=await fetch('/api/payments/initialize',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'}),data=await res.json();if(!res.ok)throw new Error(data.error||'Could not start payment.');location.href=data.authorization_url;}catch(error){alert(error.message||'Could not reach Paystack.');button.disabled=false;button.textContent='Pay with Paystack';}}
 
   async function saveCompanyProfile(ev) {
     ev.preventDefault();

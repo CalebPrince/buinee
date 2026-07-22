@@ -34,6 +34,8 @@ explains, code computes.
 from __future__ import annotations
 
 import email.utils
+import hashlib
+import hmac
 import base64
 import binascii
 import html
@@ -45,6 +47,8 @@ import sys
 import time
 import webbrowser
 import zipfile
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from http.client import responses as HTTP_REASONS
 from http.cookies import SimpleCookie
@@ -185,6 +189,7 @@ STATIC_PAGES = {
     "/admin-companies.html": "admin-companies.html",
     "/admin-plans.html": "admin-plans.html",
     "/admin-pipeline.html": "admin-pipeline.html",
+    "/admin-payments.html": "admin-payments.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -222,6 +227,7 @@ def load_env() -> dict:
         "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_REDIRECT_URI",
         "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
         "BUINEE_SECRET_KEY",
+        "PAYSTACK_PUBLIC_KEY", "PAYSTACK_SECRET_KEY", "PAYSTACK_CALLBACK_URL", "PAYSTACK_WEBHOOK_URL",
     ]:
         if os.environ.get(k):
             cfg[k] = os.environ[k]
@@ -728,6 +734,32 @@ def build_system(computed: dict | None) -> str:
     return "\n".join(lines)
 
 
+def paystack_config(cfg: dict) -> dict:
+    return {
+        "public_key": cfg.get("PAYSTACK_PUBLIC_KEY", ""),
+        "secret_key": cfg.get("PAYSTACK_SECRET_KEY", ""),
+        "callback_url": cfg.get("PAYSTACK_CALLBACK_URL", "https://buinee.app/api/paystack/callback"),
+        "webhook_url": cfg.get("PAYSTACK_WEBHOOK_URL", "https://buinee.app/api/paystack/webhook"),
+    }
+
+
+def paystack_api(method: str, path: str, cfg: dict, payload: dict | None = None) -> dict:
+    ps = paystack_config(cfg)
+    if not ps["secret_key"]:
+        raise ValueError("Paystack is not configured.")
+    body = json.dumps(payload).encode() if payload is not None else None
+    request = urllib.request.Request("https://api.paystack.co" + path, data=body, method=method,
+        headers={"Authorization": "Bearer " + ps["secret_key"], "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            result = json.loads(response.read())
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise ValueError("Paystack could not be reached. Try again.") from exc
+    if not result.get("status"):
+        raise ValueError(str(result.get("message") or "Paystack rejected the request."))
+    return result.get("data") or {}
+
+
 # --------------------------------------------------------------- route logic
 #
 # Every route lives here, transport-agnostic. A caller just needs to provide
@@ -760,6 +792,12 @@ class RouteHandlerMixin:
         if length > max_len:
             raise ValueError("body too large")
         return json.loads(self.rfile.read(length) or b"{}")
+
+    def _raw_body(self, max_len: int = 100000) -> bytes:
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > max_len:
+            raise ValueError("body too large")
+        return self.rfile.read(length)
 
     # ---------------------------------------------------------------- GET
 
@@ -810,6 +848,23 @@ class RouteHandlerMixin:
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"tasks": db.list_user_crm_tasks(user)})
+
+        if path == "/api/payments":
+            user = current_user(self)
+            if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
+                return self._json({"error": "Only a supervisor can manage billing."}, 403)
+            return self._json({"payments": db.list_payments(user["company_id"], 20),
+                               "configured": bool(paystack_config(load_env())["secret_key"])})
+
+        if path == "/api/paystack/callback":
+            reference = parse_qs(urlparse(self.path).query).get("reference", [""])[0]
+            payment = db.get_payment(reference)
+            if payment:
+                try:
+                    db.record_paystack_payment(paystack_api("GET", "/transaction/verify/" + quote(reference), load_env()))
+                except ValueError:
+                    pass
+            return self._redirect("/dashboard.html#team")
 
         if path == "/api/team-chat":
             user = current_user(self)
@@ -991,6 +1046,16 @@ class RouteHandlerMixin:
             return self._json({"opportunities": db.list_crm_opportunities(),
                                "companies": db.list_company_choices()})
 
+        if path == "/api/admin/payments":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            ps = paystack_config(load_env())
+            return self._json({"payments": db.list_payments(), "configuration": {
+                "public_key": ps["public_key"], "public_key_configured": bool(ps["public_key"]),
+                "secret_key_configured": bool(ps["secret_key"]), "webhook_url": ps["webhook_url"],
+                "callback_url": ps["callback_url"]}})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1026,6 +1091,8 @@ class RouteHandlerMixin:
             "/api/team-chat/seen": self._handle_team_messages_seen,
             "/api/team-chat/add-to-library": self._handle_team_file_to_library,
             "/api/follow-ups/status": self._handle_follow_up_status,
+            "/api/payments/initialize": self._handle_payment_initialize,
+            "/api/paystack/webhook": self._handle_paystack_webhook,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
             "/api/vouchers/review": self._handle_voucher_review,
@@ -1533,6 +1600,47 @@ class RouteHandlerMixin:
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad follow-up task."}, 400)
         return self._json({"ok": True, "task": task})
+
+    def _handle_payment_initialize(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a supervisor can manage billing."}, 403)
+        plan = db.plan_for_company(user["company_id"])
+        amount = int(round(float(plan["price"]) * 100))
+        if amount <= 0:
+            return self._json({"error": "This plan has no payment due."}, 400)
+        reference = "buinee-" + secrets.token_hex(12)
+        cfg, ps = load_env(), paystack_config(load_env())
+        db.create_payment_intent(user["company_id"], user["id"], plan["id"], amount,
+                                 plan["currency"].upper(), user["email"], reference)
+        try:
+            result = paystack_api("POST", "/transaction/initialize", cfg, {
+                "email": user["email"], "amount": str(amount), "currency": plan["currency"].upper(),
+                "reference": reference, "callback_url": ps["callback_url"],
+                "metadata": json.dumps({"company_id": user["company_id"], "plan_id": plan["id"]}),
+            })
+        except ValueError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"authorization_url": result.get("authorization_url"), "reference": reference})
+
+    def _handle_paystack_webhook(self):
+        cfg = load_env()
+        secret = paystack_config(cfg)["secret_key"]
+        try:
+            raw = self._raw_body()
+        except ValueError:
+            return self._json({"error": "Bad webhook."}, 400)
+        supplied = self.headers.get("X-Paystack-Signature") or ""
+        expected = hmac.new(secret.encode(), raw, hashlib.sha512).hexdigest() if secret else ""
+        if not secret or not hmac.compare_digest(supplied, expected):
+            return self._json({"error": "Invalid signature."}, 401)
+        try:
+            event = json.loads(raw)
+        except json.JSONDecodeError:
+            return self._json({"error": "Bad webhook."}, 400)
+        if event.get("event") == "charge.success":
+            db.record_paystack_payment(event.get("data") or {})
+        return self._json({"ok": True})
 
     def _handle_team_message(self):
         user = current_user(self)
