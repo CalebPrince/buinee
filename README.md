@@ -315,6 +315,8 @@ switched client-side with no page reload:
   offline members show a red dot and an explicit note that they will see the
   new-message alert when they return. Unread counts also appear beside the exact
   group or direct conversation, and the browser tab shows the total open count.
+  Signing out clears presence immediately; an abandoned tab falls back to the
+  75-second activity timeout.
 - **Vouchers** — prepare, submit, approve/reject. See
   [Vouchers](#vouchers) below.
 - **Flagged** — every voucher visible to this person where `voucher.py`'s

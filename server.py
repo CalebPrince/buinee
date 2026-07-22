@@ -1365,6 +1365,9 @@ class RouteHandlerMixin:
         )
 
     def _handle_logout(self):
+        user = current_user(self)
+        if user:
+            db.clear_presence(user["id"])
         db.destroy_session(session_token(self))
         return self._json({"ok": True}, extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, "", 0))])
 

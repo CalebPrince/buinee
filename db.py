@@ -1763,6 +1763,17 @@ def touch_presence(user_id: int) -> None:
         )
 
 
+def clear_presence(user_id: int) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO user_notification_state (user_id, state_key, state_value, updated_at)
+               VALUES (?, 'presence', 0, ?)
+               ON CONFLICT(user_id, state_key) DO UPDATE SET
+                 state_value = 0, updated_at = excluded.updated_at""",
+            (user_id, time.time()),
+        )
+
+
 def get_team_file(company_id: int, viewer_id: int, file_id: int, include_content: bool = True) -> dict | None:
     columns = "f.*" if include_content else "f.id, f.message_id, f.company_id, f.uploader_id, f.name, f.kind, f.media_type, f.size_bytes, f.created_at"
     with _cursor() as conn:
