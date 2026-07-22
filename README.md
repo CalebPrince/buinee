@@ -385,10 +385,11 @@ switched client-side with no page reload:
     and `/api/user/reference-documents/*`. Personal instructions and text
     references also inform mailbox triage and automations; the full private
     library is available in Ask Ada.
-- **Team** (Supervisor only, nav item hidden otherwise) — the full
-  roster and the real pending-approval queue with working Approve/Reject,
-  moved off Overview into its own page. The nav item carries a live count
-  badge for pending requests, hidden entirely at zero.
+- **Team** — the approved roster and role guide are visible to every approved
+  user; the pending-approval queue, plan capacity, and Approve/Reject controls
+  remain Supervisor-only. The signed-in person is marked “You”. Join decisions
+  require confirmation and refresh the roster, queue, empty state, seat count,
+  and live nav badge together; the badge is hidden entirely at zero.
 
 The rail also has the other two visual pieces from the reference dashboards:
 a prominent "New voucher" compose button (opens the Vouchers form directly,

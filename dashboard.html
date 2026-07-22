@@ -368,6 +368,15 @@
   .instruction-example:hover { border-color: var(--teal); color: var(--teal-deep); }
   .instruction-example b { display: block; margin-bottom: 2px; color: var(--ink); font-size: 11.5px; }
   .instruction-scope { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--ink-4); font-size: 11px; line-height: 1.55; }
+  .team-grid { align-items: start; }
+  .team-grid.single { grid-template-columns: 1fr; }
+  .team-you { margin-left: 5px; padding: 2px 6px; border-radius: 10px; background: var(--teal-soft); color: var(--teal-deep); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+  .role-guide { margin-top: 16px; }
+  .role-guide-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .role-guide-item { padding: 15px 16px; border-right: 1px solid var(--line); }
+  .role-guide-item:last-child { border-right: 0; }
+  .role-guide-item b { display: block; font-size: 12.5px; }
+  .role-guide-item p { margin-top: 4px; color: var(--ink-3); font-size: 11.5px; line-height: 1.5; }
   .personal-context { margin-top: 16px; }
   .personal-context .settings-sec { padding: 19px 20px; }
   #personalBriefingInput { width: 100%; min-height: 190px; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: 12.5px/1.7 var(--mono); resize: vertical; }
@@ -499,6 +508,9 @@
     .activity-row { grid-template-columns: 30px minmax(0, 1fr); }
     .activity-row .when { grid-column: 2; }
     .instructions-layout { grid-template-columns: 1fr; }
+    .role-guide-grid { grid-template-columns: 1fr; }
+    .role-guide-item { border-right: 0; border-bottom: 1px solid var(--line); }
+    .role-guide-item:last-child { border-bottom: 0; }
   }
 </style>
 
@@ -897,14 +909,22 @@ Do not promise a payment date unless it has already been approved."></textarea>
         <p>Everyone approved at your company, and anyone waiting on you to let them in.</p>
       </div>
       <div class="plan-banner" id="planBanner"></div>
-      <div class="grid2">
+      <div class="grid2 team-grid" id="teamGrid">
         <div class="card">
           <div class="card-h"><h3>Team</h3><div class="sub" id="teamSub"></div></div>
           <div class="card-b" id="teamRows"></div>
         </div>
-        <div class="card">
+        <div class="card" id="pendingTeamCard">
           <div class="card-h"><h3>Pending join requests</h3><div class="sub">People who typed in your company's name</div></div>
           <div class="card-b" id="pendingRows"></div>
+        </div>
+      </div>
+      <div class="card full role-guide">
+        <div class="card-h"><h3>How roles work</h3><div class="sub">Visibility and approval responsibility</div></div>
+        <div class="role-guide-grid">
+          <div class="role-guide-item"><b>Preparer</b><p>Creates vouchers and sees only their own work. Cannot approve or reject vouchers.</p></div>
+          <div class="role-guide-item"><b>Approver</b><p>Sees their own work and Preparers’ work. Can review submitted vouchers, but never their own.</p></div>
+          <div class="role-guide-item"><b>Supervisor</b><p>Sees the whole company, manages join requests, and controls company-wide AI settings.</p></div>
         </div>
       </div>
     </section>
@@ -1002,8 +1022,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
-    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)
-        || (view === 'team' && myRole !== 'finance_supervisor')) {
+    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)) {
       view = 'overview';
     }
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
@@ -1114,13 +1133,17 @@ Do not promise a payment date unless it has already been approved."></textarea>
     cards.appendChild(mailCard);
     loadMailboxPreview();
 
+    document.getElementById('teamNavItem').style.display = 'flex';
+    const teamCount = await loadTeam(me.company.name);
     if (isSupervisor) {
-      document.getElementById('teamNavItem').style.display = 'flex';
-      const teamCount = await loadTeam(me.company.name);
       const pendingCount = await loadPending();
       kpis.push({ key: 'team', n: teamCount, l: 'Team members' });
       kpis.push({ key: 'pending', n: pendingCount, l: 'Pending requests' });
       renderPlanBanner(me.company);
+    } else {
+      document.getElementById('planBanner').hidden = true;
+      document.getElementById('pendingTeamCard').hidden = true;
+      document.getElementById('teamGrid').classList.add('single');
     }
 
     kpiBox.innerHTML = kpis.map(k => `
@@ -1769,8 +1792,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
       }
       box.innerHTML = team.map(u => `
         <div class="row">
-          <div class="who2"><b>${escapeHtml(u.name)}</b><span>${escapeHtml(u.email)}</span></div>
-          <span class="role-badge">${(ROLE_INFO[u.role] || {}).label || u.role}</span>
+          <div class="who2"><b>${escapeHtml(u.name)}${u.id === myId ? '<span class="team-you">You</span>' : ''}</b><span>${escapeHtml(u.email)}</span></div>
+          <span class="role-badge">${escapeHtml((ROLE_INFO[u.role] || {}).label || u.role)}</span>
         </div>
       `).join('');
       return team.length;
@@ -1786,23 +1809,22 @@ Do not promise a payment date unless it has already been approved."></textarea>
       const res = await fetch('/api/company/pending', { credentials: 'same-origin' });
       const data = await res.json();
       const pending = data.pending || [];
-      if (pending.length) {
-        document.getElementById('teamNavCount').style.display = 'inline-block';
-        document.getElementById('teamNavCount').textContent = pending.length;
-      }
+      const badge = document.getElementById('teamNavCount');
+      badge.style.display = pending.length ? 'inline-block' : 'none';
+      badge.textContent = pending.length || '';
       if (!pending.length) {
         box.innerHTML = '<div class="empty"><h4>No one waiting</h4><p>Requests to join show up here.</p></div>';
         return 0;
       }
       box.innerHTML = pending.map(u => `
-        <div class="row" id="pending-${u.id}">
+        <div class="row" id="pending-${u.id}" data-name="${escapeHtml(u.name)}">
           <div class="who2">
             <b>${escapeHtml(u.name)}</b>
             <span>${escapeHtml(u.email)} · requested ${(ROLE_INFO[u.role] || {}).label || u.role}</span>
           </div>
           <div class="actions">
-            <button class="btn sm primary" onclick="actOnPending(${u.id}, 'approve')">Approve</button>
-            <button class="btn sm bad" onclick="actOnPending(${u.id}, 'reject')">Reject</button>
+            <button class="btn sm primary" type="button" onclick="actOnPending(${u.id}, 'approve')">Approve</button>
+            <button class="btn sm bad" type="button" onclick="actOnPending(${u.id}, 'reject')">Reject</button>
           </div>
         </div>
       `).join('');
@@ -1815,6 +1837,14 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   async function actOnPending(userId, action) {
     const row = document.getElementById(`pending-${userId}`);
+    if (!row) return;
+    const name = row.dataset.name || 'this person';
+    const verb = action === 'approve' ? 'approve' : 'reject';
+    if (!confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${name}'s request to join this company?`)) return;
+    const buttons = [...row.querySelectorAll('button')];
+    buttons.forEach(button => button.disabled = true);
+    const active = row.querySelector(action === 'approve' ? '.primary' : '.bad');
+    if (active) active.textContent = action === 'approve' ? 'Approving…' : 'Rejecting…';
     try {
       const res = await fetch('/api/company/approve', {
         method: 'POST', credentials: 'same-origin',
@@ -1826,16 +1856,16 @@ Do not promise a payment date unless it has already been approved."></textarea>
         alert(data.error || 'Could not do that.');
         return;
       }
-      row.remove();
       const me = (await (await fetch('/api/me', { credentials: 'same-origin' })).json()).user;
-      await loadTeam(me.company.name);
+      await Promise.all([loadTeam(me.company.name), loadPending()]);
       renderPlanBanner(me.company);
-      const remaining = document.querySelectorAll('#pendingRows .row[id^="pending-"]').length;
-      const badge = document.getElementById('teamNavCount');
-      if (remaining) { badge.style.display = 'inline-block'; badge.textContent = remaining; }
-      else { badge.style.display = 'none'; }
     } catch {
       alert('Could not reach the server.');
+    } finally {
+      if (row.isConnected) {
+        buttons.forEach(button => button.disabled = false);
+        if (active) active.textContent = action === 'approve' ? 'Approve' : 'Reject';
+      }
     }
   }
 
