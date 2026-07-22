@@ -353,6 +353,21 @@
     background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical;
   }
   .readonly-note { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
+  .instructions-intro { max-width: 720px; }
+  .instructions-note { display: flex; gap: 11px; align-items: flex-start; margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--teal); border-radius: 12px; background: var(--teal-soft); color: var(--ink-2); font-size: 12.5px; line-height: 1.6; }
+  .instructions-note-mark { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 800; }
+  .instructions-note b { color: var(--teal-deep); }
+  .instructions-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(240px, .8fr); gap: 16px; align-items: start; }
+  .instructions-main .settings-sec { padding: 19px 20px; }
+  .instructions-main #briefingInput { min-height: 340px; font: 12.5px/1.7 var(--mono); }
+  .instruction-tips { padding: 17px; }
+  .instruction-tips h3 { font: 600 15px var(--serif); }
+  .instruction-tips > p { margin-top: 5px; color: var(--ink-3); font-size: 12px; line-height: 1.5; }
+  .instruction-examples { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .instruction-example { padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--ink-2); font: 11.5px/1.45 var(--sans); text-align: left; }
+  .instruction-example:hover { border-color: var(--teal); color: var(--teal-deep); }
+  .instruction-example b { display: block; margin-bottom: 2px; color: var(--ink); font-size: 11.5px; }
+  .instruction-scope { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--ink-4); font-size: 11px; line-height: 1.55; }
   select {
     padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface);
     color: var(--ink); font-size: 13.5px; font-family: inherit;
@@ -471,6 +486,7 @@
     .auto-result { grid-column: 1 / -1; }
     .activity-row { grid-template-columns: 30px minmax(0, 1fr); }
     .activity-row .when { grid-column: 2; }
+    .instructions-layout { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -784,37 +800,57 @@
     <!-- ===== INSTRUCTIONS ===== -->
     <section class="view" data-view="instructions" id="viewInstructions" hidden>
       <div class="hello">
-        <div>
-          <h1>Instructions</h1>
-          <p>How Chat is configured for everyone at your company.</p>
+        <div class="instructions-intro">
+          <h1>Instructions for Ada</h1>
+          <p>Tell Ada how your business actually works—your approval rules, terminology, thresholds, and preferred tone. She reads this before Chat, email triage, and every AI automation.</p>
         </div>
       </div>
-      <div class="card full">
-        <div class="settings-sec">
-          <h3>AI provider</h3>
-          <p class="sub">Only providers with a key configured on this server can be selected. Applies to every conversation in Chat, for everyone at your company.</p>
-          <div id="providerReadonly" class="readonly-note" hidden></div>
-          <form id="providerForm" onsubmit="return saveProvider(event)" hidden>
-            <div class="vgrid">
-              <label>Provider<select id="providerSelect"></select></label>
-              <label>Model override (optional)<input id="providerModel" placeholder="Leave blank to use the provider's default"></label>
-            </div>
-            <div class="msg-error" id="providerErr" style="display:none"></div>
-            <div class="msg-ok" id="providerOk" style="display:none"></div>
-            <button class="btn primary sm" type="submit">Save</button>
-          </form>
+      <div class="instructions-note">
+        <span class="instructions-note-mark">i</span>
+        <span><b>This is what makes Ada specific to your company.</b> Instructions take effect on the next question, triage, or automation run—no restart needed. They add business context but cannot override accuracy or approval safeguards.</span>
+      </div>
+      <div class="instructions-layout">
+        <div class="card full instructions-main">
+          <div class="settings-sec">
+            <h3>AI provider</h3>
+            <p class="sub">Choose from providers configured securely on the server. API keys never appear on this page and the selection applies to everyone at your company.</p>
+            <div id="providerReadonly" class="readonly-note" hidden></div>
+            <form id="providerForm" onsubmit="return saveProvider(event)" hidden>
+              <div class="vgrid">
+                <label>Provider<select id="providerSelect"></select></label>
+                <label>Model override (optional)<input id="providerModel" placeholder="Leave blank to use the provider's default"></label>
+              </div>
+              <div class="msg-error" id="providerErr" style="display:none"></div>
+              <div class="msg-ok" id="providerOk" style="display:none"></div>
+              <button class="btn primary sm" type="submit">Save provider</button>
+            </form>
+          </div>
+          <div class="settings-sec">
+            <h3>Company briefing</h3>
+            <p class="sub">Write durable facts and rules Ada should use every time. Real thresholds, role names, document requirements, and reply style are more useful than general advice.</p>
+            <div id="briefingReadonly" class="readonly-note" hidden></div>
+            <form id="briefingForm" onsubmit="return saveBriefing(event)" hidden>
+              <textarea id="briefingInput" spellcheck="true" placeholder="Example:
+Payment requests above GHS 25,000 require Supervisor approval.
+Always quote invoice numbers in vendor replies.
+Do not promise a payment date unless it has already been approved."></textarea>
+              <div class="msg-error" id="briefingErr" style="display:none; margin-top:10px"></div>
+              <div class="msg-ok" id="briefingOk" style="display:none; margin-top:10px"></div>
+              <button class="btn primary sm" type="submit" style="margin-top:10px">Save instructions</button>
+            </form>
+          </div>
         </div>
-        <div class="settings-sec">
-          <h3>Custom instructions</h3>
-          <p class="sub">Folded into every Chat conversation at your company — policies, terminology, tone. Written by your Supervisor; doesn't override Chat's grounding rules.</p>
-          <div id="briefingReadonly" class="readonly-note" hidden></div>
-          <form id="briefingForm" onsubmit="return saveBriefing(event)" hidden>
-            <textarea id="briefingInput" placeholder="e.g. Always quote amounts in GHS to two decimals. Our fiscal year starts in July."></textarea>
-            <div class="msg-error" id="briefingErr" style="display:none; margin-top:10px"></div>
-            <div class="msg-ok" id="briefingOk" style="display:none; margin-top:10px"></div>
-            <button class="btn primary sm" type="submit" style="margin-top:10px">Save</button>
-          </form>
-        </div>
+        <aside class="card instruction-tips">
+          <h3>Useful things to include</h3>
+          <p>Supervisors can click an example to add it to the briefing, then edit the details.</p>
+          <div class="instruction-examples">
+            <button class="instruction-example" type="button" onclick="addInstructionExample('approval')"><b>Approval thresholds</b>Who approves what, and at which amount.</button>
+            <button class="instruction-example" type="button" onclick="addInstructionExample('documents')"><b>Required documents</b>POs, invoices, receipts, and references to check.</button>
+            <button class="instruction-example" type="button" onclick="addInstructionExample('vendors')"><b>Vendor rules</b>Known senders, naming conventions, and exceptions.</button>
+            <button class="instruction-example" type="button" onclick="addInstructionExample('tone')"><b>Reply style</b>How firm, formal, or concise drafts should be.</button>
+          </div>
+          <div class="instruction-scope">Only a Supervisor can change company-wide instructions. Ada still grounds voucher facts in records visible to the signed-in user.</div>
+        </aside>
       </div>
     </section>
 
@@ -1886,6 +1922,22 @@
   // -------------------------------------------------------- instructions
 
   const PROVIDER_LABELS = { anthropic: 'Anthropic (Claude)', google: 'Google (Gemini)', openrouter: 'OpenRouter' };
+  const INSTRUCTION_EXAMPLES = {
+    approval: 'Approval thresholds:\n- Payments above GHS [amount] require [role] approval.\n- [role] may approve up to GHS [amount].',
+    documents: 'Required documents:\n- Every payment request must include [documents].\n- Flag requests when [reference or document] is missing.',
+    vendors: 'Vendor rules:\n- Treat email from [vendor/domain] as [rule].\n- Use [vendor naming convention] in summaries and vouchers.',
+    tone: 'Reply style:\n- Keep vendor replies [formal/concise/firm].\n- Never promise a payment date unless it is already approved.',
+  };
+
+  function addInstructionExample(kind) {
+    const input = document.getElementById('briefingInput');
+    if (!input || input.closest('form').hidden || !INSTRUCTION_EXAMPLES[kind]) return;
+    input.value = input.value.trim()
+      ? `${input.value.trim()}\n\n${INSTRUCTION_EXAMPLES[kind]}`
+      : INSTRUCTION_EXAMPLES[kind];
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
 
   async function loadInstructions() {
     const provReadonly = document.getElementById('providerReadonly');
@@ -1905,6 +1957,10 @@
     }
 
     const isSupervisor = me.role === 'finance_supervisor';
+    document.querySelectorAll('.instruction-example').forEach(button => {
+      button.disabled = !isSupervisor;
+      button.title = isSupervisor ? 'Add this example' : 'Only a Supervisor can edit company instructions';
+    });
 
     if (isSupervisor) {
       provReadonly.hidden = true;
