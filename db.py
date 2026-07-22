@@ -220,6 +220,17 @@ def init_db() -> None:
                 updated_at    REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS crm_subscriptions (
+                company_id        INTEGER PRIMARY KEY REFERENCES companies(id),
+                subscription_status TEXT NOT NULL DEFAULT 'active',
+                billing_cycle     TEXT NOT NULL DEFAULT 'monthly',
+                renewal_date      TEXT NOT NULL DEFAULT '',
+                payment_status    TEXT NOT NULL DEFAULT 'not_connected',
+                customer_reference TEXT NOT NULL DEFAULT '',
+                notes             TEXT NOT NULL DEFAULT '',
+                updated_at        REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -1368,6 +1379,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM crm_subscriptions WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_tasks WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_interactions WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_opportunities WHERE company_id = ?", (company_id,))
@@ -1393,9 +1405,17 @@ def list_companies_with_stats() -> list[dict]:
                       COALESCE(a.lifecycle_status, 'customer') AS lifecycle_status,
                       a.relationship_owner, a.primary_contact_name,
                       a.primary_contact_email, a.summary, a.updated_at AS crm_updated_at,
-                      COALESCE(NULLIF(a.lifecycle_changed_at, 0), c.created_at) AS lifecycle_changed_at
+                      COALESCE(NULLIF(a.lifecycle_changed_at, 0), c.created_at) AS lifecycle_changed_at,
+                      COALESCE(s.subscription_status, 'active') AS subscription_status,
+                      COALESCE(s.billing_cycle, 'monthly') AS billing_cycle,
+                      COALESCE(s.renewal_date, '') AS renewal_date,
+                      COALESCE(s.payment_status, 'not_connected') AS payment_status,
+                      COALESCE(s.customer_reference, '') AS customer_reference,
+                      COALESCE(s.notes, '') AS subscription_notes,
+                      s.updated_at AS subscription_updated_at
                FROM companies c JOIN plans p ON c.plan_id = p.id
                LEFT JOIN crm_accounts a ON a.company_id = c.id
+               LEFT JOIN crm_subscriptions s ON s.company_id = c.id
                ORDER BY c.created_at""",
         ).fetchall()
         out = []
@@ -1449,6 +1469,15 @@ def list_companies_with_stats() -> list[dict]:
                 "contacts": [dict(contact) for contact in contacts],
                 "interactions": [dict(interaction) for interaction in interactions],
                 "tasks": [dict(task) for task in tasks],
+                "subscription": {
+                    "subscription_status": c["subscription_status"],
+                    "billing_cycle": c["billing_cycle"],
+                    "renewal_date": c["renewal_date"],
+                    "payment_status": c["payment_status"],
+                    "customer_reference": c["customer_reference"],
+                    "notes": c["subscription_notes"],
+                    "updated_at": c["subscription_updated_at"],
+                },
                 "crm": {
                     "legal_name": c["legal_name"] or "",
                     "industry": c["industry"] or "",
@@ -2310,6 +2339,52 @@ def delete_crm_task(company_id: int, task_id: int) -> bool:
             "DELETE FROM crm_tasks WHERE id=? AND company_id=?", (task_id, company_id)
         )
     return bool(cur.rowcount)
+
+
+CRM_SUBSCRIPTION_STATUSES = {"trial", "active", "paused", "cancel_at_period_end", "cancelled"}
+CRM_BILLING_CYCLES = {"monthly", "annual", "custom"}
+CRM_PAYMENT_STATUSES = {"not_connected", "current", "due", "overdue", "not_applicable"}
+
+
+def save_crm_subscription(company_id: int, fields: dict) -> dict:
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    subscription_status = str(fields.get("subscription_status") or "active").strip().lower()
+    billing_cycle = str(fields.get("billing_cycle") or "monthly").strip().lower()
+    payment_status = str(fields.get("payment_status") or "not_connected").strip().lower()
+    renewal_date = str(fields.get("renewal_date") or "").strip()[:10]
+    customer_reference = str(fields.get("customer_reference") or "").strip()[:120]
+    notes = str(fields.get("notes") or "").strip()[:3000]
+    if subscription_status not in CRM_SUBSCRIPTION_STATUSES:
+        raise AuthError("Choose a valid subscription status.")
+    if billing_cycle not in CRM_BILLING_CYCLES:
+        raise AuthError("Choose a valid billing cycle.")
+    if payment_status not in CRM_PAYMENT_STATUSES:
+        raise AuthError("Choose a valid payment status.")
+    if renewal_date:
+        try:
+            time.strptime(renewal_date, "%Y-%m-%d")
+        except ValueError:
+            raise AuthError("Choose a valid renewal date.")
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO crm_subscriptions
+                 (company_id, subscription_status, billing_cycle, renewal_date,
+                  payment_status, customer_reference, notes, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 subscription_status=excluded.subscription_status,
+                 billing_cycle=excluded.billing_cycle,
+                 renewal_date=excluded.renewal_date,
+                 payment_status=excluded.payment_status,
+                 customer_reference=excluded.customer_reference,
+                 notes=excluded.notes, updated_at=excluded.updated_at""",
+            (company_id, subscription_status, billing_cycle, renewal_date,
+             payment_status, customer_reference, notes, now),
+        )
+        row = conn.execute("SELECT * FROM crm_subscriptions WHERE company_id=?", (company_id,)).fetchone()
+    return dict(row)
 
 
 def list_user_crm_tasks(user: dict) -> list[dict]:

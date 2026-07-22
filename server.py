@@ -1041,6 +1041,7 @@ class RouteHandlerMixin:
             "/api/admin/company/interaction/delete": self._handle_admin_delete_crm_interaction,
             "/api/admin/company/task/save": self._handle_admin_save_crm_task,
             "/api/admin/company/task/delete": self._handle_admin_delete_crm_task,
+            "/api/admin/company/subscription": self._handle_admin_save_crm_subscription,
             "/api/admin/opportunity/save": self._handle_admin_save_opportunity,
             "/api/admin/opportunity/delete": self._handle_admin_delete_opportunity,
             "/api/admin/plans/create": self._handle_admin_create_plan,
@@ -1917,6 +1918,17 @@ class RouteHandlerMixin:
         if not db.delete_crm_task(company_id, task_id):
             return self._json({"error": "Follow-up task not found."}, 404)
         return self._json({"ok": True})
+
+    def _handle_admin_save_crm_subscription(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=6000)
+            subscription = db.save_crm_subscription(int(req.get("company_id")), req)
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad subscription record."}, 400)
+        return self._json({"ok": True, "subscription": subscription})
 
     def _handle_admin_save_opportunity(self):
         admin = current_admin(self)

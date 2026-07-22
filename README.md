@@ -303,6 +303,15 @@ weight in a security-sensitive area of the code.
   attention panel and navigation badge. Admin writes remain authenticated and
   company-scoped through `/api/admin/company/task/save` and
   `/api/admin/company/task/delete`.
+  Account 360 also includes subscription and seat management. The live seat
+  meter uses approved users against the selected plan's enforced `user_limit`;
+  pending requests are shown separately and are not counted as occupied seats.
+  Command Center can move the company between real plans and maintain manual
+  commercial metadata in `crm_subscriptions`: Trial/Active/Paused/Cancelling/
+  Cancelled status, billing cycle, renewal or end date, payment status,
+  customer/contract reference, and notes. Metadata saves through the
+  authenticated `/api/admin/company/subscription` route. Payment status is
+  explicitly manual until a payment provider is connected.
   Lifecycle management is operational rather than a bare dropdown: the CRM
   stores `lifecycle_changed_at`, resetting it only when the stage actually
   changes. The Customer accounts page shows a six-stage portfolio board (Lead,

@@ -167,6 +167,21 @@
     padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
     background: var(--paper); color: var(--ink); font-size: 12.5px; max-width: 260px;
   }
+  .crm-subscription { margin-bottom: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); }
+  .subscription-grid { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(0,1.4fr); gap: 16px; }
+  .seat-panel { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .seat-numbers { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .seat-numbers b { font: 700 26px var(--serif); }
+  .seat-numbers span { color: var(--ink-3); font-size: 11px; }
+  .seat-meter { height: 8px; margin: 10px 0 8px; overflow: hidden; border-radius: 8px; background: var(--surface-3); }
+  .seat-meter span { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
+  .seat-meter.warn span { background: var(--warn); }
+  .seat-meter.bad span { background: var(--bad); }
+  .seat-caption { color: var(--ink-3); font-size: 11px; line-height: 1.5; }
+  .subscription-plan { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .subscription-plan select { width: 100%; max-width: none; margin: 6px 0 8px; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 12px; }
+  .crm-subscription .crm-fields { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .subscription-manual { margin-top: 9px; color: var(--ink-3); font-size: 10.5px; }
 
   .danger-zone {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
@@ -249,7 +264,7 @@
     .sidebar-brand { justify-content: center; padding: 0; }
     .sidebar-brand .name, .sidebar-tag, .sidebar-link .label { display: none; }
     .sidebar-link { justify-content: center; padding: 10px; }
-    .detail-grid, .crm-fields { grid-template-columns: 1fr; gap: 14px; }
+    .detail-grid, .crm-fields, .subscription-grid, .crm-subscription .crm-fields { grid-template-columns: 1fr; gap: 14px; }
     .crm-task { grid-template-columns: 5px minmax(0,1fr); }
     .crm-task-actions { grid-column: 2; justify-content: flex-start; }
   }
@@ -438,15 +453,8 @@
           ${renderCrmContacts(c)}
           ${renderCrmHistory(c)}
           ${renderCrmTasks(c)}
+          ${renderCrmSubscription(c)}
           ${renderTeamAndPending(c)}
-          <div class="plan-change" onclick="event.stopPropagation()">
-            <label for="planSelect-${c.id}">Change plan</label>
-            <select id="planSelect-${c.id}">
-              ${allPlans.map(p => `<option value="${p.id}" ${p.id === c.plan.id ? 'selected' : ''}>${p.audience === 'individual' ? 'Individual' : 'Team'} — ${escapeHtml(p.name)} (${p.user_limit} ${p.user_limit === 1 ? 'user' : 'users'}) — ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}
-            </select>
-            <button class="btn sm" onclick="changePlan(${c.id})">Move</button>
-            <span class="msg error" id="planError-${c.id}" style="display:inline-block;margin:0"></span>
-          </div>
           <div class="danger-zone">
             <button class="btn-delete" onclick="event.stopPropagation(); deleteCompany(${c.id})">
               Delete company
@@ -833,6 +841,41 @@
     } catch {
       alert('Could not reach the server.');
     }
+  }
+
+  const SUBSCRIPTION_STATUS_LABELS = { trial:'Trial', active:'Active', paused:'Paused', cancel_at_period_end:'Cancels at period end', cancelled:'Cancelled' };
+  const BILLING_CYCLE_LABELS = { monthly:'Monthly', annual:'Annual', custom:'Custom' };
+  const PAYMENT_STATUS_LABELS = { not_connected:'Not connected', current:'Current', due:'Due', overdue:'Overdue', not_applicable:'Not applicable' };
+
+  function renderCrmSubscription(c) {
+    const s = c.subscription || {};
+    const used = Number(c.approved_count || 0), limit = Number(c.plan.user_limit || 1);
+    const percent = Math.min(100, Math.round((used / limit) * 100));
+    const meterClass = used > limit ? 'bad' : used >= limit ? 'warn' : '';
+    const options = (labels, selected) => Object.entries(labels).map(([value,label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
+    return `<section class="crm-subscription" onclick="event.stopPropagation()">
+      <div class="crm-profile-head"><h4>Subscription & seats</h4><span>Plan capacity is enforced from real approved users</span></div>
+      <div class="subscription-grid">
+        <div class="seat-panel"><div class="seat-numbers"><b>${used} / ${limit}</b><span>approved seats</span></div><div class="seat-meter ${meterClass}"><span style="width:${percent}%"></span></div><div class="seat-caption">${limit-used > 0 ? `${limit-used} seat${limit-used===1?'':'s'} available` : used===limit ? 'At plan capacity' : `${used-limit} user${used-limit===1?'':'s'} over the current limit`}${c.pending_count ? ` · ${c.pending_count} pending request${c.pending_count===1?'':'s'} not counted as occupied` : ''}</div>
+          <div class="subscription-plan"><label for="planSelect-${c.id}"><b>Current plan: ${escapeHtml(c.plan.name)}</b></label><select id="planSelect-${c.id}">${allPlans.map(p => `<option value="${p.id}" ${p.id===c.plan.id?'selected':''}>${p.audience==='individual'?'Individual':'Team'} — ${escapeHtml(p.name)} · ${p.user_limit} seat${p.user_limit===1?'':'s'} · ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}</select><button class="btn sm" type="button" onclick="changePlan(${c.id})">Move to selected plan</button><span class="msg error" id="planError-${c.id}"></span></div>
+        </div>
+        <form onsubmit="return saveCrmSubscription(event,${c.id})"><div class="crm-fields">
+          <label>Subscription status<select id="subStatus-${c.id}">${options(SUBSCRIPTION_STATUS_LABELS,s.subscription_status||'active')}</select></label>
+          <label>Billing cycle<select id="subCycle-${c.id}">${options(BILLING_CYCLE_LABELS,s.billing_cycle||'monthly')}</select></label>
+          <label>Payment status<select id="subPayment-${c.id}">${options(PAYMENT_STATUS_LABELS,s.payment_status||'not_connected')}</select></label>
+          <label>Renewal / end date<input id="subRenewal-${c.id}" type="date" value="${escapeAttr(s.renewal_date||'')}"></label>
+          <label class="wide">Customer / contract reference<input id="subReference-${c.id}" maxlength="120" value="${escapeAttr(s.customer_reference||'')}" placeholder="External billing or contract ID"></label>
+          <label class="wide">Subscription notes<textarea id="subNotes-${c.id}" maxlength="3000" placeholder="Commercial terms, renewal context, or billing notes…">${escapeHtml(s.notes||'')}</textarea></label>
+        </div><div class="crm-actions"><button class="btn sm" type="submit">Save subscription</button><span class="crm-saved" id="subSaved-${c.id}"></span><span class="msg error" id="subError-${c.id}"></span></div><div class="subscription-manual">Billing fields are maintained manually. No payment provider is connected yet.</div></form>
+      </div>
+    </section>`;
+  }
+
+  async function saveCrmSubscription(event, companyId) {
+    event.preventDefault(); const button=event.submitter, error=document.getElementById(`subError-${companyId}`), saved=document.getElementById(`subSaved-${companyId}`);
+    error.textContent=''; saved.textContent=''; button.disabled=true; button.textContent='Saving…';
+    const payload={company_id:companyId,subscription_status:document.getElementById(`subStatus-${companyId}`).value,billing_cycle:document.getElementById(`subCycle-${companyId}`).value,payment_status:document.getElementById(`subPayment-${companyId}`).value,renewal_date:document.getElementById(`subRenewal-${companyId}`).value,customer_reference:document.getElementById(`subReference-${companyId}`).value,notes:document.getElementById(`subNotes-${companyId}`).value};
+    try{const res=await fetch('/api/admin/company/subscription',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await res.json();if(!res.ok)throw new Error(data.error||'Could not save subscription.');const company=lastCompanies.find(c=>c.id===companyId);if(company)company.subscription=data.subscription;saved.textContent='Subscription saved';}catch(err){error.textContent=err.message||'Could not reach the server.';}finally{button.disabled=false;button.textContent='Save subscription';}return false;
   }
 
   async function changePlan(id) {
