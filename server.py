@@ -439,7 +439,7 @@ def public_user(user: dict) -> dict:
         "user_limit": plan["user_limit"],
         "audience": plan["audience"],
         "chat_enabled": plan["chat_enabled"],
-        "chat_limit": plan["chat_limit"],
+        "chat_limit": plan["chat_monthly_limit"],
         "mailbox_limit": plan["mailbox_limit"],
         "team_chat_enabled": plan["team_chat_enabled"],
     }
