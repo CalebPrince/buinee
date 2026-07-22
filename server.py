@@ -449,6 +449,7 @@ def public_user(user: dict) -> dict:
         "name": user["name"],
         "email": user["email"],
         "role": user["role"],
+        "onboarding_complete": bool(user.get("onboarding_complete", 1)),
         "status": user["status"],
         "company": company,
     }
@@ -1337,6 +1338,7 @@ class RouteHandlerMixin:
             "/api/company/briefing": self._handle_set_company_briefing,
             "/api/company/profile": self._handle_set_company_profile,
             "/api/user/instructions": self._handle_set_user_instructions,
+            "/api/user/onboarding/complete": self._handle_complete_onboarding,
             "/api/user/reference-documents/upload": self._handle_reference_upload,
             "/api/user/reference-documents/delete": self._handle_reference_delete,
             "/api/team-chat/send": self._handle_team_message,
@@ -1825,6 +1827,13 @@ class RouteHandlerMixin:
             {"ok": True, "user": public_user(user)},
             extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
         )
+
+    def _handle_complete_onboarding(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        db.complete_user_onboarding(user["id"])
+        return self._json({"ok": True})
 
     def _handle_logout(self):
         user = current_user(self)
