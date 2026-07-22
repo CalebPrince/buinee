@@ -164,6 +164,11 @@ def init_db() -> None:
                 severity TEXT NOT NULL DEFAULT 'error', message TEXT NOT NULL,
                 details TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS admin_inbox_states (
+                item_type TEXT NOT NULL, item_id INTEGER NOT NULL,
+                state TEXT NOT NULL DEFAULT 'unread', updated_at REAL NOT NULL,
+                PRIMARY KEY (item_type,item_id)
+            );
 
             CREATE TABLE IF NOT EXISTS crm_accounts (
                 company_id           INTEGER PRIMARY KEY REFERENCES companies(id),
@@ -1488,6 +1493,34 @@ def list_application_errors(limit: int = 300, severity: str = "", query: str = "
 def clear_application_errors() -> None:
     with _cursor() as conn:
         conn.execute("DELETE FROM application_errors")
+
+
+def list_admin_inbox() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT i.id, i.company_id, c.name AS company_name, i.contact_id,
+                      COALESCE(ct.name,'') AS contact_name, i.interaction_type AS source,
+                      i.direction, i.subject, i.body, i.author_name, i.occurred_at,
+                      COALESCE(s.state,'unread') AS state
+               FROM crm_interactions i JOIN companies c ON c.id=i.company_id
+               LEFT JOIN crm_contacts ct ON ct.id=i.contact_id
+               LEFT JOIN admin_inbox_states s ON s.item_type='interaction' AND s.item_id=i.id
+               WHERE i.interaction_type IN ('email','message','call','meeting')
+               ORDER BY i.occurred_at DESC LIMIT 500"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_admin_inbox_state(item_id: int, state: str) -> None:
+    if state not in ("unread", "read", "flagged", "archived"):
+        raise AuthError("Choose a valid inbox state.")
+    with _cursor() as conn:
+        if not conn.execute("SELECT id FROM crm_interactions WHERE id=?", (item_id,)).fetchone():
+            raise AuthError("Inbox item not found.")
+        conn.execute("""INSERT INTO admin_inbox_states(item_type,item_id,state,updated_at)
+                        VALUES('interaction',?,?,?) ON CONFLICT(item_type,item_id)
+                        DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at""",
+                     (item_id, state, time.time()))
 
 
 def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) -> dict:

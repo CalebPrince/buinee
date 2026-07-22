@@ -199,6 +199,7 @@ STATIC_PAGES = {
     "/admin-activity.html": "admin-activity.html",
     "/admin-errors.html": "admin-errors.html",
     "/admin-reports.html": "admin-reports.html",
+    "/admin-inbox.html": "admin-inbox.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -1127,6 +1128,12 @@ class RouteHandlerMixin:
                                "lifecycle": lifecycle, "payments": payments[:10],
                                "opportunities": opportunities[:10]})
 
+        if path == "/api/admin/inbox":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"items": db.list_admin_inbox()})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1189,6 +1196,7 @@ class RouteHandlerMixin:
             "/api/admin/team/update": self._handle_admin_team_update,
             "/api/admin/team/reset-password": self._handle_admin_team_reset_password,
             "/api/admin/errors/clear": self._handle_admin_errors_clear,
+            "/api/admin/inbox/state": self._handle_admin_inbox_state,
         }
         handler = handlers.get(path)
         if not handler:
@@ -2029,6 +2037,17 @@ class RouteHandlerMixin:
             return self._json({"error": "Only an owner can clear error logs."}, 403)
         db.clear_application_errors()
         db.record_admin_activity(admin, "cleared", "error_log", details="All stored application errors removed")
+        return self._json({"ok": True})
+
+    def _handle_admin_inbox_state(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            db.update_admin_inbox_state(int(req.get("item_id")), str(req.get("state") or ""))
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Could not update inbox item."}, 400)
         return self._json({"ok": True})
 
     def _owner_request(self):
