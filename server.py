@@ -196,6 +196,7 @@ STATIC_PAGES = {
     "/admin-pipeline.html": "admin-pipeline.html",
     "/admin-payments.html": "admin-payments.html",
     "/admin-team.html": "admin-team.html",
+    "/admin-activity.html": "admin-activity.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -1077,6 +1078,19 @@ class RouteHandlerMixin:
             return self._json({"members": db.list_platform_admins(),
                                "roles": list(db.PLATFORM_ADMIN_ROLES)})
 
+        if path == "/api/admin/activity":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                page = int(query.get("page", ["1"])[0])
+            except ValueError:
+                page = 1
+            return self._json(db.list_admin_activity(
+                page=page, entity_type=query.get("entity_type", [""])[0],
+                action=query.get("action", [""])[0]))
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1921,6 +1935,7 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 401)
         token = db.create_admin_session(admin["id"])
+        db.record_admin_activity(admin, "signed_in", "admin", admin["id"], admin["name"])
         return self._json(
             {"ok": True, "admin": public_admin(admin)},
             extra_headers=[("Set-Cookie", _cookie_header(ADMIN_COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
@@ -1946,6 +1961,7 @@ class RouteHandlerMixin:
                 str(req.get("current_password") or ""),
                 str(req.get("new_password") or ""),
             )
+            db.record_admin_activity(admin, "password_changed", "admin", admin["id"], admin["name"])
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
@@ -1964,6 +1980,8 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad request."}, 400)
         try:
             db.delete_company(company_id)
+            db.record_admin_activity(admin, "deleted", "company", company_id,
+                                     details="Company and related records permanently removed")
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
@@ -1979,7 +1997,8 @@ class RouteHandlerMixin:
         return admin
 
     def _handle_admin_team_create(self):
-        if not self._owner_request():
+        admin = self._owner_request()
+        if not admin:
             return
         try:
             req = self._body()
@@ -1987,6 +2006,8 @@ class RouteHandlerMixin:
                                                str(req.get("email") or ""),
                                                str(req.get("password") or ""),
                                                str(req.get("role") or ""))
+            db.record_admin_activity(admin, "created", "admin", member["id"], member["name"],
+                                     "Role: " + member["role"])
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Could not add team member."}, 400)
         return self._json({"ok": True, "member": public_admin(member)})
@@ -2000,17 +2021,22 @@ class RouteHandlerMixin:
             member = db.update_platform_admin(int(req.get("member_id")),
                                               str(req.get("role") or ""),
                                               str(req.get("status") or ""), admin["id"])
+            db.record_admin_activity(admin, "updated", "admin", member["id"], member["name"],
+                                     "Role: " + member["role"] + "; status: " + member["status"])
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Could not update team member."}, 400)
         return self._json({"ok": True, "member": public_admin(member)})
 
     def _handle_admin_team_reset_password(self):
-        if not self._owner_request():
+        admin = self._owner_request()
+        if not admin:
             return
         try:
             req = self._body()
             db.reset_platform_admin_password(int(req.get("member_id")),
                                              str(req.get("password") or ""))
+            db.record_admin_activity(admin, "password_reset", "admin", req.get("member_id"),
+                                     details="Existing sessions were signed out")
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Could not reset password."}, 400)
         return self._json({"ok": True})

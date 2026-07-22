@@ -147,6 +147,19 @@ def init_db() -> None:
                 expires_at REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS admin_activity_log (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id     INTEGER REFERENCES platform_admins(id),
+                admin_name   TEXT NOT NULL DEFAULT 'System',
+                admin_email  TEXT NOT NULL DEFAULT '',
+                action       TEXT NOT NULL,
+                entity_type  TEXT NOT NULL,
+                entity_id    TEXT NOT NULL DEFAULT '',
+                entity_label TEXT NOT NULL DEFAULT '',
+                details      TEXT NOT NULL DEFAULT '',
+                created_at   REAL NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS crm_accounts (
                 company_id           INTEGER PRIMARY KEY REFERENCES companies(id),
                 legal_name           TEXT NOT NULL DEFAULT '',
@@ -457,6 +470,8 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
+            CREATE INDEX IF NOT EXISTS idx_admin_activity_created ON admin_activity_log(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_admin_activity_entity ON admin_activity_log(entity_type, action);
             CREATE INDEX IF NOT EXISTS idx_vouchers_company ON vouchers(company_id);
             CREATE INDEX IF NOT EXISTS idx_voucher_events_company ON voucher_events(company_id);
             CREATE INDEX IF NOT EXISTS idx_automation_due ON automation_settings(enabled, next_run_at);
@@ -1401,6 +1416,48 @@ def list_platform_admins() -> list[dict]:
             "SELECT id, name, email, role, status, created_at FROM platform_admins ORDER BY name"
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def record_admin_activity(admin: dict | None, action: str, entity_type: str,
+                          entity_id: object = "", entity_label: str = "",
+                          details: str = "") -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO admin_activity_log
+               (admin_id, admin_name, admin_email, action, entity_type, entity_id,
+                entity_label, details, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (admin.get("id") if admin else None, admin.get("name", "System") if admin else "System",
+             admin.get("email", "") if admin else "", action.strip(), entity_type.strip(),
+             str(entity_id or ""), entity_label.strip(), details.strip(), time.time()),
+        )
+
+
+def list_admin_activity(page: int = 1, per_page: int = 20, entity_type: str = "",
+                        action: str = "") -> dict:
+    page, per_page = max(1, page), min(100, max(1, per_page))
+    where, params = [], []
+    if entity_type:
+        where.append("entity_type = ?")
+        params.append(entity_type)
+    if action:
+        where.append("action = ?")
+        params.append(action)
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+    with _cursor() as conn:
+        total = conn.execute("SELECT COUNT(*) AS n FROM admin_activity_log" + clause, params).fetchone()["n"]
+        rows = conn.execute(
+            "SELECT * FROM admin_activity_log" + clause + " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page],
+        ).fetchall()
+        entity_types = [r["entity_type"] for r in conn.execute(
+            "SELECT DISTINCT entity_type FROM admin_activity_log ORDER BY entity_type"
+        ).fetchall()]
+        actions = [r["action"] for r in conn.execute(
+            "SELECT DISTINCT action FROM admin_activity_log ORDER BY action"
+        ).fetchall()]
+    return {"rows": [dict(r) for r in rows], "total": total, "page": page,
+            "per_page": per_page, "entity_types": entity_types, "actions": actions}
 
 
 def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) -> dict:
