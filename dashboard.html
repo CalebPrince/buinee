@@ -655,9 +655,9 @@
             <div class="plan-banner" id="chatUsageBanner" hidden></div>
             <div class="ada-chat-log" id="chatLog"></div>
             <div class="ada-starters" id="adaStarters">
-              <button class="ada-starter" type="button" onclick="primeAda('What still needs a reply from me today?')"><b>What needs a reply?</b>Rank today’s work by who is waiting on me</button>
+              <button class="ada-starter" type="button" onclick="primeAda('What still needs a reply from me today?')"><b>What needs a reply?</b>Rank today's mail by who is waiting on me</button>
               <button class="ada-starter" type="button" onclick="primeAda('Which invoices are outstanding or overdue?')"><b>Outstanding invoices</b>Everything unpaid, oldest first</button>
-              <button class="ada-starter" type="button" onclick="primeAda('Summarize the most important work in front of me.')"><b>Summarize my work</b>Turn the current queue into clear bullets</button>
+              <button class="ada-starter" type="button" onclick="primeAda('Summarize a long email thread into clear bullets.')"><b>Summarize a thread</b>Turn a long back-and-forth into bullets</button>
               <button class="ada-starter" type="button" onclick="primeAda('Draft a polite payment chaser to a vendor. Ask me for any facts you need first.')"><b>Draft a chaser</b>Firm but polite, ready to edit</button>
             </div>
           </div>
@@ -858,7 +858,7 @@
     approved: { label: 'Approved', cls: 'good' },
     rejected: { label: 'Rejected', cls: 'bad' },
   };
-  let myId = null, myRole = null, myName = '', allVouchers = [], chatHistory = [], pendingAttachments = [];
+  let myId = null, myRole = null, myName = '', allVouchers = [], chatHistory = [], pendingAttachments = [], assistantReady = null;
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
   const triageAnalyses = new Map();
 
@@ -1430,6 +1430,8 @@
     try {
       const res = await fetch('/api/demo/status', { credentials: 'same-origin' });
       const data = await res.json();
+      assistantReady = !!data.available;
+      renderChatLog();
       if (data.available) {
         pill.className = 'pill';
         pill.innerHTML = '<span class="dot live"></span> Assistant ready';
@@ -1441,6 +1443,7 @@
         document.querySelectorAll('.ada-composer button').forEach(b => b.disabled = true);
       }
     } catch {
+      assistantReady = null;
       pill.className = 'pill off';
       pill.innerHTML = '<span class="dot off"></span> Assistant status unknown';
       // Leave chat enabled — the send attempt will surface the real error.
@@ -1807,7 +1810,10 @@
   function renderChatLog() {
     const box = document.getElementById('chatLog');
     const first = (myName || '').split(/\s+/)[0] || 'there';
-    const welcome = `<div class="ada-msg ai"><div class="av">A</div><div class="bub">Hi ${escapeHtml(first)} — I’m <b>Ada</b>. Ask me anything about your mailbox or the accounts it touches. I can review email, work from your visible vouchers, assess documents, and draft replies for you to edit.<span class="meta">Nothing is sent without you</span></div></div>`;
+    const modelNotice = assistantReady === false
+      ? '<span class="meta">No model configured yet — add a key in Settings.</span>'
+      : '';
+    const welcome = `<div class="ada-msg ai"><div class="av">A</div><div class="bub">Hi ${escapeHtml(first)}— I’m <b>Ada</b>. Ask me anything about your mailbox or the accounts it touches. I can summarize threads, draft replies, chase outstanding invoices, and cross-check what vendors send against your ledger.${modelNotice}</div></div>`;
     box.innerHTML = welcome + chatHistory.map(m => {
       const mine = m.role === 'user';
       const docs = (m.docs || []).length
