@@ -251,6 +251,14 @@
   .plan-banner.at-limit { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
   .plan-banner b { color: var(--ink); }
   .plan-banner.at-limit b { color: var(--warn); }
+  .upgrade-notice { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:17px 19px; margin-bottom:18px; border:1px solid var(--teal); border-radius:14px; background:var(--teal-soft); color:var(--ink-2); }
+  .upgrade-notice h3 { margin:0 0 4px; color:var(--teal-deep); font:600 17px var(--serif); }
+  .upgrade-notice p { margin:0; max-width:680px; font-size:12.5px; line-height:1.5; }
+  .upgrade-plans { display:flex; flex-direction:column; gap:9px; }
+  .upgrade-plan { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; padding:13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); text-align:left; }
+  .upgrade-plan:hover { border-color:var(--teal); background:var(--teal-soft); }
+  .upgrade-plan b,.upgrade-plan span { display:block; }
+  .upgrade-plan span { margin-top:3px; color:var(--ink-3); font-size:11.5px; }
   .company-profile-card { margin-bottom: 18px; }
   .company-profile-fields { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 11px; }
   .company-profile-fields label { display: flex; flex-direction: column; gap: 5px; color: var(--ink-2); font-size: 11.5px; font-weight: 700; }
@@ -926,7 +934,8 @@
 
     <!-- ===== TEAM CHAT ===== -->
     <section class="view team-chat-view" data-view="teamchat" id="viewTeamChat" hidden>
-      <div class="team-chat-shell">
+      <div class="upgrade-notice" id="teamChatUpgradeNotice" hidden></div>
+      <div class="team-chat-shell" id="teamChatShell">
         <div class="team-chat-head">
           <div><h1>Team chat</h1><p id="teamChatSubtitle">Your department’s shared conversation and files</p></div>
           <button class="btn sm" type="button" onclick="clearTeamConversation()">Clear conversation</button>
@@ -968,6 +977,7 @@
         </div>
         <button class="btn primary" type="button" disabled title="Custom automations are coming soon">+ New automation</button>
       </div>
+      <div class="upgrade-notice" id="automationUpgradeNotice" hidden></div>
       <div class="automation-note">
         <span class="automation-note-mark">i</span>
         <span><b>Read-only automations.</b> Enabled recipes can analyze your mailbox on schedule. They never send, move, delete, or mark email as read. Availability depends on your company’s AI plan.</span>
@@ -1157,6 +1167,16 @@ Do not promise a payment date unless it has already been approved."></textarea>
   </div>
 </div>
 
+<div class="source-back" id="upgradeBack" onclick="closeUpgradeModal(event)">
+  <div class="source-modal" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" onclick="event.stopPropagation()">
+    <div class="source-modal-head">
+      <div><h2 id="upgradeTitle">Upgrade your plan</h2><p>Choose the plan that fits your company. Your new plan starts after Paystack confirms payment.</p></div>
+      <button class="source-close" type="button" onclick="closeUpgradeModal()" aria-label="Close">×</button>
+    </div>
+    <div class="upgrade-plans" id="upgradePlans"><div class="source-modal-note">Loading plans…</div></div>
+  </div>
+</div>
+
 <div class="source-back" id="sourceBack" onclick="closeSourceModal(event)">
   <div class="source-modal" role="dialog" aria-modal="true" aria-labelledby="sourceModalTitle" onclick="event.stopPropagation()">
     <div class="source-modal-head">
@@ -1241,7 +1261,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     approved: { label: 'Approved', cls: 'good' },
     rejected: { label: 'Rejected', cls: 'bad' },
   };
-  let myId = null, myRole = null, myName = '', allVouchers = [], chatHistory = [], pendingAttachments = [], assistantReady = null;
+  let myId = null, myRole = null, myName = '', myCompany = null, allVouchers = [], chatHistory = [], pendingAttachments = [], assistantReady = null;
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
   let automationStates = {};
   let activityEvents = [], activityFilter = 'all';
@@ -1252,8 +1272,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
-    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)
-        || (view === 'teamchat' && !teamChatAvailable)) {
+    if (!Object.prototype.hasOwnProperty.call(CRUMB_NAMES, view)) {
       view = 'overview';
     }
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
@@ -1319,6 +1338,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     myId = me.id;
     myRole = me.role;
     myName = me.name;
+    myCompany = me.company;
     loadAdaConversation();
     teamChatAvailable = !!me.company.plan.team_chat_enabled;
     teamChatCompanyName = me.company.name;
@@ -1330,10 +1350,18 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.getElementById('rolePill').textContent = info.label;
     document.getElementById('whoAv').textContent = initials(me.name);
     document.getElementById('whoAv').title = me.name;
+    document.getElementById('teamChatNav').style.display = 'flex';
     if (teamChatAvailable) {
-      document.getElementById('teamChatNav').style.display = 'flex';
       document.getElementById('teamChatSubtitle').textContent = `${me.company.name} · approved members only`;
       loadTeamMessages();
+    } else {
+      document.getElementById('teamChatShell').hidden = true;
+      showUpgradeNotice(
+        document.getElementById('teamChatUpgradeNotice'),
+        'Team chat is available on team plans',
+        'Upgrade to give your staff shared and private conversations, files, presence and message notifications.',
+        'team_chat'
+      );
     }
 
     document.getElementById('greeting').textContent = `Welcome, ${me.name.split(' ')[0]}.`;
@@ -2080,7 +2108,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
         }
       }
       if (!data.item) {
-        box.innerHTML = `<div class="triage-ada-body"><div class="msg-error">${escapeHtml(data.error || 'Ada could not summarize this email.')}</div><button class="btn" type="button" onclick="summarizeTriage()">Try again</button></div>`;
+        const action = res.status === 402 ? upgradeActionHtml('Upgrade plan', 'ai') : '<button class="btn" type="button" onclick="summarizeTriage()">Try again</button>';
+        box.innerHTML = `<div class="triage-ada-body"><div class="msg-error">${escapeHtml(data.error || 'Ada could not summarize this email.')}</div>${action}</div>`;
         return;
       }
       triageAnalyses.set(String(message.id), data.item);
@@ -2123,13 +2152,17 @@ Do not promise a payment date unless it has already been approved."></textarea>
   };
 
   function showMailboxResult() {
-    const code = new URLSearchParams(location.search).get('mailbox');
-    if (!code) return;
-    const hit = MAILBOX_RESULTS[code];
+    const params = new URLSearchParams(location.search);
+    const code = params.get('mailbox');
+    const payment = params.get('payment');
+    const hit = code && MAILBOX_RESULTS[code];
     if (hit) alert(hit[1]);
+    if (payment === 'success') alert('Payment confirmed. Your upgraded plan is now active.');
+    if (!code && !payment) return;
     // Strip it so a refresh doesn't repeat the message.
     const url = new URL(location);
     url.searchParams.delete('mailbox');
+    url.searchParams.delete('payment');
     history.replaceState(null, '', url);
   }
 
@@ -2196,7 +2229,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (data.connected) {
       const connected = (data.accounts || []).map(account => { const icon=sourceIcon(account.provider); return `<div class="source-option"><span class="source-option-icon ${icon[1]}">${icon[0]}</span><span class="source-option-copy"><b>${escapeHtml(account.label)}</b><span>${escapeHtml(account.email)}</span></span><button class="btn sm bad" type="button" onclick="disconnectMailbox(${account.id})">Disconnect</button></div>`; }).join('');
       const gmailSoon = data.providers.some(p => p.id === 'google') ? '' : `<button class="source-option" type="button" disabled><span class="source-option-icon google">G</span><span class="source-option-copy"><b>Gmail / Google Workspace</b><span>Google authorization will be added later</span></span><span class="source-option-state">Coming soon</span></button>`;
-      const more = data.can_connect ? data.providers.map(p => { const icon=sourceIcon(p.id); return `<button class="source-option" type="button" onclick="connectMailbox('${p.id}')"><span class="source-option-icon ${icon[1]}">${icon[0]}</span><span class="source-option-copy"><b>Add another ${escapeHtml(p.label)}</b><span>${p.id==='imap'?'Connect a different webmail address':'Connect another inbox'}</span></span><span class="source-option-state">Connect</span></button>`; }).join('') + gmailSoon : `<div class="source-modal-note">Your plan includes ${data.mailbox_limit} mailbox${data.mailbox_limit===1?'':'es'} per user. Upgrade or change the allowance in your plan to add more.</div>`;
+      const more = data.can_connect ? data.providers.map(p => { const icon=sourceIcon(p.id); return `<button class="source-option" type="button" onclick="connectMailbox('${p.id}')"><span class="source-option-icon ${icon[1]}">${icon[0]}</span><span class="source-option-copy"><b>Add another ${escapeHtml(p.label)}</b><span>${p.id==='imap'?'Connect a different webmail address':'Connect another inbox'}</span></span><span class="source-option-state">Connect</span></button>`; }).join('') + gmailSoon : `<div class="source-modal-note">Your plan includes ${data.mailbox_limit} mailbox${data.mailbox_limit===1?'':'es'} per user. Upgrade to add more.</div>${upgradeActionHtml('Upgrade plan', 'mailbox')}`;
       options.innerHTML = `<div class="source-modal-note"><b>Connected mailboxes</b> · ${(data.accounts||[]).length} of ${data.mailbox_limit}</div>${connected}<div class="source-modal-note"><b>Add another source</b></div>${more}`;
     } else if (!data.secrets_ready) {
       options.innerHTML = `<div class="source-modal-note">${escapeHtml(data.secrets_problem)}</div>`;
@@ -2350,9 +2383,17 @@ Do not promise a payment date unless it has already been approved."></textarea>
       banner.hidden = false;
       if (!gate.allowed) {
         banner.classList.add('at-limit');
+        const upgrade = upgradeActionHtml('Upgrade plan', 'ai');
         banner.innerHTML = gate.reason === 'not_included'
-          ? `<span>Chat isn't included in your company's <b>${escapeHtml(gate.plan)}</b> plan. Ask the platform to move your company to a plan that includes it.</span>`
-          : `<span>Your company has used all <b>${gate.limit}</b> Chat messages included in the <b>${escapeHtml(gate.plan)}</b> plan this month. More become available next month.</span>`;
+          ? `<span>Ask Ada isn't included in your company's <b>${escapeHtml(gate.plan)}</b> plan. Upgrade to start chatting with Ada.</span>${upgrade}`
+          : `<span>Your company has used all <b>${gate.limit}</b> Ada messages included in the <b>${escapeHtml(gate.plan)}</b> plan this month. Upgrade for a higher allowance or wait until next month.</span>${upgrade}`;
+        showUpgradeNotice(
+          document.getElementById('automationUpgradeNotice'),
+          'Automations need an AI plan',
+          'Upgrade to let Ada run scheduled mailbox reviews and invoice cross-checks.',
+          'ai'
+        );
+        document.querySelectorAll('[data-auto-run],[data-auto-toggle]').forEach(button => button.disabled = true);
         document.getElementById('chatInput').disabled = true;
         document.getElementById('chatInput').placeholder = "Chat isn't available on your current plan.";
         document.querySelectorAll('.ada-composer button').forEach(b => b.disabled = true);
@@ -2408,6 +2449,72 @@ Do not promise a payment date unless it has already been approved."></textarea>
       const box = document.getElementById('companyProfileErr');
       box.textContent = error.message || 'Could not load the company profile.';
       box.style.display = 'block';
+    }
+  }
+
+  function upgradeActionHtml(label = 'Upgrade plan', feature = '') {
+    return myRole === 'finance_supervisor'
+      ? `<button class="btn primary sm" type="button" onclick="openUpgradeModal('${feature}')">${escapeHtml(label)}</button>`
+      : '<span><b>Ask your company Supervisor to upgrade the plan.</b></span>';
+  }
+
+  function showUpgradeNotice(element, title, message, feature = '') {
+    if (!element) return;
+    element.hidden = false;
+    element.innerHTML = `<div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(message)}</p></div>${upgradeActionHtml('Upgrade plan', feature)}`;
+  }
+
+  async function openUpgradeModal(feature = '') {
+    if (myRole !== 'finance_supervisor') {
+      alert('Only your company Supervisor can change the billing plan.');
+      return;
+    }
+    const back = document.getElementById('upgradeBack');
+    const box = document.getElementById('upgradePlans');
+    back.classList.add('open');
+    box.innerHTML = '<div class="source-modal-note">Loading plans…</div>';
+    try {
+      const res = await fetch('/api/plans', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load plans.');
+      const currentPrice = Number(myCompany?.plan?.price || 0);
+      const currentMailboxes = Number(myCompany?.plan?.mailbox_limit || 0);
+      const plans = (data.plans || []).filter(plan => Number(plan.price) > currentPrice)
+        .filter(plan => feature !== 'ai' || plan.chat_enabled)
+        .filter(plan => feature !== 'team_chat' || plan.team_chat_enabled)
+        .filter(plan => feature !== 'mailbox' || Number(plan.mailbox_limit) > currentMailboxes);
+      box.innerHTML = plans.length ? plans.map(plan => `
+        <button class="upgrade-plan" type="button" onclick="startUpgrade(${Number(plan.id)}, this)">
+          <div><b>${escapeHtml(plan.name)}</b><span>${Number(plan.user_limit)} user${Number(plan.user_limit) === 1 ? '' : 's'} · ${Number(plan.mailbox_limit)} mailbox${Number(plan.mailbox_limit) === 1 ? '' : 'es'} per user${plan.chat_enabled ? ' · Ada included' : ''}</span></div>
+          <b>${escapeHtml(plan.currency)} ${Number(plan.price).toFixed(2)}/month</b>
+        </button>`).join('') : '<div class="source-modal-note">You are already on the highest available plan.</div>';
+    } catch (error) {
+      box.innerHTML = `<div class="source-modal-note">${escapeHtml(error.message || 'Could not load plans.')}</div>`;
+    }
+  }
+
+  function closeUpgradeModal(event) {
+    if (event && event.target !== document.getElementById('upgradeBack')) return;
+    document.getElementById('upgradeBack').classList.remove('open');
+  }
+
+  async function startUpgrade(planId, button) {
+    button.disabled = true;
+    const old = button.innerHTML;
+    button.innerHTML = '<b>Opening secure payment…</b>';
+    try {
+      const res = await fetch('/api/payments/initialize', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: planId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not start the upgrade.');
+      location.href = data.authorization_url;
+    } catch (error) {
+      alert(error.message || 'Could not reach Paystack.');
+      button.disabled = false;
+      button.innerHTML = old;
     }
   }
 

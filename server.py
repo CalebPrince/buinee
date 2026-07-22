@@ -438,6 +438,9 @@ def public_user(user: dict) -> dict:
         "currency": plan["currency"],
         "user_limit": plan["user_limit"],
         "audience": plan["audience"],
+        "chat_enabled": plan["chat_enabled"],
+        "chat_limit": plan["chat_limit"],
+        "mailbox_limit": plan["mailbox_limit"],
         "team_chat_enabled": plan["team_chat_enabled"],
     }
     company["user_count"] = db.company_user_count(user["company_id"])
@@ -1987,7 +1990,17 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
             return self._json({"error": "Only a supervisor can manage billing."}, 403)
-        plan = db.plan_for_company(user["company_id"])
+        current_plan = db.plan_for_company(user["company_id"])
+        try:
+            req = self._body()
+            requested_id = int(req.get("plan_id")) if req.get("plan_id") is not None else None
+        except (ValueError, TypeError):
+            return self._json({"error": "Choose a valid plan."}, 400)
+        plan = db.get_plan(requested_id) if requested_id is not None else current_plan
+        if not plan:
+            return self._json({"error": "Choose a valid plan."}, 400)
+        if requested_id is not None and float(plan["price"]) <= float(current_plan["price"]):
+            return self._json({"error": "Choose a plan above your current plan."}, 400)
         try:
             payment = initialize_plan_payment(user, plan, load_env())
         except ValueError as exc:

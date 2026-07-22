@@ -2732,6 +2732,13 @@ def record_paystack_payment(data: dict) -> dict | None:
                       str(authorization.get("exp_year") or ""), str(data.get("gateway_response") or "")[:300],
                       str(data.get("paid_at") or ""), time.time(), reference))
         if verified:
+            # A successful, amount-verified payment activates the exact plan
+            # stored on the server-side payment intent. Client metadata is not
+            # trusted for this change.
+            conn.execute(
+                "UPDATE companies SET plan_id=? WHERE id=?",
+                (expected["plan_id"], expected["company_id"]),
+            )
             conn.execute("""INSERT INTO crm_subscriptions(company_id,payment_status,updated_at)
                          VALUES(?, 'current', ?) ON CONFLICT(company_id) DO UPDATE SET
                          payment_status='current',updated_at=excluded.updated_at""",
