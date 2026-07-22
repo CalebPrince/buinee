@@ -807,6 +807,11 @@ def delete_mailbox_connection(user_id: int) -> None:
 
 # ------------------------------------------------------------------ plans
 
+def _plan_with_entitlements(row: sqlite3.Row) -> dict:
+    plan = dict(row)
+    plan["team_chat_enabled"] = plan["audience"] == "team"
+    return plan
+
 def list_plans() -> list[dict]:
     """Individual tiers first, then team tiers, each in its own sort_order.
 
@@ -820,19 +825,19 @@ def list_plans() -> list[dict]:
             "SELECT * FROM plans "
             "ORDER BY CASE audience WHEN 'individual' THEN 0 ELSE 1 END, sort_order"
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_plan_with_entitlements(r) for r in rows]
 
 
 def get_plan(plan_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute("SELECT * FROM plans WHERE id = ?", (plan_id,)).fetchone()
-    return dict(row) if row else None
+    return _plan_with_entitlements(row) if row else None
 
 
 def get_default_plan() -> dict:
     with _cursor() as conn:
         row = conn.execute("SELECT * FROM plans WHERE is_default = 1 LIMIT 1").fetchone()
-    return dict(row)
+    return _plan_with_entitlements(row)
 
 
 def create_plan(name: str, price: float, currency: str, user_limit: int,
@@ -919,7 +924,7 @@ def plan_for_company(company_id: int) -> dict:
                WHERE c.id = ?""",
             (company_id,),
         ).fetchone()
-    return dict(row) if row else get_default_plan()
+    return _plan_with_entitlements(row) if row else get_default_plan()
 
 
 def can_add_user(company_id: int) -> bool:

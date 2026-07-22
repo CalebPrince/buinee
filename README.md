@@ -411,7 +411,10 @@ switched client-side with no page reload:
   require confirmation and refresh the roster, queue, empty state, seat count,
   and live nav badge together; the badge is hidden entirely at zero.
 - **Team chat** — available only when the company is on a plan whose audience
-  is `team` (enforced in both UI and API). Approved members of the same company
+  is `team` (enforced in both UI and API). It is included automatically in
+  every Team pricing tier and excluded from every Individual/Solo tier; it is
+  not controlled by the separately metered AI assistant setting. Approved
+  members of the same company
   appear in a conversation rail and can exchange messages with the whole team
   or privately with one selected colleague. Each message supports up to three
   files. Downloads are authenticated and restricted to members of that group or
@@ -667,18 +670,22 @@ cancellation). The tier/limit machinery and the Command Center's ability to
 move a company between tiers are both real and working; what's missing is
 the part where a company would actually pay to get moved there themselves.
 
-**Chat is gated by plan, because it isn't free to run.** Every company's Chat
-conversations run on the platform owner's own AI provider key (see
+**The AI assistant is gated by plan, because it isn't free to run.** Every
+company's AI conversations run on the platform owner's own AI provider key (see
 [Vouchers](#vouchers)'s "AI provider" section under Instructions) - there's
 no bring-your-own-key option, so usage has to tie back to what a company's
 plan actually pays for, the same reasoning `user_limit` was always built on.
 Two new plan fields:
 
-- **`chat_enabled`** - whether Chat is available at all on this plan. Seeded
+- **`chat_enabled`** - whether the AI assistant is available on this plan. Seeded
   demo default: off on Free, on for Starter/Growth.
 - **`chat_monthly_limit`** - a message cap per company per calendar month,
   `NULL` for unlimited. Seeded demo default: 200/mo on Starter, unlimited on
   Growth.
+
+These two fields do not control Team chat. Team chat is an automatic entitlement
+of `audience='team'`, while `audience='individual'` always excludes it. Both the
+landing-page pricing cards and Command Center plan cards state that entitlement.
 
 Usage is a genuine persisted counter (`chat_usage` table, one row per
 company per `YYYY-MM`), not the in-memory per-IP rate limiter the landing

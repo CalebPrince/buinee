@@ -709,7 +709,8 @@
     const solo = p.audience === "individual";
     const seats = solo ? "Just you" : `Up to ${p.user_limit} people`;
     const items = [[seats, true], ["Vouchers, approvals and letters", true],
-                   [solo ? "Your own approval trail" : "Full approval trail, per role", true]];
+                   [solo ? "Your own approval trail" : "Full approval trail, per role", true],
+                   [p.team_chat_enabled ? "Team chat, direct messages and shared files" : "Team chat not included", !!p.team_chat_enabled]];
     if (!p.chat_enabled) {
       items.push(["AI assistant not included", false]);
     } else if (p.chat_monthly_limit === null || p.chat_monthly_limit === undefined) {

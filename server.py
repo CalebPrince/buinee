@@ -365,6 +365,7 @@ def public_user(user: dict) -> dict:
         "currency": plan["currency"],
         "user_limit": plan["user_limit"],
         "audience": plan["audience"],
+        "team_chat_enabled": plan["team_chat_enabled"],
     }
     company["user_count"] = db.company_user_count(user["company_id"])
     return {
@@ -799,7 +800,7 @@ class RouteHandlerMixin:
             user = current_user(self)
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
-            if db.plan_for_company(user["company_id"])["audience"] != "team":
+            if not db.plan_for_company(user["company_id"])["team_chat_enabled"]:
                 return self._json({"error": "Team chat requires a team plan."}, 403)
             try:
                 query = parse_qs(urlparse(self.path).query)
@@ -818,7 +819,7 @@ class RouteHandlerMixin:
             user = current_user(self)
             if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
-            if db.plan_for_company(user["company_id"])["audience"] != "team":
+            if not db.plan_for_company(user["company_id"])["team_chat_enabled"]:
                 return self._json({"error": "Team chat requires a team plan."}, 403)
             try:
                 file_id = int(parse_qs(urlparse(self.path).query).get("id", [""])[0])
@@ -1477,7 +1478,7 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
-        if db.plan_for_company(user["company_id"])["audience"] != "team":
+        if not db.plan_for_company(user["company_id"])["team_chat_enabled"]:
             return self._json({"error": "Team chat requires a team plan."}, 403)
         if rate_limited(f"team-chat:{user['id']}", max_hits=30, window=60):
             return self._json({"error": "Too many messages—wait a moment and try again."}, 429)
@@ -1506,7 +1507,7 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
-        if db.plan_for_company(user["company_id"])["audience"] != "team":
+        if not db.plan_for_company(user["company_id"])["team_chat_enabled"]:
             return self._json({"error": "Team chat requires a team plan."}, 403)
         try:
             recipient_raw = self._body().get("recipient_id")
@@ -1532,7 +1533,7 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
-        if db.plan_for_company(user["company_id"])["audience"] != "team":
+        if not db.plan_for_company(user["company_id"])["team_chat_enabled"]:
             return self._json({"error": "Team chat requires a team plan."}, 403)
         try:
             file_id = int(self._body().get("file_id"))

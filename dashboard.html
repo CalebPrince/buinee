@@ -1237,7 +1237,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     myId = me.id;
     myRole = me.role;
     myName = me.name;
-    teamChatAvailable = me.company.plan.audience === 'team';
+    teamChatAvailable = !!me.company.plan.team_chat_enabled;
     teamChatCompanyName = me.company.name;
     const savedConversation = localStorage.getItem(`buinee.teamConversation.${myId}`);
     teamChatRecipient = savedConversation && savedConversation !== 'group' ? Number(savedConversation) : null;

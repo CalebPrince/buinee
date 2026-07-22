@@ -218,7 +218,7 @@
           <div class="hero-line">
             <span class="eyebrow">Pricing tiers</span>
             <h1>Plans</h1>
-            <p>What each tier costs and how many approved employees a company on it can have. Changes take effect immediately across every company on that plan.</p>
+            <p>What each tier costs and how many approved employees a company on it can have. Every Team tier includes Team chat; Individual tiers never do. Changes take effect immediately across every company on that plan.</p>
           </div>
 
           <div class="note-banner">
@@ -259,9 +259,9 @@
               <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;align-items:end">
                 <label style="display:flex;flex-direction:row;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink-2)">
                   <input type="checkbox" id="newChatEnabled" style="width:auto">
-                  Chat included
+                  AI assistant included
                 </label>
-                <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2)">Chat messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2)">AI messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
                   <input type="number" id="newChatLimit" min="0" placeholder="Unlimited" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
                 </label>
               </div>
@@ -333,9 +333,10 @@
         <div class="plan-limit">${p.audience === 'individual'
             ? 'One person, their own workspace'
             : `Up to <b>${p.user_limit}</b> user${p.user_limit === 1 ? '' : 's'}`}</div>
+        <div class="plan-limit">Team chat: <b>${p.team_chat_enabled ? 'included' : 'not included'}</b></div>
         <div class="plan-limit">${p.chat_enabled
-            ? `Chat: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
-            : 'Chat: <b>not included</b>'}</div>
+            ? `AI assistant: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
+            : 'AI assistant: <b>not included</b>'}</div>
         <div class="plan-actions">
           <button class="btn sm" onclick="toggleEdit(${p.id})">Edit</button>
         </div>
@@ -358,9 +359,9 @@
           </label>
           <label style="flex-direction:row;align-items:center;gap:7px">
             <input type="checkbox" id="editChatEnabled-${p.id}" ${p.chat_enabled ? 'checked' : ''} style="width:auto">
-            Chat included in this plan
+            AI assistant included in this plan
           </label>
-          <label>Chat messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
+          <label>AI messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
             <input type="number" id="editChatLimit-${p.id}" value="${p.chat_monthly_limit == null ? '' : p.chat_monthly_limit}" min="0" placeholder="Unlimited">
           </label>
           <div class="btnrow">
