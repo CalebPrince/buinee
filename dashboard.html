@@ -306,6 +306,15 @@
   .triage-desk h1 { font: 600 24px/1.25 var(--serif); margin-bottom: 8px; overflow-wrap: anywhere; }
   .triage-meta { color: var(--ink-3); font-size: 12.5px; overflow-wrap: anywhere; padding-bottom: 17px; border-bottom: 1px solid var(--line); }
   .triage-body { margin-top: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-2); font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .triage-attachments { margin-top: 14px; display: grid; gap: 8px; }
+  .triage-attachments-title { color: var(--ink-4); font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .triage-attachment { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-2); text-decoration: none; }
+  a.triage-attachment:hover { border-color: var(--teal); color: var(--teal); }
+  .triage-attachment-icon { flex: none; font-size: 17px; }
+  .triage-attachment-copy { min-width: 0; flex: 1; }
+  .triage-attachment-copy b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+  .triage-attachment-copy span { display: block; margin-top: 2px; color: var(--ink-4); font-size: 10.5px; }
+  .triage-attachment-action { flex: none; color: var(--teal); font-size: 11px; font-weight: 750; }
   .triage-known { margin-top: 20px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
   .triage-known h3 { font: 600 14px var(--serif); margin-bottom: 5px; }
   .triage-known p { color: var(--ink-3); font-size: 12.5px; }
@@ -1914,12 +1923,24 @@ Do not promise a payment date unless it has already been approved."></textarea>
     const m = triageMessages.find(item => String(item.id) === selectedTriageId);
     if (!m) return;
     const sender = mailboxSender(m.from);
+    const attachments = Array.isArray(m.attachments) ? m.attachments : [];
+    const attachmentHtml = attachments.length ? `<div class="triage-attachments">
+      <div class="triage-attachments-title">Attachments · ${attachments.length}</div>
+      ${attachments.map(file => {
+        const meta = `${escapeHtml(file.media_type || 'File')} · ${formatFileSize(file.size)}`;
+        const inner = `<span class="triage-attachment-icon">📎</span><span class="triage-attachment-copy"><b>${escapeHtml(file.name || 'Attachment')}</b><span>${meta}</span></span><span class="triage-attachment-action">${file.downloadable ? 'Download' : 'Over 10 MB'}</span>`;
+        if (!file.downloadable) return `<div class="triage-attachment">${inner}</div>`;
+        const href = `/api/mailbox/attachment?message_id=${encodeURIComponent(m.id)}&part=${encodeURIComponent(file.part)}`;
+        return `<a class="triage-attachment" href="${href}" download>${inner}</a>`;
+      }).join('')}
+    </div>` : '';
     document.getElementById('triageDesk').innerHTML = `
       <div class="triage-desk-inner">
         <div class="eyebrow">${m.unread ? 'Unread message' : 'Recent message'}</div>
         <h1>${escapeHtml(m.subject || '(no subject)')}</h1>
         <div class="triage-meta">From <b>${escapeHtml(sender)}</b>${m.received ? ` · ${escapeHtml(new Date(m.received).toLocaleString())}` : ''}</div>
         <div class="triage-body">${escapeHtml(m.body || 'This message has no readable text body.')}</div>
+        ${attachmentHtml}
         <div class="triage-ada" id="triageAda">${triageAnalysisHtml(m)}</div>
         <div class="triage-actions">
           <button class="btn" type="button" onclick="loadTriage(true)">Refresh inbox</button>

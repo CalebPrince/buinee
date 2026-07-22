@@ -591,7 +591,8 @@ def run_automation(user_id: int, recipe_key: str) -> dict:
         emails.append({
             "id": str(message.get("id") or ""), "from_name": from_name or from_email,
             "from_email": from_email, "received": message.get("received") or "",
-            "subject": message.get("subject") or "(no subject)", "attachments": [],
+            "subject": message.get("subject") or "(no subject)",
+            "attachments": [item.get("name") for item in message.get("attachments", [])],
             "body": message.get("body") or "", "unread": bool(message.get("unread")),
         })
 
@@ -1024,6 +1025,28 @@ class RouteHandlerMixin:
             except mailbox.MailboxError as exc:
                 return self._json({"error": str(exc)}, 400)
             return self._json({"messages": msgs})
+
+        if path == "/api/mailbox/attachment":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            query = parse_qs(urlparse(self.path).query)
+            message_id = str(query.get("message_id", [""])[0])
+            try:
+                part = int(query.get("part", ["-1"])[0])
+            except (TypeError, ValueError):
+                return self._json({"error": "Bad attachment reference."}, 400)
+            try:
+                connection, creds = live_mailbox(user["id"], load_env())
+                attachment = mailbox.get_attachment(connection, creds, message_id, part)
+            except mailbox.MailboxError as exc:
+                return self._json({"error": str(exc)}, 400)
+            disposition = "attachment; filename*=UTF-8''" + quote(attachment["name"])
+            return self._send(
+                200, attachment["data"], attachment["media_type"],
+                [("Content-Disposition", disposition),
+                 ("Content-Security-Policy", "default-src 'none'; sandbox")],
+            )
 
         if path == "/api/automations":
             user = current_user(self)
@@ -1517,7 +1540,7 @@ class RouteHandlerMixin:
             "from_email": from_email,
             "received": message.get("received") or "",
             "subject": message.get("subject") or "(no subject)",
-            "attachments": [],
+            "attachments": [item.get("name") for item in message.get("attachments", [])],
             "body": message["body"],
             "unread": bool(message.get("unread")),
         }

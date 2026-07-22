@@ -43,6 +43,7 @@ import urllib.request
 
 EXPIRY_SKEW_SECONDS = 120
 MAX_BODY_CHARS = 20_000
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 PROVIDERS = ("microsoft", "google", "imap")
 
@@ -392,6 +393,62 @@ def _mime_body(msg) -> str:
     return _plain_body("\n\n".join(html), "text/html")
 
 
+def _mime_attachments(msg) -> list[dict]:
+    """Return attachment metadata without placing file data in inbox JSON."""
+    attachments = []
+    parts = msg.walk() if msg.is_multipart() else [msg]
+    for index, part in enumerate(parts):
+        filename = _decode_header(part.get_filename() or "")
+        if not filename and part.get_content_disposition() != "attachment":
+            continue
+        raw = part.get_payload(decode=True) or b""
+        attachments.append({
+            "part": index,
+            "name": filename or f"attachment-{len(attachments) + 1}",
+            "media_type": part.get_content_type() or "application/octet-stream",
+            "size": len(raw),
+            "downloadable": 0 < len(raw) <= MAX_ATTACHMENT_BYTES,
+        })
+    return attachments
+
+
+def get_attachment(connection: dict, creds: dict, message_id: str,
+                   part_index: int) -> dict:
+    """Fetch one attachment from the signed-in user's IMAP inbox on demand."""
+    if connection["provider"] != "imap":
+        raise MailboxError("Attachment downloads are currently available for Webmail / IMAP.")
+    if not message_id.isdigit() or part_index < 0:
+        raise MailboxError("That attachment reference is invalid.")
+    conn = _imap_connect(connection["imap_host"], connection["imap_port"],
+                         connection["account_email"], creds["password"])
+    try:
+        conn.select("INBOX", readonly=True)
+        typ, fetched = conn.fetch(message_id.encode("ascii"), "(BODY.PEEK[])")
+        if typ != "OK" or not fetched or not isinstance(fetched[0], tuple):
+            raise MailboxError("That email is no longer available in the inbox.")
+        msg = email.message_from_bytes(fetched[0][1])
+        parts = list(msg.walk() if msg.is_multipart() else [msg])
+        if part_index >= len(parts):
+            raise MailboxError("That attachment is no longer available.")
+        part = parts[part_index]
+        filename = _decode_header(part.get_filename() or "")
+        if not filename and part.get_content_disposition() != "attachment":
+            raise MailboxError("That message part is not an attachment.")
+        raw = part.get_payload(decode=True) or b""
+        if not raw:
+            raise MailboxError("That attachment is empty.")
+        if len(raw) > MAX_ATTACHMENT_BYTES:
+            raise MailboxError("That attachment is larger than the 10 MB download limit.")
+        return {"name": filename or "attachment",
+                "media_type": part.get_content_type() or "application/octet-stream",
+                "data": raw}
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+
+
 def _gmail_part_body(payload: dict) -> str:
     plain, html = [], []
 
@@ -509,6 +566,7 @@ def list_recent(cfg: dict, connection: dict, creds: dict, limit: int = 10,
             }
             if include_body:
                 item["body"] = _mime_body(msg)
+                item["attachments"] = _mime_attachments(msg)
             out.append(item)
         return out
     finally:
