@@ -1508,8 +1508,6 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
-        if len(db.list_mailbox_connections(user["id"])) >= db.plan_for_company(user["company_id"])["mailbox_limit"]:
-            return self._json({"error": "Your plan's mailbox limit has been reached."}, 402)
         try:
             connection_id = int(self._body().get("connection_id"))
         except Exception:
@@ -1521,6 +1519,8 @@ class RouteHandlerMixin:
         user = current_user(self)
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
+        if len(db.list_mailbox_connections(user["id"])) >= db.plan_for_company(user["company_id"])["mailbox_limit"]:
+            return self._json({"error": "Your plan's mailbox limit has been reached."}, 402)
         try:
             req = self._body()
         except Exception:
