@@ -150,6 +150,9 @@ def init_db() -> None:
                 website              TEXT NOT NULL DEFAULT '',
                 phone                TEXT NOT NULL DEFAULT '',
                 location             TEXT NOT NULL DEFAULT '',
+                address              TEXT NOT NULL DEFAULT '',
+                registration_number  TEXT NOT NULL DEFAULT '',
+                tax_id               TEXT NOT NULL DEFAULT '',
                 lifecycle_status     TEXT NOT NULL DEFAULT 'customer',
                 relationship_owner   TEXT NOT NULL DEFAULT '',
                 primary_contact_name TEXT NOT NULL DEFAULT '',
@@ -383,6 +386,7 @@ def init_db() -> None:
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
+        _migrate_crm_profile_fields(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -490,6 +494,13 @@ def _migrate_team_message_recipient(conn: sqlite3.Connection) -> None:
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(team_messages)").fetchall()]
     if "recipient_id" not in cols:
         conn.execute("ALTER TABLE team_messages ADD COLUMN recipient_id INTEGER REFERENCES users(id)")
+
+
+def _migrate_crm_profile_fields(conn: sqlite3.Connection) -> None:
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(crm_accounts)").fetchall()}
+    for name in ("address", "registration_number", "tax_id"):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE crm_accounts ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
 
 
 # ------------------------------------------------------------------ passwords
@@ -1301,6 +1312,7 @@ def list_companies_with_stats() -> list[dict]:
             """SELECT c.id, c.name, c.created_at, p.id AS plan_id, p.name AS plan_name,
                       p.user_limit AS plan_user_limit, p.audience AS plan_audience,
                       a.legal_name, a.industry, a.website, a.phone, a.location,
+                      a.address, a.registration_number, a.tax_id,
                       COALESCE(a.lifecycle_status, 'customer') AS lifecycle_status,
                       a.relationship_owner, a.primary_contact_name,
                       a.primary_contact_email, a.summary, a.updated_at AS crm_updated_at
@@ -1336,6 +1348,9 @@ def list_companies_with_stats() -> list[dict]:
                     "website": c["website"] or "",
                     "phone": c["phone"] or "",
                     "location": c["location"] or "",
+                    "address": c["address"] or "",
+                    "registration_number": c["registration_number"] or "",
+                    "tax_id": c["tax_id"] or "",
                     "lifecycle_status": c["lifecycle_status"],
                     "relationship_owner": c["relationship_owner"] or "",
                     "primary_contact_name": c["primary_contact_name"] or "",
@@ -1863,6 +1878,65 @@ def automation_states(user_id: int) -> dict[str, dict]:
 CRM_LIFECYCLE_STATUSES = {"lead", "trial", "customer", "at_risk", "paused", "churned"}
 
 
+def get_company_profile(company_id: int) -> dict:
+    with _cursor() as conn:
+        row = conn.execute(
+            """SELECT legal_name, industry, website, phone, location, address,
+                      registration_number, tax_id,
+                      primary_contact_name, primary_contact_email, updated_at
+               FROM crm_accounts WHERE company_id = ?""",
+            (company_id,),
+        ).fetchone()
+    return dict(row) if row else {
+        "legal_name": "", "industry": "", "website": "", "phone": "",
+        "location": "", "address": "", "registration_number": "", "tax_id": "",
+        "primary_contact_name": "",
+        "primary_contact_email": "", "updated_at": None,
+    }
+
+
+def update_company_profile(company_id: int, fields: dict) -> dict:
+    values = {
+        "legal_name": str(fields.get("legal_name") or "").strip()[:160],
+        "industry": str(fields.get("industry") or "").strip()[:100],
+        "website": str(fields.get("website") or "").strip()[:300],
+        "phone": str(fields.get("phone") or "").strip()[:80],
+        "location": str(fields.get("location") or "").strip()[:160],
+        "address": str(fields.get("address") or "").strip()[:300],
+        "registration_number": str(fields.get("registration_number") or "").strip()[:100],
+        "tax_id": str(fields.get("tax_id") or "").strip()[:100],
+        "primary_contact_name": str(fields.get("primary_contact_name") or "").strip()[:120],
+        "primary_contact_email": str(fields.get("primary_contact_email") or "").strip().lower()[:254],
+    }
+    email = values["primary_contact_email"]
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        raise AuthError("Enter a valid primary contact email.")
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO crm_accounts
+                   (company_id, legal_name, industry, website, phone, location,
+                    address, registration_number, tax_id,
+                    primary_contact_name, primary_contact_email, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 legal_name=excluded.legal_name, industry=excluded.industry,
+                 website=excluded.website, phone=excluded.phone,
+                 location=excluded.location, address=excluded.address,
+                 registration_number=excluded.registration_number,
+                 tax_id=excluded.tax_id,
+                 primary_contact_name=excluded.primary_contact_name,
+                 primary_contact_email=excluded.primary_contact_email,
+                 updated_at=excluded.updated_at""",
+            (company_id, values["legal_name"], values["industry"], values["website"],
+             values["phone"], values["location"], values["address"],
+             values["registration_number"], values["tax_id"], values["primary_contact_name"],
+             values["primary_contact_email"], now),
+        )
+    values["updated_at"] = now
+    return values
+
+
 def update_crm_account(company_id: int, fields: dict) -> dict:
     if not get_company(company_id):
         raise AuthError("No such company.")
@@ -1875,6 +1949,9 @@ def update_crm_account(company_id: int, fields: dict) -> dict:
         "website": str(fields.get("website") or "").strip()[:300],
         "phone": str(fields.get("phone") or "").strip()[:80],
         "location": str(fields.get("location") or "").strip()[:160],
+        "address": str(fields.get("address") or "").strip()[:300],
+        "registration_number": str(fields.get("registration_number") or "").strip()[:100],
+        "tax_id": str(fields.get("tax_id") or "").strip()[:100],
         "relationship_owner": str(fields.get("relationship_owner") or "").strip()[:120],
         "primary_contact_name": str(fields.get("primary_contact_name") or "").strip()[:120],
         "primary_contact_email": str(fields.get("primary_contact_email") or "").strip().lower()[:254],
@@ -1887,19 +1964,23 @@ def update_crm_account(company_id: int, fields: dict) -> dict:
         conn.execute(
             """INSERT INTO crm_accounts
                    (company_id, legal_name, industry, website, phone, location,
+                    address, registration_number, tax_id,
                     lifecycle_status, relationship_owner, primary_contact_name,
                     primary_contact_email, summary, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(company_id) DO UPDATE SET
                  legal_name=excluded.legal_name, industry=excluded.industry,
                  website=excluded.website, phone=excluded.phone, location=excluded.location,
+                 address=excluded.address, registration_number=excluded.registration_number,
+                 tax_id=excluded.tax_id,
                  lifecycle_status=excluded.lifecycle_status,
                  relationship_owner=excluded.relationship_owner,
                  primary_contact_name=excluded.primary_contact_name,
                  primary_contact_email=excluded.primary_contact_email,
                  summary=excluded.summary, updated_at=excluded.updated_at""",
             (company_id, values["legal_name"], values["industry"], values["website"],
-             values["phone"], values["location"], lifecycle,
+             values["phone"], values["location"], values["address"],
+             values["registration_number"], values["tax_id"], lifecycle,
              values["relationship_owner"], values["primary_contact_name"],
              values["primary_contact_email"], values["summary"], now),
         )

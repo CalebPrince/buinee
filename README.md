@@ -266,9 +266,14 @@ weight in a security-sensitive area of the code.
   Each expanded company now starts with a persistent **Account 360** CRM
   profile: lifecycle status (Lead, Trial, Customer, At risk, Paused, Churned),
   legal name, industry, website, phone, location, Buinee relationship owner,
-  primary contact, and an internal account summary. CRM fields live in
+  registered address, registration number, tax ID/TIN, primary contact, and an
+  internal account summary. CRM fields live in
   `crm_accounts`, are visible only to authenticated platform admins, and save
   through `/api/admin/company/crm`; they never leak into the customer workspace.
+  The company Supervisor can maintain the shared official/contact fields from
+  the dashboard Team page through `/api/company/profile`. Lifecycle status,
+  Buinee relationship owner, and internal summary remain Command Center-only;
+  both surfaces update the same `crm_accounts` record.
   Expanded, there's also a **Delete company** button (`db.delete_company`,
   `/api/admin/company/delete`) — permanently removes the company and every
   user in it (and their sessions), with a native confirm dialog first.

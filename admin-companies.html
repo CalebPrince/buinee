@@ -410,6 +410,9 @@
         ${field('website', 'Website', 'url', 'https://…')}
         ${field('phone', 'Company phone', 'tel')}
         ${field('location', 'Location', 'text', 'City, country')}
+        ${field('address', 'Registered address')}
+        ${field('registration_number', 'Registration number')}
+        ${field('tax_id', 'Tax ID / TIN')}
         ${field('relationship_owner', 'Relationship owner', 'text', 'Buinee account owner')}
         ${field('primary_contact_name', 'Primary contact', 'text', c.supervisor ? c.supervisor.name : '')}
         ${field('primary_contact_email', 'Primary contact email', 'email', c.supervisor ? c.supervisor.email : '')}
@@ -420,7 +423,7 @@
   }
 
   async function saveCrmAccount(id, button) {
-    const names = ['legal_name', 'industry', 'website', 'phone', 'location', 'lifecycle_status', 'relationship_owner', 'primary_contact_name', 'primary_contact_email', 'summary'];
+    const names = ['legal_name', 'industry', 'website', 'phone', 'location', 'address', 'registration_number', 'tax_id', 'lifecycle_status', 'relationship_owner', 'primary_contact_name', 'primary_contact_email', 'summary'];
     const payload = { company_id: id };
     names.forEach(name => { payload[name] = document.getElementById(`crm-${name}-${id}`).value; });
     const error = document.getElementById(`crmError-${id}`);

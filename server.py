@@ -789,6 +789,14 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"team": db.list_team(user["company_id"])})
 
+        if path == "/api/company/profile":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            if user["role"] != "finance_supervisor":
+                return self._json({"error": "Only a supervisor can manage the company profile."}, 403)
+            return self._json({"profile": db.get_company_profile(user["company_id"])})
+
         if path == "/api/notifications":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -995,6 +1003,7 @@ class RouteHandlerMixin:
             "/api/company/approve": self._handle_approve,
             "/api/company/set-model": self._handle_set_company_model,
             "/api/company/briefing": self._handle_set_company_briefing,
+            "/api/company/profile": self._handle_set_company_profile,
             "/api/user/instructions": self._handle_set_user_instructions,
             "/api/user/reference-documents/upload": self._handle_reference_upload,
             "/api/user/reference-documents/delete": self._handle_reference_delete,
@@ -1434,6 +1443,19 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "company": company})
+
+    def _handle_set_company_profile(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a supervisor can manage the company profile."}, 403)
+        try:
+            req = self._body(max_len=8000)
+            profile = db.update_company_profile(user["company_id"], req)
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad company profile."}, 400)
+        return self._json({"ok": True, "profile": profile})
 
     def _handle_set_user_instructions(self):
         user = current_user(self)
