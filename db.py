@@ -337,6 +337,14 @@ def init_db() -> None:
                 PRIMARY KEY (user_id, conversation)
             );
 
+            CREATE TABLE IF NOT EXISTS user_notification_state (
+                user_id    INTEGER NOT NULL REFERENCES users(id),
+                state_key  TEXT NOT NULL,
+                state_value INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (user_id, state_key)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
@@ -1664,6 +1672,59 @@ def clear_team_conversation(company_id: int, viewer_id: int,
                    cleared_through_id = excluded.cleared_through_id,
                    cleared_at = excluded.cleared_at""",
             (viewer_id, conversation, row["last_id"], time.time()),
+        )
+
+
+def notification_summary(user: dict) -> dict:
+    user_id, company_id, role = user["id"], user["company_id"], user["role"]
+    with _cursor() as conn:
+        state = conn.execute(
+            "SELECT state_value FROM user_notification_state WHERE user_id = ? AND state_key = 'team_seen'",
+            (user_id,),
+        ).fetchone()
+        team_seen = state["state_value"] if state else 0
+        unread_team = conn.execute(
+            """SELECT COUNT(*) AS n FROM team_messages
+               WHERE company_id = ? AND id > ? AND sender_id != ?
+                 AND (recipient_id IS NULL OR recipient_id = ?)""",
+            (company_id, team_seen, user_id, user_id),
+        ).fetchone()["n"]
+        pending = 0
+        if role == "finance_supervisor":
+            pending = conn.execute(
+                "SELECT COUNT(*) AS n FROM users WHERE company_id = ? AND status = 'pending'",
+                (company_id,),
+            ).fetchone()["n"]
+        awaiting = 0
+        if role in ("senior_accountant", "finance_supervisor"):
+            awaiting = conn.execute(
+                """SELECT COUNT(*) AS n FROM vouchers
+                   WHERE company_id = ? AND status = 'submitted' AND created_by != ?""",
+                (company_id, user_id),
+            ).fetchone()["n"]
+        rejected = conn.execute(
+            """SELECT COUNT(*) AS n FROM vouchers
+               WHERE company_id = ? AND created_by = ? AND status = 'rejected'""",
+            (company_id, user_id),
+        ).fetchone()["n"]
+    return {"team_messages": unread_team, "pending_users": pending,
+            "awaiting_approval": awaiting, "rejected_vouchers": rejected}
+
+
+def mark_team_messages_seen(user: dict) -> None:
+    with _cursor() as conn:
+        row = conn.execute(
+            """SELECT COALESCE(MAX(id), 0) AS last_id FROM team_messages
+               WHERE company_id = ? AND sender_id != ?
+                 AND (recipient_id IS NULL OR recipient_id = ?)""",
+            (user["company_id"], user["id"], user["id"]),
+        ).fetchone()
+        conn.execute(
+            """INSERT INTO user_notification_state (user_id, state_key, state_value, updated_at)
+               VALUES (?, 'team_seen', ?, ?)
+               ON CONFLICT(user_id, state_key) DO UPDATE SET
+                 state_value = excluded.state_value, updated_at = excluded.updated_at""",
+            (user["id"], row["last_id"], time.time()),
         )
 
 

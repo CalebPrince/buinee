@@ -215,6 +215,19 @@
   .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; box-shadow: var(--shadow); }
   .kpi .val { font-family: var(--mono); font-size: 27px; font-weight: 600; letter-spacing: -.02em; margin-top: 8px; }
   .kpi .l { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  .attention { margin: -4px 0 22px; padding: 14px; border: 1px solid var(--ochre); border-radius: 14px; background: var(--ochre-soft); }
+  .attention-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .attention-head h2 { font: 600 17px var(--serif); }
+  .attention-head span { color: var(--ink-3); font-size: 11.5px; }
+  .attention-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+  .attention-item { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); text-align: left; }
+  .attention-item:hover { border-color: var(--ochre); transform: translateY(-1px); }
+  .attention-count { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--ochre); color: #fff; font: 700 12px var(--mono); }
+  .attention-copy b, .attention-copy span { display: block; }
+  .attention-copy b { font-size: 12.5px; }
+  .attention-copy span { margin-top: 2px; color: var(--ink-3); font-size: 10.5px; }
+  .attention-arrow { color: var(--ochre); font-size: 18px; }
+  .attention-clear { padding: 11px 2px 1px; color: var(--ink-3); font-size: 12px; }
 
   .plan-banner {
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -629,6 +642,7 @@
       <button class="nav-item" id="teamChatNav" data-view="teamchat" onclick="go('teamchat')" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
         Team chat
+        <span class="count" id="teamChatNavCount" style="display:none"></span>
       </button>
       <button class="nav-item" data-view="automations" onclick="go('automations')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -700,6 +714,7 @@
           New voucher
         </button>
       </div>
+      <section class="attention" id="attentionCenter" hidden aria-live="polite"></section>
       <div class="kpis" id="kpis"></div>
       <div class="grid2" id="overviewCards"></div>
     </section>
@@ -1148,7 +1163,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   let automationStates = {};
   let activityEvents = [], activityFilter = 'all';
   let fixFilter = 'all';
-  let teamChatAvailable = false, teamMessages = [], pendingTeamFiles = [], teamMembers = [];
+  let teamChatAvailable = false, teamMessages = [], pendingTeamFiles = [], teamMembers = [], notificationCounts = {};
   let teamChatRecipient = null, teamChatCompanyName = '';
   const triageAnalyses = new Map();
 
@@ -1160,6 +1175,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== view);
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === view));
     document.getElementById('crumbView').textContent = CRUMB_NAMES[view] || 'Overview';
+    if (view === 'teamchat' && teamChatAvailable) markTeamMessagesSeen();
     if (view === 'triage' && !triageMessages.length) loadTriage();
     if (syncUrl) {
       const url = new URL(location.href);
@@ -1253,6 +1269,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (seesApprovals) kpis.find(k => k.key === 'awaiting').n = voucherCounts.awaiting;
     kpis.find(k => k.key === 'flagged').n = voucherCounts.flagged;
     kpis.find(k => k.key === 'issues').n = collectFixItems().length;
+    await loadNotifications();
 
     const cards = document.getElementById('overviewCards');
     cards.appendChild(emptyCard(
@@ -1309,6 +1326,44 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.getElementById('loading').style.display = 'none';
     go(location.hash.slice(1) || 'overview', { replace: true });
   }
+
+  async function loadNotifications() {
+    try {
+      const res = await fetch('/api/notifications', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) return;
+      notificationCounts = { ...(data.notifications || {}), unread_email: notificationCounts.unread_email || 0 };
+      renderAttentionCenter();
+    } catch { /* Existing workspace remains usable if alerts cannot load. */ }
+  }
+
+  function renderAttentionCenter() {
+    const items = [];
+    const n = notificationCounts;
+    if (n.pending_users) items.push({ count: n.pending_users, title: 'Access requests', copy: 'Approve or reject new team members', view: 'team' });
+    if (n.awaiting_approval) items.push({ count: n.awaiting_approval, title: 'Vouchers waiting', copy: 'Review submissions awaiting your decision', view: 'vouchers' });
+    if (n.rejected_vouchers) items.push({ count: n.rejected_vouchers, title: 'Returned vouchers', copy: 'Correct vouchers sent back to you', view: 'fix' });
+    if (n.unread_email) items.push({ count: n.unread_email, title: 'Unread inbox messages', copy: 'Open your mailbox triage queue', view: 'triage' });
+    if (n.team_messages && teamChatAvailable) items.push({ count: n.team_messages, title: 'New team messages', copy: 'Read messages sent since your last visit', view: 'teamchat' });
+    const box = document.getElementById('attentionCenter');
+    const total = items.reduce((sum, item) => sum + item.count, 0);
+    box.hidden = false;
+    box.innerHTML = `<div class="attention-head"><h2>${total ? 'Needs your attention' : 'You’re up to date'}</h2><span>${total ? `${total} open ${total === 1 ? 'item' : 'items'}` : 'Nothing is waiting on you'}</span></div>
+      ${items.length ? `<div class="attention-list">${items.map(item => `<button class="attention-item" type="button" onclick="go('${item.view}')"><span class="attention-count">${item.count}</span><span class="attention-copy"><b>${item.title}</b><span>${item.copy}</span></span><span class="attention-arrow">›</span></button>`).join('')}</div>` : '<div class="attention-clear">New approvals, returned work, and team messages will appear here first.</div>'}`;
+    const badge = document.getElementById('teamChatNavCount');
+    badge.style.display = n.team_messages ? 'inline-block' : 'none';
+    badge.textContent = n.team_messages || '';
+  }
+
+  async function markTeamMessagesSeen() {
+    notificationCounts.team_messages = 0;
+    renderAttentionCenter();
+    try {
+      await fetch('/api/team-chat/seen', { method: 'POST', credentials: 'same-origin' });
+    } catch { /* The next refresh restores the count if marking fails. */ }
+  }
+
+  setInterval(loadNotifications, 30000);
 
   // ------------------------------------------------------------ automations
 
@@ -1609,11 +1664,15 @@ Do not promise a payment date unless it has already been approved."></textarea>
       }
       const messages = Array.isArray(data.messages) ? data.messages : [];
       if (!messages.length) {
+        notificationCounts.unread_email = 0;
+        renderAttentionCenter();
         body.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Your inbox is clear</h4><p>No recent messages were returned by the mail provider.</p></div>`;
         return;
       }
       const ranked = [...messages].sort((a, b) => Number(!!b.unread) - Number(!!a.unread));
       const unread = ranked.filter(m => m.unread).length;
+      notificationCounts.unread_email = unread;
+      renderAttentionCenter();
       body.innerHTML = `
         <div class="mail-list">
           ${ranked.map(m => `
@@ -2196,7 +2255,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
         return;
       }
       const me = (await (await fetch('/api/me', { credentials: 'same-origin' })).json()).user;
-      await Promise.all([loadTeam(me.company.name), loadPending()]);
+      await Promise.all([loadTeam(me.company.name), loadPending(), loadNotifications()]);
       renderPlanBanner(me.company);
     } catch {
       alert('Could not reach the server.');
@@ -2255,6 +2314,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     setKpi('mine', counts.mine);
     if (myRole === 'senior_accountant' || myRole === 'finance_supervisor') setKpi('awaiting', counts.awaiting);
     setKpi('flagged', counts.flagged);
+    loadNotifications();
   }
 
   function renderFlagged() {

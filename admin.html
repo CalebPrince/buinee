@@ -145,6 +145,17 @@
     background: var(--surface-2); color: var(--ink-2);
   }
   .count-badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .attention-panel { margin-bottom: 18px; padding: 15px; border: 1px solid var(--warn); border-radius: 12px; background: var(--warn-soft); }
+  .attention-panel .head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; }
+  .attention-panel .head h2 { font-size: 16px; }
+  .attention-panel .head span { color: var(--ink-3); font-size: 11.5px; }
+  .admin-alerts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+  .admin-alert { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); text-decoration: none; }
+  .admin-alert:hover { border-color: var(--warn); }
+  .admin-alert .n { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--warn); color: #fff; font: 700 12px var(--mono); }
+  .admin-alert b, .admin-alert small { display: block; }
+  .admin-alert b { font-size: 12.5px; }
+  .admin-alert small { margin-top: 2px; color: var(--ink-3); font-size: 10.5px; }
   .no-super { font-style: italic; }
   .empty-mini { font-size: 12.5px; color: var(--ink-3); padding: 6px 0; }
 
@@ -216,6 +227,8 @@
             <p>The numbers that matter at a glance, the newest signups, and whether the platform itself is configured. For every company's full team, see Companies.</p>
           </div>
 
+          <section class="attention-panel" id="adminAttention" aria-live="polite"></section>
+
           <div class="tiles" id="tiles"></div>
 
           <div class="panel">
@@ -280,11 +293,29 @@
     }
 
     renderTiles(overview.platform);
+    renderAdminAttention(overview);
     renderRecentCompanies(overview.companies);
     renderSystem(overview.system);
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
+  }
+
+  function renderAdminAttention(overview) {
+    const companies = overview.companies || [];
+    const system = overview.system || {};
+    const alerts = [];
+    const pending = companies.reduce((sum, company) => sum + (company.pending_count || 0), 0);
+    const missingSupervisors = companies.filter(company => !company.supervisor).length;
+    const planBlocks = companies.filter(company => company.needs_team_plan).length;
+    const systemWarnings = [!system.demo_agent_configured, !system.fx_rates_loaded].filter(Boolean).length;
+    if (pending) alerts.push({ n: pending, title: 'Pending access requests', copy: 'Across all companies', href: '/admin-companies.html' });
+    if (planBlocks) alerts.push({ n: planBlocks, title: 'Plan-blocked teams', copy: 'Requests waiting on a team plan', href: '/admin-companies.html' });
+    if (missingSupervisors) alerts.push({ n: missingSupervisors, title: 'No supervisor assigned', copy: 'Companies without an approver', href: '/admin-companies.html' });
+    if (systemWarnings) alerts.push({ n: systemWarnings, title: 'System setup warnings', copy: 'Configuration needs attention', href: '#systemRows' });
+    const total = alerts.reduce((sum, alert) => sum + alert.n, 0);
+    document.getElementById('adminAttention').innerHTML = `<div class="head"><h2>${total ? 'Command center attention' : 'Command center clear'}</h2><span>${total ? `${total} open ${total === 1 ? 'item' : 'items'}` : 'No platform exceptions detected'}</span></div>
+      ${alerts.length ? `<div class="admin-alerts">${alerts.map(alert => `<a class="admin-alert" href="${alert.href}"><span class="n">${alert.n}</span><span><b>${alert.title}</b><small>${alert.copy}</small></span><span>›</span></a>`).join('')}</div>` : '<div class="empty-mini">New company, access, plan, and system exceptions will appear here first.</div>'}`;
   }
 
   function renderTiles(platform) {

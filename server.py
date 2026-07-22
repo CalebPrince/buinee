@@ -788,6 +788,12 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"team": db.list_team(user["company_id"])})
 
+        if path == "/api/notifications":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"notifications": db.notification_summary(user)})
+
         if path == "/api/team-chat":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -992,6 +998,7 @@ class RouteHandlerMixin:
             "/api/user/reference-documents/delete": self._handle_reference_delete,
             "/api/team-chat/send": self._handle_team_message,
             "/api/team-chat/clear": self._handle_clear_team_conversation,
+            "/api/team-chat/seen": self._handle_team_messages_seen,
             "/api/team-chat/add-to-library": self._handle_team_file_to_library,
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
@@ -1503,6 +1510,13 @@ class RouteHandlerMixin:
             db.clear_team_conversation(user["company_id"], user["id"], recipient_id)
         except (TypeError, ValueError):
             return self._json({"error": "Bad conversation."}, 400)
+        return self._json({"ok": True})
+
+    def _handle_team_messages_seen(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        db.mark_team_messages_seen(user)
         return self._json({"ok": True})
 
     def _handle_team_file_to_library(self):

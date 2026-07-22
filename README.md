@@ -254,7 +254,9 @@ weight in a security-sensitive area of the code.
   or "no Supervisor yet", approved/pending counts —
   several fit per row, more wrap to new rows as companies are added), and
   the system panel (is the demo agent configured, are FX rates loaded, the
-  sqlite path). A "View all companies" link goes to the full list.
+  sqlite path). A command-center attention queue appears first for access
+  requests, plan-blocked teams, missing supervisors, and system configuration
+  warnings. A "View all companies" link goes to the full list.
 - **Companies** (`admin-companies.html`) — every company, newest first, as
   the same kind of compact grid card. Click one (or Enter/Space — it's a
   real `role="button"`) to expand it in place: it spans the full grid width
@@ -302,6 +304,13 @@ switched client-side with no page reload:
   The inbox card is live and renders the latest ten headers, unread first.
   Semantic-only metrics such as emails triaged and replies drafted remain
   "—" and explicitly say that their workflow is not enabled yet.
+- **Needs your attention** — a role-aware queue before the KPI tiles on every
+  login. Supervisors see pending access and submitted vouchers; approvers see
+  vouchers awaiting review; preparers see returned vouchers; mailbox users see
+  unread inbox mail; team-plan users see unread team messages. Counts refresh
+  every 30 seconds and link directly
+  to the relevant work area. Opening Team chat marks its incoming-message count
+  seen for that user.
 - **Vouchers** — prepare, submit, approve/reject. See
   [Vouchers](#vouchers) below.
 - **Flagged** — every voucher visible to this person where `voucher.py`'s
