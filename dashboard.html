@@ -1193,6 +1193,11 @@
           <span class="source-option-state">Connected</span>
         </div>
         <button class="btn bad" id="sourceDisconnect" type="button" onclick="disconnectMailbox()">Disconnect mailbox</button>
+        ${data.account.provider === 'google' ? '' : `<button class="source-option" type="button" disabled>
+          <span class="source-option-icon google">G</span>
+          <span class="source-option-copy"><b>Gmail / Google Workspace</b><span>Google authorization will be added later</span></span>
+          <span class="source-option-state">Coming soon</span>
+        </button>`}
         <button class="source-option" type="button" disabled>
           <span class="source-option-icon accounts">$</span>
           <span class="source-option-copy"><b>Accounting system</b><span>Voucher cross-checking and reconciliation</span></span>
@@ -1203,7 +1208,7 @@
     } else if (!data.providers.length) {
       options.innerHTML = '<div class="source-modal-note">No mail provider is configured on this deployment yet.</div>';
     } else {
-      options.innerHTML = data.providers.map(p => {
+      const providerButtons = data.providers.map(p => {
         const icon = sourceIcon(p.id);
         const detail = p.id === 'microsoft' ? 'Outlook and Microsoft 365'
           : p.id === 'google' ? 'Gmail and Google Workspace'
@@ -1213,7 +1218,14 @@
           <span class="source-option-copy"><b>${escapeHtml(p.label)}</b><span>${detail}</span></span>
           <span class="source-option-state">Connect</span>
         </button>`;
-      }).join('') + `<button class="source-option" type="button" disabled>
+      }).join('');
+      const gmailSoon = data.providers.some(p => p.id === 'google') ? '' : `
+        <button class="source-option" type="button" disabled>
+          <span class="source-option-icon google">G</span>
+          <span class="source-option-copy"><b>Gmail / Google Workspace</b><span>Google authorization will be added later</span></span>
+          <span class="source-option-state">Coming soon</span>
+        </button>`;
+      options.innerHTML = providerButtons + gmailSoon + `<button class="source-option" type="button" disabled>
         <span class="source-option-icon accounts">$</span>
         <span class="source-option-copy"><b>Accounting system</b><span>Voucher cross-checking and reconciliation</span></span>
         <span class="source-option-state">Coming later</span>
