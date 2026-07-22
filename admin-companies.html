@@ -176,6 +176,20 @@
     background: var(--surface-2); color: var(--ink-2);
   }
   .count-badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .crm-status { width: fit-content; margin-top: 4px; padding: 2px 8px; border-radius: 20px; background: var(--violet-soft); color: var(--violet); font-size: 9.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .crm-status.at_risk { background: var(--warn-soft); color: var(--warn); }
+  .crm-status.churned, .crm-status.paused { background: var(--bad-soft); color: var(--bad); }
+  .crm-profile { margin-bottom: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); }
+  .crm-profile-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .crm-profile-head h4 { color: var(--violet); }
+  .crm-profile-head span { color: var(--ink-3); font-size: 11px; }
+  .crm-fields { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+  .crm-fields label { display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); font-size: 11.5px; font-weight: 700; }
+  .crm-fields input, .crm-fields select, .crm-fields textarea { width: 100%; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: 12.5px/1.4 var(--sans); }
+  .crm-fields .wide { grid-column: 1 / -1; }
+  .crm-fields textarea { min-height: 86px; resize: vertical; }
+  .crm-actions { display: flex; align-items: center; gap: 10px; margin-top: 11px; }
+  .crm-saved { color: var(--teal); font-size: 11.5px; }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
 
@@ -185,7 +199,7 @@
     .sidebar-brand { justify-content: center; padding: 0; }
     .sidebar-brand .name, .sidebar-tag, .sidebar-link .label { display: none; }
     .sidebar-link { justify-content: center; padding: 10px; }
-    .detail-grid { grid-template-columns: 1fr; gap: 14px; }
+    .detail-grid, .crm-fields { grid-template-columns: 1fr; gap: 14px; }
   }
 </style>
 
@@ -235,9 +249,9 @@
 
         <div id="content" style="display:none">
           <div class="hero-line">
-            <span class="eyebrow">Every company, in full</span>
-            <h1>Companies</h1>
-            <p>Every company registered on Buinee. Click one to see its Supervisor's full details, team and pending list.</p>
+            <span class="eyebrow">CRM · Account records</span>
+            <h1>Customer accounts</h1>
+            <p>Open a company to manage its customer profile, primary contact, relationship owner, plan, team, and access requests in one place.</p>
           </div>
 
           <div class="panel">
@@ -266,6 +280,10 @@
     const d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
     return d.innerHTML;
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function fmtDate(epochSeconds) {
@@ -342,6 +360,7 @@
               ? `Supervisor: ${escapeHtml(c.supervisor.name)}`
               : '<span class="no-super">no Supervisor yet</span>'}</span>
             <span class="meta">Plan: <b>${escapeHtml(c.plan.name)}</b> ${planSummary(c)}</span>
+            <span class="crm-status ${escapeHtml(c.crm.lifecycle_status)}">${escapeHtml(CRM_STATUS_LABELS[c.crm.lifecycle_status] || c.crm.lifecycle_status)}</span>
           </div>
           <div class="counts">
             <span class="count-badge" title="Approved employees">${c.approved_count}</span>
@@ -353,6 +372,7 @@
           ${c.supervisor
             ? `<div class="supervisor-line">Supervisor: <b>${escapeHtml(c.supervisor.name)}</b> · ${escapeHtml(c.supervisor.email)}</div>`
             : '<div class="supervisor-line"><span class="no-super">No Supervisor yet</span></div>'}
+          ${renderCrmProfile(c)}
           ${renderTeamAndPending(c)}
           <div class="plan-change" onclick="event.stopPropagation()">
             <label for="planSelect-${c.id}">Change plan</label>
@@ -371,6 +391,53 @@
         </div>
       </div>
     `).join('');
+  }
+
+  const CRM_STATUS_LABELS = {
+    lead: 'Lead', trial: 'Trial', customer: 'Customer', at_risk: 'At risk',
+    paused: 'Paused', churned: 'Churned',
+  };
+
+  function renderCrmProfile(c) {
+    const a = c.crm || {};
+    const field = (name, label, type = 'text', placeholder = '') => `<label>${label}<input type="${type}" id="crm-${name}-${c.id}" value="${escapeAttr(a[name] || '')}" placeholder="${escapeAttr(placeholder)}"></label>`;
+    return `<section class="crm-profile" onclick="event.stopPropagation()">
+      <div class="crm-profile-head"><h4>Account 360</h4><span>Internal customer record · visible only in Command Center</span></div>
+      <div class="crm-fields">
+        <label>Relationship status<select id="crm-lifecycle_status-${c.id}">${Object.entries(CRM_STATUS_LABELS).map(([value, label]) => `<option value="${value}" ${a.lifecycle_status === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+        ${field('legal_name', 'Legal name', 'text', c.name)}
+        ${field('industry', 'Industry', 'text', 'e.g. Construction')}
+        ${field('website', 'Website', 'url', 'https://…')}
+        ${field('phone', 'Company phone', 'tel')}
+        ${field('location', 'Location', 'text', 'City, country')}
+        ${field('relationship_owner', 'Relationship owner', 'text', 'Buinee account owner')}
+        ${field('primary_contact_name', 'Primary contact', 'text', c.supervisor ? c.supervisor.name : '')}
+        ${field('primary_contact_email', 'Primary contact email', 'email', c.supervisor ? c.supervisor.email : '')}
+        <label class="wide">Account summary<textarea id="crm-summary-${c.id}" placeholder="What matters about this customer, their goals, and the relationship…">${escapeHtml(a.summary || '')}</textarea></label>
+      </div>
+      <div class="crm-actions"><button class="btn sm" type="button" onclick="saveCrmAccount(${c.id}, this)">Save profile</button><span class="crm-saved" id="crmSaved-${c.id}"></span><span class="msg error" id="crmError-${c.id}"></span></div>
+    </section>`;
+  }
+
+  async function saveCrmAccount(id, button) {
+    const names = ['legal_name', 'industry', 'website', 'phone', 'location', 'lifecycle_status', 'relationship_owner', 'primary_contact_name', 'primary_contact_email', 'summary'];
+    const payload = { company_id: id };
+    names.forEach(name => { payload[name] = document.getElementById(`crm-${name}-${id}`).value; });
+    const error = document.getElementById(`crmError-${id}`);
+    const saved = document.getElementById(`crmSaved-${id}`);
+    error.textContent = ''; saved.textContent = ''; button.disabled = true; button.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/admin/company/crm', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) { error.textContent = data.error || 'Could not save this profile.'; return; }
+      const company = lastCompanies.find(item => item.id === id);
+      if (company) company.crm = data.account;
+      const status = document.querySelector(`#card-${id} .crm-status`);
+      status.className = `crm-status ${data.account.lifecycle_status}`;
+      status.textContent = CRM_STATUS_LABELS[data.account.lifecycle_status] || data.account.lifecycle_status;
+      saved.textContent = 'Profile saved';
+    } catch { error.textContent = 'Could not reach the server.'; }
+    finally { button.disabled = false; button.textContent = 'Save profile'; }
   }
 
   function toggleCard(id) {

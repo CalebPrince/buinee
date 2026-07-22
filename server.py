@@ -1010,6 +1010,7 @@ class RouteHandlerMixin:
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
             "/api/admin/company/delete": self._handle_admin_delete_company,
+            "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/plans/create": self._handle_admin_create_plan,
             "/api/admin/plans/update": self._handle_admin_update_plan,
             "/api/admin/company/set-plan": self._handle_admin_set_company_plan,
@@ -1769,6 +1770,18 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
+
+    def _handle_admin_update_crm_account(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=12000)
+            company_id = int(req.get("company_id"))
+            account = db.update_crm_account(company_id, req)
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad account profile."}, 400)
+        return self._json({"ok": True, "account": account})
 
     def _handle_admin_create_plan(self):
         admin = current_admin(self)

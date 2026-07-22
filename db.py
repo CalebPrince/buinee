@@ -143,6 +143,21 @@ def init_db() -> None:
                 expires_at REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS crm_accounts (
+                company_id           INTEGER PRIMARY KEY REFERENCES companies(id),
+                legal_name           TEXT NOT NULL DEFAULT '',
+                industry             TEXT NOT NULL DEFAULT '',
+                website              TEXT NOT NULL DEFAULT '',
+                phone                TEXT NOT NULL DEFAULT '',
+                location             TEXT NOT NULL DEFAULT '',
+                lifecycle_status     TEXT NOT NULL DEFAULT 'customer',
+                relationship_owner   TEXT NOT NULL DEFAULT '',
+                primary_contact_name TEXT NOT NULL DEFAULT '',
+                primary_contact_email TEXT NOT NULL DEFAULT '',
+                summary              TEXT NOT NULL DEFAULT '',
+                updated_at           REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -1269,6 +1284,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM crm_accounts WHERE company_id = ?", (company_id,))
         conn.execute(
             "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE company_id = ?)",
             (company_id,),
@@ -1283,8 +1299,13 @@ def list_companies_with_stats() -> list[dict]:
     with _cursor() as conn:
         companies = conn.execute(
             """SELECT c.id, c.name, c.created_at, p.id AS plan_id, p.name AS plan_name,
-                      p.user_limit AS plan_user_limit, p.audience AS plan_audience
+                      p.user_limit AS plan_user_limit, p.audience AS plan_audience,
+                      a.legal_name, a.industry, a.website, a.phone, a.location,
+                      COALESCE(a.lifecycle_status, 'customer') AS lifecycle_status,
+                      a.relationship_owner, a.primary_contact_name,
+                      a.primary_contact_email, a.summary, a.updated_at AS crm_updated_at
                FROM companies c JOIN plans p ON c.plan_id = p.id
+               LEFT JOIN crm_accounts a ON a.company_id = c.id
                ORDER BY c.created_at""",
         ).fetchall()
         out = []
@@ -1309,6 +1330,19 @@ def list_companies_with_stats() -> list[dict]:
                 "supervisor": {"name": supervisor["name"], "email": supervisor["email"]} if supervisor else None,
                 "team": [dict(u) for u in team],
                 "pending": [dict(u) for u in pending],
+                "crm": {
+                    "legal_name": c["legal_name"] or "",
+                    "industry": c["industry"] or "",
+                    "website": c["website"] or "",
+                    "phone": c["phone"] or "",
+                    "location": c["location"] or "",
+                    "lifecycle_status": c["lifecycle_status"],
+                    "relationship_owner": c["relationship_owner"] or "",
+                    "primary_contact_name": c["primary_contact_name"] or "",
+                    "primary_contact_email": c["primary_contact_email"] or "",
+                    "summary": c["summary"] or "",
+                    "updated_at": c["crm_updated_at"],
+                },
                 "plan": {
                     "id": c["plan_id"],
                     "name": c["plan_name"],
@@ -1824,6 +1858,53 @@ def automation_states(user_id: int) -> dict[str, dict]:
             run["result"] = {}
         item["latest_run"] = run
     return out
+
+
+CRM_LIFECYCLE_STATUSES = {"lead", "trial", "customer", "at_risk", "paused", "churned"}
+
+
+def update_crm_account(company_id: int, fields: dict) -> dict:
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    lifecycle = str(fields.get("lifecycle_status") or "customer").strip().lower()
+    if lifecycle not in CRM_LIFECYCLE_STATUSES:
+        raise AuthError("Choose a valid customer status.")
+    values = {
+        "legal_name": str(fields.get("legal_name") or "").strip()[:160],
+        "industry": str(fields.get("industry") or "").strip()[:100],
+        "website": str(fields.get("website") or "").strip()[:300],
+        "phone": str(fields.get("phone") or "").strip()[:80],
+        "location": str(fields.get("location") or "").strip()[:160],
+        "relationship_owner": str(fields.get("relationship_owner") or "").strip()[:120],
+        "primary_contact_name": str(fields.get("primary_contact_name") or "").strip()[:120],
+        "primary_contact_email": str(fields.get("primary_contact_email") or "").strip().lower()[:254],
+        "summary": str(fields.get("summary") or "").strip()[:4000],
+    }
+    if values["primary_contact_email"] and ("@" not in values["primary_contact_email"] or "." not in values["primary_contact_email"].split("@")[-1]):
+        raise AuthError("Enter a valid primary contact email.")
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO crm_accounts
+                   (company_id, legal_name, industry, website, phone, location,
+                    lifecycle_status, relationship_owner, primary_contact_name,
+                    primary_contact_email, summary, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 legal_name=excluded.legal_name, industry=excluded.industry,
+                 website=excluded.website, phone=excluded.phone, location=excluded.location,
+                 lifecycle_status=excluded.lifecycle_status,
+                 relationship_owner=excluded.relationship_owner,
+                 primary_contact_name=excluded.primary_contact_name,
+                 primary_contact_email=excluded.primary_contact_email,
+                 summary=excluded.summary, updated_at=excluded.updated_at""",
+            (company_id, values["legal_name"], values["industry"], values["website"],
+             values["phone"], values["location"], lifecycle,
+             values["relationship_owner"], values["primary_contact_name"],
+             values["primary_contact_email"], values["summary"], now),
+        )
+    values.update({"lifecycle_status": lifecycle, "updated_at": now})
+    return values
 
 
 def set_automation(user_id: int, recipe_key: str, enabled: bool, next_run_at: float | None) -> None:

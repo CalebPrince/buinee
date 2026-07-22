@@ -263,6 +263,12 @@ weight in a security-sensitive area of the code.
   and reveals the Supervisor's email plus the complete team and
   pending list. Click again to collapse. Nothing is truncated once
   expanded; collapsed cards stay small so many companies fit on screen.
+  Each expanded company now starts with a persistent **Account 360** CRM
+  profile: lifecycle status (Lead, Trial, Customer, At risk, Paused, Churned),
+  legal name, industry, website, phone, location, Buinee relationship owner,
+  primary contact, and an internal account summary. CRM fields live in
+  `crm_accounts`, are visible only to authenticated platform admins, and save
+  through `/api/admin/company/crm`; they never leak into the customer workspace.
   Expanded, there's also a **Delete company** button (`db.delete_company`,
   `/api/admin/company/delete`) — permanently removes the company and every
   user in it (and their sessions), with a native confirm dialog first.
