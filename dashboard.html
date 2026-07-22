@@ -228,6 +228,20 @@
   .attention-copy span { margin-top: 2px; color: var(--ink-3); font-size: 10.5px; }
   .attention-arrow { color: var(--ochre); font-size: 18px; }
   .attention-clear { padding: 11px 2px 1px; color: var(--ink-3); font-size: 12px; }
+  .daily-brief { margin: 0 0 18px; border: 1px solid var(--teal); border-radius: 14px; background: var(--surface); overflow: hidden; box-shadow: var(--shadow); }
+  .daily-brief-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:15px 17px; background:var(--teal-soft); }
+  .daily-brief-head h2 { margin:0; font:600 18px var(--serif); color:var(--teal-deep); }
+  .daily-brief-head p { margin:3px 0 0; color:var(--ink-3); font-size:12px; }
+  .daily-brief-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .daily-section { min-width:0; padding:15px 17px; border-right:1px solid var(--line); }
+  .daily-section:last-child { border-right:0; }
+  .daily-section h3 { margin:0 0 9px; font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-4); }
+  .daily-item { padding:8px 0; border-bottom:1px solid var(--line); font-size:12.5px; line-height:1.45; }
+  .daily-item:last-child { border-bottom:0; }
+  .daily-item b,.daily-item span { display:block; overflow-wrap:anywhere; }
+  .daily-item span { margin-top:2px; color:var(--ink-4); font-size:10.5px; }
+  .daily-empty { color:var(--ink-4); font-size:12px; }
+  @media(max-width:800px){.daily-brief-grid{grid-template-columns:1fr}.daily-section{border-right:0;border-bottom:1px solid var(--line)}.daily-section:last-child{border-bottom:0}}
 
   .plan-banner {
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -752,6 +766,7 @@
         </button>
       </div>
       <section class="attention" id="attentionCenter" hidden aria-live="polite"></section>
+      <section class="daily-brief" id="dailyBriefing" hidden aria-live="polite"></section>
       <div class="kpis" id="kpis"></div>
       <div class="grid2" id="overviewCards"></div>
     </section>
@@ -1339,6 +1354,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     kpis.find(k => k.key === 'flagged').n = voucherCounts.flagged;
     kpis.find(k => k.key === 'issues').n = collectFixItems().length;
     await loadNotifications();
+    loadDailyBriefing();
 
     const cards = document.getElementById('overviewCards');
     cards.appendChild(emptyCard(
@@ -1409,6 +1425,23 @@ Do not promise a payment date unless it has already been approved."></textarea>
       renderAttentionCenter();
       if (teamChatAvailable) refreshTeamPresence();
     } catch { /* Existing workspace remains usable if alerts cannot load. */ }
+  }
+
+  async function loadDailyBriefing() {
+    const box = document.getElementById('dailyBriefing');
+    try {
+      const res = await fetch('/api/daily-briefing', { credentials:'same-origin' });
+      const data = await res.json();
+      if (!res.ok) return;
+      const brief = data.briefing || {};
+      const due = brief.due || [], completed = brief.completed || [], conversations = brief.conversations || [];
+      const dueHtml = due.length ? due.slice(0,6).map(task => `<div class="daily-item"><b>${escapeHtml(task.title)}</b><span>${task.due_state === 'overdue' ? 'Overdue' : task.due_state === 'today' ? 'Due today' : task.due_date ? `Due ${escapeHtml(task.due_date)}` : 'Open follow-up'}${task.assigned_user_name && myRole === 'finance_supervisor' ? ` · ${escapeHtml(task.assigned_user_name)}` : ''}</span></div>`).join('') : '<div class="daily-empty">Nothing due or overdue.</div>';
+      const doneHtml = completed.length ? completed.slice(0,6).map(task => `<div class="daily-item"><b>${escapeHtml(task.title)}</b><span>${task.assigned_user_name ? escapeHtml(task.assigned_user_name) + ' · ' : ''}Completed in the last 24 hours</span></div>`).join('') : '<div class="daily-empty">No follow-ups completed in the last 24 hours.</div>';
+      const conversationHtml = conversations.length ? conversations.slice(0,6).map(message => `<div class="daily-item"><b>${escapeHtml(message.sender_name)}${message.recipient_name ? ` → ${escapeHtml(message.recipient_name)}` : ' · Team'}</b><span>${escapeHtml((message.body || 'Shared a file').slice(0,120))}</span></div>`).join('') : '<div class="daily-empty">No team conversation activity in the last 24 hours.</div>';
+      const mailLine = brief.mail ? escapeHtml(brief.mail.headline || 'Morning mailbox review complete') : 'Enable Morning triage in Automations for an email summary.';
+      box.innerHTML = `<div class="daily-brief-head"><div><h2>${myRole === 'finance_supervisor' ? 'Team morning briefing' : 'Your morning briefing'}</h2><p>${mailLine}</p></div><button class="btn sm" type="button" onclick="loadDailyBriefing()">Refresh</button></div><div class="daily-brief-grid"><div class="daily-section"><h3>Needs attention</h3>${dueHtml}</div><div class="daily-section"><h3>Completed since yesterday</h3>${doneHtml}</div><div class="daily-section"><h3>Conversation recap</h3>${conversationHtml}</div></div>`;
+      box.hidden = false;
+    } catch { /* The overview remains available if briefing generation fails. */ }
   }
 
   function renderAttentionCenter() {
@@ -1638,10 +1671,38 @@ Do not promise a payment date unless it has already been approved."></textarea>
           <div class="team-message-meta">${escapeHtml(message.sender_name)} · ${escapeHtml(role)} · ${escapeHtml(new Date(message.created_at * 1000).toLocaleString())}</div>
           ${message.body ? `<div class="team-message-bubble">${escapeHtml(message.body)}</div>` : ''}
           ${files ? `<div class="team-files">${files}</div>` : ''}
+          ${myRole === 'finance_supervisor' && message.body ? `<div class="team-files"><button class="btn sm" type="button" onclick="createFollowUpFromChat(${message.id})">Assign as follow-up</button></div>` : ''}
         </div>
       </article>`;
     }).join('');
     if (nearBottom || teamMessages.length <= 100) stream.scrollTop = stream.scrollHeight;
+  }
+
+  async function createFollowUpFromChat(messageId) {
+    const message = teamMessages.find(item => Number(item.id) === Number(messageId));
+    if (!message) return;
+    const choices = teamMembers.map((member, index) => `${index + 1}. ${member.name}`).join('\n');
+    const picked = prompt(`Assign this follow-up to whom?\n\n${choices}`, '1');
+    if (picked === null) return;
+    const member = teamMembers[Number(picked) - 1];
+    if (!member) { alert('Choose a number from the team list.'); return; }
+    const title = prompt('Confirm or edit the task:', (message.body || '').slice(0, 180));
+    if (!title || !title.trim()) return;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const dueDate = prompt('Due date (YYYY-MM-DD), or leave blank:', today);
+    if (dueDate === null) return;
+    try {
+      const res = await fetch('/api/follow-ups/from-chat', {
+        method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ message_id:messageId, assigned_user_id:member.id,
+          title:title.trim(), due_date:dueDate.trim(), priority:'normal' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not create the follow-up.');
+      alert(`Assigned to ${member.name}. It will appear in their alerts and morning briefing.`);
+      followUpsLoaded = false; loadDailyBriefing(); loadNotifications();
+    } catch(error) { alert(error.message || 'Could not reach the server.'); }
   }
 
   function renderTeamChatMembers() {

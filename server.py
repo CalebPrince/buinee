@@ -914,6 +914,18 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"tasks": db.list_user_crm_tasks(user)})
 
+        if path == "/api/daily-briefing":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            briefing = db.daily_briefing(user)
+            morning = next((item for item in public_automations(user["id"])
+                            if item["key"] == "morning_triage"), {})
+            latest = morning.get("latest_run") or {}
+            briefing["mail"] = latest.get("result") if latest.get("status") == "complete" else None
+            briefing["role"] = user["role"]
+            return self._json({"briefing": briefing})
+
         if path == "/api/payments":
             user = current_user(self)
             if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
@@ -1248,6 +1260,7 @@ class RouteHandlerMixin:
             "/api/team-chat/seen": self._handle_team_messages_seen,
             "/api/team-chat/add-to-library": self._handle_team_file_to_library,
             "/api/follow-ups/status": self._handle_follow_up_status,
+            "/api/follow-ups/from-chat": self._handle_follow_up_from_chat,
             "/api/payments/initialize": self._handle_payment_initialize,
             "/api/paystack/webhook": self._handle_paystack_webhook,
             "/api/vouchers/create": self._handle_voucher_create,
@@ -1800,6 +1813,31 @@ class RouteHandlerMixin:
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad follow-up task."}, 400)
+        return self._json({"ok": True, "task": task})
+
+    def _handle_follow_up_from_chat(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a supervisor can assign conversation follow-ups."}, 403)
+        try:
+            req = self._body(max_len=8000)
+            message_id = int(req.get("message_id"))
+            assigned_user_id = int(req.get("assigned_user_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Choose a message and team member."}, 400)
+        message = db.get_team_message(user["company_id"], message_id, user["id"])
+        if not message:
+            return self._json({"error": "That conversation message is not available to you."}, 404)
+        title = str(req.get("title") or message.get("body") or "Conversation follow-up").strip()[:180]
+        try:
+            task = db.save_crm_task(user["company_id"], {
+                "assigned_user_id": assigned_user_id, "title": title,
+                "details": f"From team chat: {message.get('body') or '(file shared)'}",
+                "due_date": str(req.get("due_date") or ""),
+                "priority": str(req.get("priority") or "normal"), "status": "open",
+            }, user["name"])
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "task": task})
 
     def _handle_payment_initialize(self):

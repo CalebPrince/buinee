@@ -2745,6 +2745,53 @@ def list_user_crm_tasks(user: dict) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def daily_briefing(user: dict) -> dict:
+    """Factual work due today and activity since yesterday for one user."""
+    now = time.time()
+    today = time.strftime("%Y-%m-%d", time.localtime(now))
+    yesterday_start = now - 24 * 60 * 60
+    with _cursor() as conn:
+        scope_sql = "t.company_id=?" if user["role"] == "finance_supervisor" else \
+                    "t.company_id=? AND t.assigned_user_id=?"
+        scope_args = ((user["company_id"],) if user["role"] == "finance_supervisor"
+                      else (user["company_id"], user["id"]))
+        due = conn.execute(
+            f"""SELECT t.*, u.name AS assigned_user_name FROM crm_tasks t
+                LEFT JOIN users u ON u.id=t.assigned_user_id
+                WHERE {scope_sql} AND t.status='open'
+                ORDER BY CASE WHEN t.due_date!='' AND t.due_date<? THEN 0
+                              WHEN t.due_date=? THEN 1 ELSE 2 END,
+                         CASE WHEN t.due_date='' THEN 1 ELSE 0 END, t.due_date, t.id DESC
+                LIMIT 12""",
+            (*scope_args, today, today),
+        ).fetchall()
+        completed = conn.execute(
+            f"""SELECT t.title, t.completed_at, u.name AS assigned_user_name
+                FROM crm_tasks t LEFT JOIN users u ON u.id=t.assigned_user_id
+                WHERE {scope_sql} AND t.status='completed' AND t.completed_at>=?
+                ORDER BY t.completed_at DESC LIMIT 10""",
+            (*scope_args, yesterday_start),
+        ).fetchall()
+        conversations = conn.execute(
+            """SELECT m.id, m.body, m.created_at, u.name AS sender_name,
+                      r.name AS recipient_name
+               FROM team_messages m JOIN users u ON u.id=m.sender_id
+               LEFT JOIN users r ON r.id=m.recipient_id
+               WHERE m.company_id=? AND m.created_at>=?
+                 AND (m.recipient_id IS NULL OR m.sender_id=? OR m.recipient_id=?)
+               ORDER BY m.id DESC LIMIT 12""",
+            (user["company_id"], yesterday_start, user["id"], user["id"]),
+        ).fetchall()
+    items = []
+    for row in due:
+        item = dict(row)
+        item["due_state"] = ("overdue" if item["due_date"] and item["due_date"] < today
+                             else "today" if item["due_date"] == today else "upcoming")
+        items.append(item)
+    return {"date": today, "due": items, "completed": [dict(row) for row in completed],
+            "conversations": [dict(row) for row in conversations]}
+
+
 def set_user_crm_task_status(user: dict, task_id: int, status: str) -> dict:
     if status not in CRM_TASK_STATUSES:
         raise AuthError("Choose a valid task status.")
