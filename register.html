@@ -572,7 +572,12 @@
         return false;
       }
       if (!res.ok) { showMsg('registerError', data.error || 'Something went wrong.'); return false; }
-      location.href = '/dashboard';
+      if (data.payment_required && data.authorization_url) {
+        btn.textContent = 'Opening secure payment…';
+        location.href = data.authorization_url;
+      } else {
+        location.href = '/dashboard';
+      }
     } catch {
       showMsg('registerError', 'Could not reach the server.');
     } finally {

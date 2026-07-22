@@ -802,6 +802,24 @@ def paystack_api(method: str, path: str, cfg: dict, payload: dict | None = None)
     return result.get("data") or {}
 
 
+def initialize_plan_payment(user: dict, plan: dict, cfg: dict) -> dict:
+    amount = int(round(float(plan["price"]) * 100))
+    if amount <= 0:
+        raise ValueError("This plan has no payment due.")
+    reference = "buinee-" + secrets.token_hex(12)
+    ps = paystack_config(cfg)
+    db.create_payment_intent(user["company_id"], user["id"], plan["id"], amount,
+                             plan["currency"].upper(), user["email"], reference)
+    result = paystack_api("POST", "/transaction/initialize", cfg, {
+        "email": user["email"], "amount": str(amount),
+        "currency": plan["currency"].upper(), "reference": reference,
+        "callback_url": ps["callback_url"],
+        "metadata": json.dumps({"company_id": user["company_id"],
+                                "plan_id": plan["id"], "registration": True}),
+    })
+    return {"authorization_url": result.get("authorization_url"), "reference": reference}
+
+
 # --------------------------------------------------------------- route logic
 #
 # Every route lives here, transport-agnostic. A caller just needs to provide
@@ -857,7 +875,7 @@ class RouteHandlerMixin:
 
         if path == "/api/me":
             user = current_user(self)
-            if not user:
+            if not user or user["status"] != "approved":
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"user": public_user(user)})
 
@@ -906,12 +924,16 @@ class RouteHandlerMixin:
         if path == "/api/paystack/callback":
             reference = parse_qs(urlparse(self.path).query).get("reference", [""])[0]
             payment = db.get_payment(reference)
+            verified = False
             if payment:
                 try:
-                    db.record_paystack_payment(paystack_api("GET", "/transaction/verify/" + quote(reference), load_env()))
+                    recorded = db.record_paystack_payment(
+                        paystack_api("GET", "/transaction/verify/" + quote(reference), load_env())
+                    )
+                    verified = bool(recorded and recorded.get("status") == "success")
                 except ValueError:
                     pass
-            return self._redirect("/dashboard#team")
+            return self._redirect("/dashboard?payment=success" if verified else "/login?payment=failed")
 
         if path == "/api/team-chat":
             user = current_user(self)
@@ -1324,6 +1346,10 @@ class RouteHandlerMixin:
             plan_id = int(req["plan_id"]) if req.get("plan_id") is not None else None
         except (TypeError, ValueError):
             plan_id = None
+        plan = db.get_plan(plan_id) if plan_id is not None else None
+        if not plan:
+            return self._json({"error": "Choose a valid pricing plan."}, 400)
+        payment_required = float(plan["price"]) > 0
         try:
             user = db.register_company(
                 str(req.get("company_name") or ""),
@@ -1333,6 +1359,7 @@ class RouteHandlerMixin:
                 str(req.get("role") or ""),
                 plan_id=plan_id,
                 allow_duplicate_name=bool(req.get("allow_duplicate_name")),
+                initial_status="payment_pending" if payment_required else "approved",
             )
         except db.DuplicateCompanyError as exc:
             # Not a failure so much as a question - the form asks whether this
@@ -1347,8 +1374,19 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         db.record_terms_acceptance(user["id"], TERMS_VERSION)
         token = db.create_session(user["id"])
+        payment = None
+        if payment_required:
+            try:
+                payment = initialize_plan_payment(user, plan, load_env())
+            except ValueError as exc:
+                return self._json(
+                    {"error": f"Your account was created, but payment could not start: {exc}"},
+                    503,
+                    [("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
+                )
         return self._json(
-            {"ok": True, "user": public_user(user)},
+            {"ok": True, "user": public_user(user), "payment_required": payment_required,
+             "authorization_url": payment.get("authorization_url") if payment else ""},
             extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
         )
 
@@ -1610,6 +1648,21 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 401)
         token = db.create_session(user["id"])
+        if user["status"] == "payment_pending":
+            try:
+                payment = initialize_plan_payment(
+                    user, db.plan_for_company(user["company_id"]), load_env()
+                )
+            except ValueError as exc:
+                return self._json(
+                    {"error": f"Payment could not start: {exc}"}, 503,
+                    [("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
+                )
+            return self._json(
+                {"ok": True, "payment_required": True,
+                 "authorization_url": payment["authorization_url"]},
+                extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
+            )
         return self._json(
             {"ok": True, "user": public_user(user)},
             extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
@@ -1755,22 +1808,11 @@ class RouteHandlerMixin:
         if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
             return self._json({"error": "Only a supervisor can manage billing."}, 403)
         plan = db.plan_for_company(user["company_id"])
-        amount = int(round(float(plan["price"]) * 100))
-        if amount <= 0:
-            return self._json({"error": "This plan has no payment due."}, 400)
-        reference = "buinee-" + secrets.token_hex(12)
-        cfg, ps = load_env(), paystack_config(load_env())
-        db.create_payment_intent(user["company_id"], user["id"], plan["id"], amount,
-                                 plan["currency"].upper(), user["email"], reference)
         try:
-            result = paystack_api("POST", "/transaction/initialize", cfg, {
-                "email": user["email"], "amount": str(amount), "currency": plan["currency"].upper(),
-                "reference": reference, "callback_url": ps["callback_url"],
-                "metadata": json.dumps({"company_id": user["company_id"], "plan_id": plan["id"]}),
-            })
+            payment = initialize_plan_payment(user, plan, load_env())
         except ValueError as exc:
             return self._json({"error": str(exc)}, 400)
-        return self._json({"authorization_url": result.get("authorization_url"), "reference": reference})
+        return self._json(payment)
 
     def _handle_paystack_webhook(self):
         cfg = load_env()

@@ -807,14 +807,16 @@ def has_approved_supervisor(company_id: int) -> bool:
 
 
 def register_company(company_name: str, name: str, email: str, password: str, role: str,
-                      plan_id: int | None = None, allow_duplicate_name: bool = False) -> dict:
+                      plan_id: int | None = None, allow_duplicate_name: bool = False,
+                      initial_status: str = "approved") -> dict:
     """Create a company and its first user, in whatever role they actually hold.
 
     Not assumed to be Supervisor just because they're the one setting
     the account up - a junior person can register the company on the boss's
     behalf and get only their own limited access. Whatever role is chosen,
     this account is approved immediately: there's nobody else at a brand-new
-    company who could approve it.
+    company who could approve it. Paid-plan registrations instead begin in
+    payment_pending and are activated only by a verified gateway payment.
 
     `plan_id` is the tier chosen on the landing page's pricing section before
     ever reaching this form - falls back to whichever plan is_default if
@@ -852,6 +854,8 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         raise AuthError("That doesn't look like an email address.")
     if len(password) < 8:
         raise AuthError("Password must be at least 8 characters.")
+    if initial_status not in ("approved", "payment_pending"):
+        raise AuthError("Not a valid registration status.")
     if get_user_by_email(email):
         raise AuthError("An account with that email already exists.")
     if not allow_duplicate_name:
@@ -870,8 +874,9 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         cur = conn.execute(
             """INSERT INTO users
                (company_id, name, email, password_hash, salt, role, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'approved', ?)""",
-            (company_id, name, email, _hash_password(password, salt), salt.hex(), role, now),
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (company_id, name, email, _hash_password(password, salt), salt.hex(), role,
+             initial_status, now),
         )
         user_id = cur.lastrowid
 
@@ -2688,6 +2693,10 @@ def record_paystack_payment(data: dict) -> dict | None:
                          VALUES(?, 'current', ?) ON CONFLICT(company_id) DO UPDATE SET
                          payment_status='current',updated_at=excluded.updated_at""",
                          (expected["company_id"], time.time()))
+            conn.execute(
+                "UPDATE users SET status='approved' WHERE id=? AND status='payment_pending'",
+                (expected["user_id"],),
+            )
         row = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
     return dict(row)
 

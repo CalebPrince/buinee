@@ -254,7 +254,12 @@
         errEl.classList.add('show');
         return false;
       }
-      location.href = '/dashboard';
+      if (data.payment_required && data.authorization_url) {
+        btn.textContent = 'Opening secure payment…';
+        location.href = data.authorization_url;
+      } else {
+        location.href = '/dashboard';
+      }
     } catch {
       errEl.textContent = 'Could not reach the server.';
       errEl.classList.add('show');
