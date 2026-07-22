@@ -116,6 +116,7 @@ section before assuming this applies):
 | `dashboard.html` | Post-login workspace — sidebar app shell, role-scoped views, see below |
 | `admin.html` | Command Center: Overview — platform stat tiles, the 5 newest signups, system status |
 | `admin-companies.html` | Command Center: Companies — every company in full, Supervisor + complete team/pending |
+| `admin-pipeline.html` | Command Center CRM: opportunity pipeline, forecast value, probability and close dates |
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
 | `admin-settings.html` | Command Center: Settings — change the platform owner's own password |
 | `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes — routing logic is transport-agnostic, see Deployment above |
@@ -289,6 +290,14 @@ weight in a security-sensitive area of the code.
   each account's time in its current stage. Existing CRM rows are backfilled
   from their last update; accounts without a CRM row use company registration
   time until their first stage change.
+  The next CRM module is a dedicated **Sales pipeline** page backed by
+  `crm_opportunities`. Opportunities link to real companies and move through
+  Prospecting, Qualified, Proposal, Negotiation, Won, and Lost. Each stores an
+  estimated value/currency, probability, expected close date, owner, and notes.
+  The page calculates open value, probability-weighted forecast, and won value
+  without incorrectly adding different currencies together. Cards can move
+  stage directly or open the full editor; all writes are platform-admin-only
+  through `/api/admin/opportunity/save` and `/api/admin/opportunity/delete`.
   Expanded, there's also a **Delete company** button (`db.delete_company`,
   `/api/admin/company/delete`) — permanently removes the company and every
   user in it (and their sessions), with a native confirm dialog first.

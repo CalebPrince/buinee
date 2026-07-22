@@ -175,6 +175,21 @@ def init_db() -> None:
                 updated_at  REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS crm_opportunities (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id          INTEGER NOT NULL REFERENCES companies(id),
+                name                TEXT NOT NULL,
+                stage               TEXT NOT NULL DEFAULT 'prospecting',
+                value               REAL NOT NULL DEFAULT 0,
+                currency            TEXT NOT NULL DEFAULT 'GHS',
+                probability         INTEGER NOT NULL DEFAULT 10,
+                expected_close_date TEXT NOT NULL DEFAULT '',
+                owner               TEXT NOT NULL DEFAULT '',
+                notes               TEXT NOT NULL DEFAULT '',
+                created_at          REAL NOT NULL,
+                updated_at          REAL NOT NULL
+            );
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -388,6 +403,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_team_messages_company ON team_messages(company_id, id);
             CREATE INDEX IF NOT EXISTS idx_team_message_files_message ON team_message_files(message_id);
             CREATE INDEX IF NOT EXISTS idx_crm_contacts_company ON crm_contacts(company_id, is_primary, name);
+            CREATE INDEX IF NOT EXISTS idx_crm_opportunities_stage ON crm_opportunities(stage, expected_close_date);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1313,6 +1329,7 @@ def delete_company(company_id: int) -> None:
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute("DELETE FROM crm_opportunities WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_contacts WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_accounts WHERE company_id = ?", (company_id,))
         conn.execute(
@@ -2042,6 +2059,95 @@ def delete_crm_contact(company_id: int, contact_id: int) -> bool:
                 (time.time(), company_id),
             )
     return True
+
+
+CRM_OPPORTUNITY_STAGES = {"prospecting", "qualified", "proposal", "negotiation", "won", "lost"}
+
+
+def list_company_choices() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute("SELECT id, name FROM companies ORDER BY name").fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_crm_opportunities() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT o.*, c.name AS company_name FROM crm_opportunities o
+               JOIN companies c ON c.id = o.company_id
+               ORDER BY CASE o.stage WHEN 'prospecting' THEN 0 WHEN 'qualified' THEN 1
+                 WHEN 'proposal' THEN 2 WHEN 'negotiation' THEN 3
+                 WHEN 'won' THEN 4 ELSE 5 END,
+                 CASE WHEN o.expected_close_date = '' THEN 1 ELSE 0 END,
+                 o.expected_close_date, o.updated_at DESC"""
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def save_crm_opportunity(fields: dict) -> dict:
+    try:
+        opportunity_id = int(fields.get("opportunity_id") or 0)
+        company_id = int(fields.get("company_id"))
+        value = float(fields.get("value") or 0)
+        probability = int(fields.get("probability") or 0)
+    except (TypeError, ValueError):
+        raise AuthError("Check the company, value, and probability.")
+    if not get_company(company_id):
+        raise AuthError("Choose a valid company.")
+    name = str(fields.get("name") or "").strip()[:160]
+    stage = str(fields.get("stage") or "prospecting").strip().lower()
+    currency = str(fields.get("currency") or "GHS").strip().upper()[:6] or "GHS"
+    close_date = str(fields.get("expected_close_date") or "").strip()[:10]
+    if not name:
+        raise AuthError("Opportunity name is required.")
+    if stage not in CRM_OPPORTUNITY_STAGES:
+        raise AuthError("Choose a valid pipeline stage.")
+    if value < 0:
+        raise AuthError("Opportunity value cannot be negative.")
+    if probability < 0 or probability > 100:
+        raise AuthError("Probability must be from 0 to 100.")
+    if close_date:
+        try:
+            time.strptime(close_date, "%Y-%m-%d")
+        except ValueError:
+            raise AuthError("Enter a valid expected close date.")
+    owner = str(fields.get("owner") or "").strip()[:120]
+    notes = str(fields.get("notes") or "").strip()[:2000]
+    now = time.time()
+    with _cursor() as conn:
+        if opportunity_id:
+            existing = conn.execute("SELECT id FROM crm_opportunities WHERE id = ?", (opportunity_id,)).fetchone()
+            if not existing:
+                raise AuthError("Opportunity not found.")
+            conn.execute(
+                """UPDATE crm_opportunities SET company_id=?, name=?, stage=?, value=?,
+                     currency=?, probability=?, expected_close_date=?, owner=?, notes=?, updated_at=?
+                   WHERE id=?""",
+                (company_id, name, stage, value, currency, probability, close_date,
+                 owner, notes, now, opportunity_id),
+            )
+        else:
+            cur = conn.execute(
+                """INSERT INTO crm_opportunities
+                     (company_id, name, stage, value, currency, probability,
+                      expected_close_date, owner, notes, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (company_id, name, stage, value, currency, probability, close_date,
+                 owner, notes, now, now),
+            )
+            opportunity_id = cur.lastrowid
+        row = conn.execute(
+            """SELECT o.*, c.name AS company_name FROM crm_opportunities o
+               JOIN companies c ON c.id=o.company_id WHERE o.id=?""",
+            (opportunity_id,),
+        ).fetchone()
+    return dict(row)
+
+
+def delete_crm_opportunity(opportunity_id: int) -> bool:
+    with _cursor() as conn:
+        cur = conn.execute("DELETE FROM crm_opportunities WHERE id = ?", (opportunity_id,))
+        return cur.rowcount > 0
 
 
 def update_crm_account(company_id: int, fields: dict) -> dict:

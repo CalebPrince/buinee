@@ -184,6 +184,7 @@ STATIC_PAGES = {
     "/admin.html": "admin.html",
     "/admin-companies.html": "admin-companies.html",
     "/admin-plans.html": "admin-plans.html",
+    "/admin-pipeline.html": "admin-pipeline.html",
     "/admin-login.html": "admin-login.html",
     "/admin-settings.html": "admin-settings.html",
 }
@@ -977,6 +978,13 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"plans": db.list_plans()})
 
+        if path == "/api/admin/pipeline":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"opportunities": db.list_crm_opportunities(),
+                               "companies": db.list_company_choices()})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -1022,6 +1030,8 @@ class RouteHandlerMixin:
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
+            "/api/admin/opportunity/save": self._handle_admin_save_opportunity,
+            "/api/admin/opportunity/delete": self._handle_admin_delete_opportunity,
             "/api/admin/plans/create": self._handle_admin_create_plan,
             "/api/admin/plans/update": self._handle_admin_update_plan,
             "/api/admin/company/set-plan": self._handle_admin_set_company_plan,
@@ -1830,6 +1840,28 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad contact."}, 400)
         if not db.delete_crm_contact(company_id, contact_id):
             return self._json({"error": "Contact not found."}, 404)
+        return self._json({"ok": True})
+
+    def _handle_admin_save_opportunity(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            opportunity = db.save_crm_opportunity(self._body(max_len=8000))
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad opportunity."}, 400)
+        return self._json({"ok": True, "opportunity": opportunity})
+
+    def _handle_admin_delete_opportunity(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            opportunity_id = int(self._body().get("opportunity_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad opportunity."}, 400)
+        if not db.delete_crm_opportunity(opportunity_id):
+            return self._json({"error": "Opportunity not found."}, 404)
         return self._json({"ok": True})
 
     def _handle_admin_create_plan(self):
