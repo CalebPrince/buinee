@@ -44,6 +44,7 @@ import json
 import os
 import re
 import secrets
+import struct
 import sys
 import time
 import traceback
@@ -292,6 +293,7 @@ def load_env() -> dict:
         "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_REDIRECT_URI",
         "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
         "BUINEE_SECRET_KEY",
+        "BUINEE_COOKIE_SECURE", "BUINEE_TRUST_PROXY",
         "PAYSTACK_PUBLIC_KEY", "PAYSTACK_SECRET_KEY", "PAYSTACK_CALLBACK_URL", "PAYSTACK_WEBHOOK_URL",
     ]:
         if os.environ.get(k):
@@ -343,13 +345,18 @@ def rate_limited(key: str, max_hits: int = MAX_TURNS, window: int = WINDOW_SECON
 
 
 def client_ip(handler) -> str:
-    return handler.headers.get("X-Forwarded-For", handler.client_address[0]).split(",")[0].strip()
+    direct = handler.client_address[0]
+    if load_env().get("BUINEE_TRUST_PROXY", "0") == "1":
+        forwarded = handler.headers.get("X-Forwarded-For") or ""
+        return forwarded.split(",")[0].strip() or direct
+    return direct
 
 
 # ------------------------------------------------------------------- auth helpers
 
 def _cookie_header(name: str, token: str, max_age: int) -> str:
-    return f"{name}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}"
+    secure = "; Secure" if load_env().get("BUINEE_COOKIE_SECURE", "1") != "0" else ""
+    return f"{name}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}{secure}"
 
 
 def _cookie(handler, name: str) -> str | None:
@@ -470,11 +477,54 @@ def current_admin(handler) -> dict | None:
 
 def public_admin(admin: dict) -> dict:
     return {"id": admin["id"], "name": admin["name"], "email": admin["email"],
-            "role": admin.get("role", "owner"), "status": admin.get("status", "active")}
+            "role": admin.get("role", "owner"), "status": admin.get("status", "active"),
+            "mfa_enabled": bool(admin.get("mfa_secret_enc"))}
 
 
 def admin_is_owner(admin: dict | None) -> bool:
     return bool(admin and admin.get("role", "owner") == "owner")
+
+
+def _totp_secret() -> str:
+    return base64.b32encode(os.urandom(20)).decode("ascii").rstrip("=")
+
+
+def _totp_code(secret: str, counter: int) -> str:
+    padded = secret + "=" * ((8 - len(secret) % 8) % 8)
+    key = base64.b32decode(padded, casefold=True)
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff) % 1_000_000
+    return f"{value:06d}"
+
+
+def verify_totp(secret: str, supplied: str) -> bool:
+    code = re.sub(r"\D", "", supplied or "")
+    if len(code) != 6:
+        return False
+    counter = int(time.time() // 30)
+    return any(secrets.compare_digest(_totp_code(secret, counter + drift), code)
+               for drift in (-1, 0, 1))
+
+
+def _mfa_secret(cfg: dict, encrypted: str) -> str:
+    return str(secretstore.decrypt(cfg, encrypted).get("totp_secret") or "")
+
+
+def verify_admin_mfa(admin: dict, supplied: str, consume_recovery: bool = True) -> bool:
+    encrypted = admin.get("mfa_secret_enc") or ""
+    if not encrypted:
+        return True
+    try:
+        if verify_totp(_mfa_secret(load_env(), encrypted), supplied):
+            return True
+    except secretstore.SecretsUnavailable:
+        pass
+    normalized = re.sub(r"[^A-Z0-9]", "", (supplied or "").upper())
+    if len(normalized) < 8 or not consume_recovery:
+        return False
+    recovery_hash = hashlib.sha256(normalized.encode()).hexdigest()
+    return db.consume_admin_recovery_code(admin["id"], recovery_hash)
 
 
 def fx() -> voucher.FxRates | None:
@@ -924,6 +974,17 @@ class RouteHandlerMixin:
             ("Content-Length", str(len(body))),
             ("Cache-Control", "no-store"),
             ("X-Content-Type-Options", "nosniff"),
+            ("X-Frame-Options", "DENY"),
+            ("Referrer-Policy", "strict-origin-when-cross-origin"),
+            ("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()"),
+            ("Cross-Origin-Opener-Policy", "same-origin"),
+            ("Cross-Origin-Resource-Policy", "same-origin"),
+            ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
+            ("Content-Security-Policy",
+             "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+             "form-action 'self'; script-src 'self' 'unsafe-inline'; "
+             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+             "font-src 'self'; connect-src 'self'"),
             *list(extra_headers or []),
         ]
         self._resp_body = b"" if getattr(self, "_head_only", False) else body
@@ -947,6 +1008,22 @@ class RouteHandlerMixin:
         if length > max_len:
             raise ValueError("body too large")
         return self.rfile.read(length)
+
+    def _post_is_same_origin(self) -> bool:
+        """Reject browser cross-site mutations while preserving API clients."""
+        fetch_site = (self.headers.get("Sec-Fetch-Site") or "").lower()
+        if fetch_site == "cross-site":
+            return False
+        origin = self.headers.get("Origin")
+        if origin:
+            origin_url = urlparse(origin)
+            expected_host = (self.headers.get("Host") or "").lower()
+            return origin_url.scheme in ("https", "http") and origin_url.netloc.lower() == expected_host
+        # Modern browsers send Origin on POST. Requests without it are allowed
+        # only when they carry no authenticated Buinee cookie (CLI/API login,
+        # registration and health tooling).
+        raw_cookie = self.headers.get("Cookie") or ""
+        return COOKIE_NAME not in raw_cookie and ADMIN_COOKIE_NAME not in raw_cookie
 
     # ---------------------------------------------------------------- GET
 
@@ -1233,27 +1310,27 @@ class RouteHandlerMixin:
                 "system": {
                     "demo_agent_configured": active_provider(cfg) is not None,
                     "fx_rates_loaded": fx() is not None,
-                    "database_path": str(db.DB_FILE),
+                    "database_ready": db.DB_FILE.exists(),
                 },
             })
 
         if path == "/api/admin/plans":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "billing")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             return self._json({"plans": db.list_plans()})
 
         if path == "/api/admin/pipeline":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "sales")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             return self._json({"opportunities": db.list_crm_opportunities(),
                                "companies": db.list_company_choices()})
 
         if path == "/api/admin/payments":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "billing")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             ps = paystack_config(load_env())
             return self._json({"payments": db.list_payments(), "configuration": {
                 "public_key": ps["public_key"], "public_key_configured": bool(ps["public_key"]),
@@ -1270,9 +1347,9 @@ class RouteHandlerMixin:
                                "roles": list(db.PLATFORM_ADMIN_ROLES)})
 
         if path == "/api/admin/activity":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "operations", "support")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             query = parse_qs(urlparse(self.path).query)
             try:
                 page = int(query.get("page", ["1"])[0])
@@ -1283,9 +1360,9 @@ class RouteHandlerMixin:
                 action=query.get("action", [""])[0]))
 
         if path == "/api/admin/errors":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "support")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             query = parse_qs(urlparse(self.path).query)
             try: limit = int(query.get("limit", ["300"])[0])
             except ValueError: limit = 300
@@ -1293,9 +1370,9 @@ class RouteHandlerMixin:
                 query.get("severity", [""])[0], query.get("query", [""])[0])})
 
         if path == "/api/admin/reports":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "sales", "billing")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             companies, payments, opportunities = (db.list_companies_with_stats(),
                                                    db.list_payments(), db.list_crm_opportunities())
             revenue, forecast, plans, lifecycle = {}, {}, {}, {}
@@ -1317,14 +1394,14 @@ class RouteHandlerMixin:
                                "opportunities": opportunities[:10]})
 
         if path == "/api/admin/inbox":
-            admin = current_admin(self)
+            admin = self._admin_role_request("owner", "operations", "support")
             if not admin:
-                return self._json({"error": "Not signed in."}, 401)
+                return
             return self._json({"items": db.list_admin_inbox()})
 
         if path == "/api/admin/invoices":
-            admin = current_admin(self)
-            if not admin: return self._json({"error": "Not signed in."}, 401)
+            admin = self._admin_role_request("owner", "billing")
+            if not admin: return
             return self._json({"invoices": db.list_admin_invoices(), "companies": db.list_company_choices()})
 
         if path in STATIC_PAGES:
@@ -1339,6 +1416,8 @@ class RouteHandlerMixin:
 
     def _route_post(self):
         path = self.path.split("?")[0]
+        if path != "/api/paystack/webhook" and not self._post_is_same_origin():
+            return self._json({"error": "This request did not come from Buinee."}, 403)
         handlers = {
             "/api/demo": self._handle_demo,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
@@ -1374,6 +1453,9 @@ class RouteHandlerMixin:
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
+            "/api/admin/mfa/setup": self._handle_admin_mfa_setup,
+            "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
+            "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
             "/api/admin/company/delete": self._handle_admin_delete_company,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
@@ -1822,16 +1904,21 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "pending": True, "company": db.get_company(company_id)})
 
     def _handle_login(self):
-        if rate_limited(f"auth:{client_ip(self)}", max_hits=20, window=600):
-            return self._json({"error": "Too many attempts — try again shortly."}, 429)
         try:
             req = self._body()
         except Exception:
             return self._json({"error": "Bad request."}, 400)
+        email_address = str(req.get("email") or "").strip().lower()
+        if db.login_rate_limited("user", client_ip(self), email_address):
+            return self._json({"error": "Too many sign-in attempts. Try again in 15 minutes."}, 429)
         try:
-            user = db.authenticate(str(req.get("email") or ""), str(req.get("password") or ""))
+            user = db.authenticate(email_address, str(req.get("password") or ""))
         except db.AuthError as exc:
-            return self._json({"error": str(exc)}, 401)
+            db.record_login_failure("user", client_ip(self), email_address)
+            if "waiting for a supervisor" in str(exc):
+                return self._json({"error": str(exc)}, 401)
+            return self._json({"error": "Email or password is incorrect."}, 401)
+        db.clear_login_failures("user", email_address)
         token = db.create_session(user["id"])
         if user["status"] == "payment_pending":
             try:
@@ -2305,16 +2392,28 @@ class RouteHandlerMixin:
     # ------------------------------------------------------- platform admin
 
     def _handle_admin_login(self):
-        if rate_limited(f"admin-auth:{client_ip(self)}", max_hits=20, window=600):
-            return self._json({"error": "Too many attempts — try again shortly."}, 429)
         try:
             req = self._body()
         except Exception:
             return self._json({"error": "Bad request."}, 400)
+        email_address = str(req.get("email") or "").strip().lower()
+        if db.login_rate_limited("admin", client_ip(self), email_address, max_hits=6):
+            return self._json({"error": "Too many sign-in attempts. Try again in 15 minutes."}, 429)
         try:
-            admin = db.authenticate_admin(str(req.get("email") or ""), str(req.get("password") or ""))
-        except db.AuthError as exc:
-            return self._json({"error": str(exc)}, 401)
+            admin = db.authenticate_admin(email_address, str(req.get("password") or ""))
+        except db.AuthError:
+            db.record_login_failure("admin", client_ip(self), email_address)
+            return self._json({"error": "Email or password is incorrect."}, 401)
+        if admin.get("mfa_secret_enc"):
+            code = str(req.get("mfa_code") or "")
+            if not code:
+                return self._json({"error": "Enter the code from your authenticator app.",
+                                   "mfa_required": True}, 401)
+            if not verify_admin_mfa(admin, code):
+                db.record_login_failure("admin", client_ip(self), email_address)
+                return self._json({"error": "That verification code is not valid.",
+                                   "mfa_required": True}, 401)
+        db.clear_login_failures("admin", email_address)
         token = db.create_admin_session(admin["id"])
         db.record_admin_activity(admin, "signed_in", "admin", admin["id"], admin["name"])
         return self._json(
@@ -2345,12 +2444,13 @@ class RouteHandlerMixin:
             db.record_admin_activity(admin, "password_changed", "admin", admin["id"], admin["name"])
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
-        return self._json({"ok": True})
+        return self._json({"ok": True},
+                          extra_headers=[("Set-Cookie", _cookie_header(ADMIN_COOKIE_NAME, "", 0))])
 
     def _handle_admin_delete_company(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
         except Exception:
@@ -2367,6 +2467,65 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
 
+    def _handle_admin_mfa_setup(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            db.authenticate_admin(admin["email"], str(req.get("current_password") or ""))
+            cfg = load_env()
+            if not secretstore.is_ready(cfg):
+                raise db.AuthError("Secure credential storage is not configured.")
+            secret = _totp_secret()
+            db.set_admin_mfa_pending(
+                admin["id"], secretstore.encrypt(cfg, {"totp_secret": secret})
+            )
+        except (db.AuthError, secretstore.SecretsUnavailable) as exc:
+            return self._json({"error": str(exc)}, 400)
+        label = quote(f"Buinee:{admin['email']}")
+        issuer = quote("Buinee Command Center")
+        return self._json({"secret": secret,
+                           "otpauth_uri": f"otpauth://totp/{label}?secret={secret}&issuer={issuer}"})
+
+    def _handle_admin_mfa_enable(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            code = str(self._body().get("code") or "")
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        pending = admin.get("mfa_pending_enc") or ""
+        try:
+            secret = _mfa_secret(load_env(), pending)
+        except secretstore.SecretsUnavailable:
+            secret = ""
+        if not secret or not verify_totp(secret, code):
+            return self._json({"error": "That authenticator code is not valid."}, 400)
+        recovery_codes = [secrets.token_hex(8).upper() for _ in range(8)]
+        recovery_hashes = [hashlib.sha256(code.encode()).hexdigest() for code in recovery_codes]
+        db.enable_admin_mfa(admin["id"], pending, recovery_hashes)
+        db.record_admin_activity(admin, "mfa_enabled", "admin", admin["id"], admin["name"])
+        return self._json({"ok": True, "recovery_codes": recovery_codes},
+                          extra_headers=[("Set-Cookie", _cookie_header(ADMIN_COOKIE_NAME, "", 0))])
+
+    def _handle_admin_mfa_disable(self):
+        admin = current_admin(self)
+        if not admin:
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            db.authenticate_admin(admin["email"], str(req.get("current_password") or ""))
+        except db.AuthError:
+            return self._json({"error": "Current password is incorrect."}, 400)
+        if not verify_admin_mfa(admin, str(req.get("code") or "")):
+            return self._json({"error": "That verification code is not valid."}, 400)
+        db.disable_admin_mfa(admin["id"])
+        db.record_admin_activity(admin, "mfa_disabled", "admin", admin["id"], admin["name"])
+        return self._json({"ok": True},
+                          extra_headers=[("Set-Cookie", _cookie_header(ADMIN_COOKIE_NAME, "", 0))])
+
     def _handle_admin_errors_clear(self):
         admin = current_admin(self)
         if not admin_is_owner(admin):
@@ -2376,9 +2535,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_inbox_state(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "support")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
             db.update_admin_inbox_state(int(req.get("item_id")), str(req.get("state") or ""))
@@ -2387,16 +2546,16 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_invoice_create(self):
-        admin=current_admin(self)
-        if not admin: return self._json({"error":"Not signed in."},401)
+        admin=self._admin_role_request("owner", "billing")
+        if not admin: return
         try: invoice=db.save_admin_invoice(self._body(max_len=20000))
         except (db.AuthError,TypeError,ValueError) as exc: return self._json({"error":str(exc)},400)
         db.record_admin_activity(admin,"created","invoice",invoice["id"],invoice["invoice_number"],invoice["customer_name"])
         return self._json({"ok":True,"invoice":invoice})
 
     def _handle_admin_invoice_status(self):
-        admin=current_admin(self)
-        if not admin: return self._json({"error":"Not signed in."},401)
+        admin=self._admin_role_request("owner", "billing")
+        if not admin: return
         try:
             req=self._body(); invoice=db.update_admin_invoice_status(int(req.get("invoice_id")),str(req.get("status") or ""))
         except (db.AuthError,TypeError,ValueError) as exc: return self._json({"error":str(exc)},400)
@@ -2410,6 +2569,16 @@ class RouteHandlerMixin:
             return None
         if not admin_is_owner(admin):
             self._json({"error": "Only a Command Center owner can manage the back-office team."}, 403)
+            return None
+        return admin
+
+    def _admin_role_request(self, *allowed):
+        admin = current_admin(self)
+        if not admin:
+            self._json({"error": "Not signed in."}, 401)
+            return None
+        if admin.get("role", "owner") not in allowed:
+            self._json({"error": "Your Command Center role cannot make this change."}, 403)
             return None
         return admin
 
@@ -2459,9 +2628,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_update_crm_account(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body(max_len=12000)
             company_id = int(req.get("company_id"))
@@ -2471,9 +2640,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "account": account})
 
     def _handle_admin_save_crm_contact(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body(max_len=6000)
             contact = db.save_crm_contact(int(req.get("company_id")), req)
@@ -2482,9 +2651,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "contact": contact})
 
     def _handle_admin_delete_crm_contact(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
             company_id = int(req.get("company_id"))
@@ -2496,9 +2665,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_save_crm_interaction(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body(max_len=12000)
             interaction = db.save_crm_interaction(
@@ -2509,9 +2678,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "interaction": interaction})
 
     def _handle_admin_delete_crm_interaction(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
             company_id = int(req.get("company_id"))
@@ -2523,9 +2692,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_save_crm_task(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body(max_len=8000)
             task = db.save_crm_task(int(req.get("company_id")), req, admin["name"])
@@ -2534,9 +2703,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "task": task})
 
     def _handle_admin_delete_crm_task(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "operations", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
             company_id = int(req.get("company_id"))
@@ -2548,9 +2717,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_save_crm_subscription(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "billing")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body(max_len=6000)
             subscription = db.save_crm_subscription(int(req.get("company_id")), req)
@@ -2559,9 +2728,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "subscription": subscription})
 
     def _handle_admin_save_opportunity(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             opportunity = db.save_crm_opportunity(self._body(max_len=8000))
         except (db.AuthError, TypeError, ValueError) as exc:
@@ -2569,9 +2738,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "opportunity": opportunity})
 
     def _handle_admin_delete_opportunity(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "sales")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             opportunity_id = int(self._body().get("opportunity_id"))
         except (TypeError, ValueError):
@@ -2581,9 +2750,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True})
 
     def _handle_admin_create_plan(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "billing")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
         except Exception:
@@ -2606,9 +2775,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "plan": plan})
 
     def _handle_admin_update_plan(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "billing")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
         except Exception:
@@ -2638,9 +2807,9 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "plan": plan})
 
     def _handle_admin_set_company_plan(self):
-        admin = current_admin(self)
+        admin = self._admin_role_request("owner", "billing")
         if not admin:
-            return self._json({"error": "Not signed in."}, 401)
+            return
         try:
             req = self._body()
         except Exception:

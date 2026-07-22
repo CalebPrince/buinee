@@ -34,7 +34,9 @@ import email.utils
 import base64
 import html.parser
 import imaplib
+import ipaddress
 import json
+import socket
 import ssl
 import time
 import urllib.error
@@ -269,10 +271,65 @@ def refresh(cfg: dict, provider: str, creds: dict) -> dict | None:
 # ---------------------------------------------------------------------- IMAP
 
 
+class _PrivateAddressError(OSError):
+    """The only address(es) a host resolved to are inside our own network."""
+
+
+def _resolved_public_address(host: str, port: int):
+    """Resolve host once, reject it if any candidate is a private address.
+
+    Checking a hostname and then letting imaplib resolve it again to
+    actually connect would leave a DNS-rebinding gap: a name could resolve
+    to a public address for the check and a private one moments later for
+    the real connection. Resolving once here and handing the exact address
+    back to the caller to dial closes that gap. If a name has both public
+    and private candidates, treat it as disallowed rather than picking
+    whichever happens to sort first.
+    """
+    try:
+        candidates = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise OSError(f"Couldn't resolve {host}") from exc
+    for family, socktype, proto, _canonname, sockaddr in candidates:
+        ip = ipaddress.ip_address(sockaddr[0].split("%")[0])  # strip IPv6 zone id
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+            raise _PrivateAddressError(
+                "That server address isn't reachable from here. Use the "
+                "public hostname your mail provider gives you."
+            )
+    return candidates[0]
+
+
+class _PinnedIMAP4_SSL(imaplib.IMAP4_SSL):
+    """IMAP4_SSL that connects to a single, pre-validated address.
+
+    Overriding _create_socket lets us resolve exactly once (see
+    _resolved_public_address) and dial that address directly, instead of
+    letting imaplib re-resolve the hostname when it opens the socket.
+    `server_hostname` is still the original hostname, so the mail
+    provider's certificate still has to match it.
+    """
+
+    def _create_socket(self, timeout):
+        family, socktype, proto, _canonname, sockaddr = _resolved_public_address(self.host, self.port)
+        sock = socket.socket(family, socktype, proto)
+        try:
+            if timeout is not None:
+                sock.settimeout(timeout)
+            sock.connect(sockaddr)
+        except OSError:
+            sock.close()
+            raise
+        return self.ssl_context.wrap_socket(sock, server_hostname=self.host)
+
+
 def _imap_connect(host: str, port: int, username: str, password: str) -> imaplib.IMAP4_SSL:
     try:
-        conn = imaplib.IMAP4_SSL(host, port or 993, timeout=20,
-                                 ssl_context=ssl.create_default_context())
+        conn = _PinnedIMAP4_SSL(host, port or 993, timeout=20,
+                                ssl_context=ssl.create_default_context())
+    except _PrivateAddressError as exc:
+        raise MailboxError(str(exc)) from exc
     except (OSError, ssl.SSLError) as exc:
         raise MailboxError(
             f"Couldn't reach {host} on port {port or 993}. Check the server "

@@ -102,6 +102,9 @@
       <label>Password
         <input type="password" id="password" required autocomplete="current-password" placeholder="Your password">
       </label>
+      <label id="mfaLabel" hidden>Authenticator or recovery code
+        <input type="text" id="mfaCode" autocomplete="one-time-code" placeholder="6-digit or recovery code">
+      </label>
       <button class="btn" type="submit" id="submitBtn">Sign in</button>
     </form>
     <div class="foot-link">Not the platform owner? <a href="/login">Go to company sign-in</a>.</div>
@@ -122,10 +125,16 @@
         body: JSON.stringify({
           email: document.getElementById('email').value,
           password: document.getElementById('password').value,
+          mfa_code: document.getElementById('mfaCode').value,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.mfa_required) {
+          document.getElementById('mfaLabel').hidden = false;
+          document.getElementById('mfaCode').required = true;
+          document.getElementById('mfaCode').focus();
+        }
         errEl.textContent = data.error || 'Could not sign in.';
         errEl.classList.add('show');
         return false;

@@ -148,6 +148,14 @@ def init_db() -> None:
                 expires_at REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS login_attempts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                scope           TEXT NOT NULL,
+                ip_hash         TEXT NOT NULL,
+                identifier_hash TEXT NOT NULL,
+                created_at      REAL NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS admin_activity_log (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 admin_id     INTEGER REFERENCES platform_admins(id),
@@ -493,6 +501,8 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
+            CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup
+                ON login_attempts(scope, ip_hash, identifier_hash, created_at);
             CREATE INDEX IF NOT EXISTS idx_admin_activity_created ON admin_activity_log(created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_admin_activity_entity ON admin_activity_log(entity_type, action);
             CREATE INDEX IF NOT EXISTS idx_vouchers_company ON vouchers(company_id);
@@ -528,6 +538,7 @@ def init_db() -> None:
         _migrate_user_terms_acceptance(conn)
         _migrate_user_onboarding(conn)
         _migrate_platform_admin_roles(conn)
+        _migrate_hashed_sessions(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -732,6 +743,32 @@ def _migrate_platform_admin_roles(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE platform_admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'")
     if "status" not in cols:
         conn.execute("ALTER TABLE platform_admins ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+    if "mfa_secret_enc" not in cols:
+        conn.execute("ALTER TABLE platform_admins ADD COLUMN mfa_secret_enc TEXT NOT NULL DEFAULT ''")
+    if "mfa_pending_enc" not in cols:
+        conn.execute("ALTER TABLE platform_admins ADD COLUMN mfa_pending_enc TEXT NOT NULL DEFAULT ''")
+    if "mfa_recovery_json" not in cols:
+        conn.execute("ALTER TABLE platform_admins ADD COLUMN mfa_recovery_json TEXT NOT NULL DEFAULT '[]'")
+
+
+def _session_digest(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _migrate_hashed_sessions(conn: sqlite3.Connection) -> None:
+    # Browser cookies keep the random bearer value. Only its SHA-256 digest is
+    # stored, so a copied database cannot be used directly to impersonate an
+    # active user. Existing sessions remain valid through this one-time hash.
+    for table in ("sessions", "admin_sessions"):
+        rows = conn.execute(f"SELECT token FROM {table}").fetchall()
+        for row in rows:
+            token = row["token"]
+            if len(token) == 64 and all(ch in "0123456789abcdef" for ch in token):
+                continue
+            conn.execute(
+                f"UPDATE {table} SET token=? WHERE token=?",
+                (_session_digest(token), token),
+            )
 
 
 # ------------------------------------------------------------------ passwords
@@ -744,6 +781,41 @@ def _hash_password(password: str, salt: bytes) -> str:
 
 def _new_salt() -> bytes:
     return os.urandom(16)
+
+
+def _attempt_hash(value: str) -> str:
+    return hashlib.sha256(value.strip().lower().encode("utf-8")).hexdigest()
+
+
+def login_rate_limited(scope: str, ip: str, identifier: str,
+                       max_hits: int = 8, window: int = 900) -> bool:
+    cutoff = time.time() - window
+    ip_hash, identifier_hash = _attempt_hash(ip), _attempt_hash(identifier)
+    with _cursor() as conn:
+        conn.execute("DELETE FROM login_attempts WHERE created_at<?", (cutoff,))
+        row = conn.execute(
+            """SELECT SUM(CASE WHEN ip_hash=? THEN 1 ELSE 0 END) AS by_ip,
+                      SUM(CASE WHEN identifier_hash=? THEN 1 ELSE 0 END) AS by_identifier
+               FROM login_attempts WHERE scope=? AND created_at>=?""",
+            (ip_hash, identifier_hash, scope, cutoff),
+        ).fetchone()
+    return max(int(row["by_ip"] or 0), int(row["by_identifier"] or 0)) >= max_hits
+
+
+def record_login_failure(scope: str, ip: str, identifier: str) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            "INSERT INTO login_attempts(scope,ip_hash,identifier_hash,created_at) VALUES(?,?,?,?)",
+            (scope, _attempt_hash(ip), _attempt_hash(identifier), time.time()),
+        )
+
+
+def clear_login_failures(scope: str, identifier: str) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            "DELETE FROM login_attempts WHERE scope=? AND identifier_hash=?",
+            (scope, _attempt_hash(identifier)),
+        )
 
 
 # -------------------------------------------------------------------- lookups
@@ -922,8 +994,8 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         raise AuthError("Not a valid role.")
     if "@" not in email:
         raise AuthError("That doesn't look like an email address.")
-    if len(password) < 8:
-        raise AuthError("Password must be at least 8 characters.")
+    if len(password) < 12:
+        raise AuthError("Password must be at least 12 characters.")
     if initial_status not in ("approved", "payment_pending"):
         raise AuthError("Not a valid registration status.")
     if get_user_by_email(email):
@@ -1366,8 +1438,8 @@ def request_to_join(company_id: int, name: str, email: str, password: str, role:
         raise AuthError("Your name is too short.")
     if "@" not in email:
         raise AuthError("That doesn't look like an email address.")
-    if len(password) < 8:
-        raise AuthError("Password must be at least 8 characters.")
+    if len(password) < 12:
+        raise AuthError("Password must be at least 12 characters.")
     if not get_company(company_id):
         raise AuthError("That company no longer exists.")
     if get_user_by_email(email):
@@ -1419,7 +1491,7 @@ def create_session(user_id: int) -> str:
     with _cursor() as conn:
         conn.execute(
             "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-            (token, user_id, now, now + SESSION_TTL_SECONDS),
+            (_session_digest(token), user_id, now, now + SESSION_TTL_SECONDS),
         )
     return token
 
@@ -1429,7 +1501,7 @@ def get_user_by_session(token: str | None) -> dict | None:
         return None
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT user_id, expires_at FROM sessions WHERE token = ?", (token,)
+            "SELECT user_id, expires_at FROM sessions WHERE token = ?", (_session_digest(token),)
         ).fetchone()
         if not row or row["expires_at"] < time.time():
             return None
@@ -1443,7 +1515,7 @@ def destroy_session(token: str | None) -> None:
     if not token:
         return
     with _cursor() as conn:
-        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.execute("DELETE FROM sessions WHERE token = ?", (_session_digest(token),))
 
 
 # ------------------------------------------------------------- approvals (per-company)
@@ -1536,8 +1608,8 @@ def create_platform_admin(name: str, email: str, password: str, role: str = "own
         raise AuthError("Name is too short.")
     if "@" not in email:
         raise AuthError("That doesn't look like an email address.")
-    if len(password) < 8:
-        raise AuthError("Password must be at least 8 characters.")
+    if len(password) < 12:
+        raise AuthError("Password must be at least 12 characters.")
     role = role.strip().lower()
     if role not in PLATFORM_ADMIN_ROLES:
         raise AuthError("Choose a valid back-office role.")
@@ -1569,13 +1641,54 @@ def authenticate_admin(email: str, password: str) -> dict:
     return admin
 
 
+def set_admin_mfa_pending(admin_id: int, encrypted_secret: str) -> None:
+    with _cursor() as conn:
+        conn.execute("UPDATE platform_admins SET mfa_pending_enc=? WHERE id=?",
+                     (encrypted_secret, admin_id))
+
+
+def enable_admin_mfa(admin_id: int, encrypted_secret: str,
+                     recovery_hashes: list[str]) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE platform_admins SET mfa_secret_enc=?,mfa_pending_enc='',
+               mfa_recovery_json=? WHERE id=?""",
+            (encrypted_secret, json.dumps(recovery_hashes), admin_id),
+        )
+        conn.execute("DELETE FROM admin_sessions WHERE admin_id=?", (admin_id,))
+
+
+def disable_admin_mfa(admin_id: int) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE platform_admins SET mfa_secret_enc='',mfa_pending_enc='',
+               mfa_recovery_json='[]' WHERE id=?""", (admin_id,)
+        )
+        conn.execute("DELETE FROM admin_sessions WHERE admin_id=?", (admin_id,))
+
+
+def consume_admin_recovery_code(admin_id: int, code_hash: str) -> bool:
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT mfa_recovery_json FROM platform_admins WHERE id=?", (admin_id,)
+        ).fetchone()
+        hashes = json.loads(row["mfa_recovery_json"] or "[]") if row else []
+        match = next((value for value in hashes if secrets.compare_digest(value, code_hash)), None)
+        if not match:
+            return False
+        hashes.remove(match)
+        conn.execute("UPDATE platform_admins SET mfa_recovery_json=? WHERE id=?",
+                     (json.dumps(hashes), admin_id))
+    return True
+
+
 def create_admin_session(admin_id: int) -> str:
     token = secrets.token_urlsafe(32)
     now = time.time()
     with _cursor() as conn:
         conn.execute(
             "INSERT INTO admin_sessions (token, admin_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-            (token, admin_id, now, now + SESSION_TTL_SECONDS),
+            (_session_digest(token), admin_id, now, now + SESSION_TTL_SECONDS),
         )
     return token
 
@@ -1585,7 +1698,7 @@ def get_admin_by_session(token: str | None) -> dict | None:
         return None
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT admin_id, expires_at FROM admin_sessions WHERE token = ?", (token,)
+            "SELECT admin_id, expires_at FROM admin_sessions WHERE token = ?", (_session_digest(token),)
         ).fetchone()
         if not row or row["expires_at"] < time.time():
             return None
@@ -1760,8 +1873,8 @@ def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) 
 def reset_platform_admin_password(admin_id: int, new_password: str) -> None:
     if not _get_admin(admin_id):
         raise AuthError("Team member not found.")
-    if len(new_password) < 8:
-        raise AuthError("Temporary password must be at least 8 characters.")
+    if len(new_password) < 12:
+        raise AuthError("Temporary password must be at least 12 characters.")
     salt = _new_salt()
     with _cursor() as conn:
         conn.execute("UPDATE platform_admins SET password_hash = ?, salt = ? WHERE id = ?",
@@ -1773,7 +1886,7 @@ def destroy_admin_session(token: str | None) -> None:
     if not token:
         return
     with _cursor() as conn:
-        conn.execute("DELETE FROM admin_sessions WHERE token = ?", (token,))
+        conn.execute("DELETE FROM admin_sessions WHERE token = ?", (_session_digest(token),))
 
 
 def change_admin_password(admin_id: int, current_password: str, new_password: str) -> None:
@@ -1783,14 +1896,15 @@ def change_admin_password(admin_id: int, current_password: str, new_password: st
     salt = bytes.fromhex(admin["salt"])
     if _hash_password(current_password, salt) != admin["password_hash"]:
         raise AuthError("Current password is wrong.")
-    if len(new_password) < 8:
-        raise AuthError("New password must be at least 8 characters.")
+    if len(new_password) < 12:
+        raise AuthError("New password must be at least 12 characters.")
     new_salt = _new_salt()
     with _cursor() as conn:
         conn.execute(
             "UPDATE platform_admins SET password_hash = ?, salt = ? WHERE id = ?",
             (_hash_password(new_password, new_salt), new_salt.hex(), admin_id),
         )
+        conn.execute("DELETE FROM admin_sessions WHERE admin_id=?", (admin_id,))
 
 
 def delete_company(company_id: int) -> None:

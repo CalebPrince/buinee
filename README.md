@@ -184,12 +184,14 @@ supervisor at Company A cannot see or act on Company B's queue even by
 guessing a user id. This was verified directly (registered two companies,
 confirmed cross-company approve attempts get rejected).
 
-Passwords: PBKDF2-HMAC-SHA256, stdlib `hashlib`, no bcrypt dependency —
-consistent with the rest of this project's no-extra-dependency approach.
-Sessions: random token in its own `sessions` table (not a JWT), so they can
-be revoked without touching the password. Cookie is `HttpOnly`,
-`SameSite=Lax`; no `Secure` flag yet because there's no HTTPS locally — **add
-that before this is ever deployed over the open internet.**
+Passwords: PBKDF2-HMAC-SHA256, stdlib `hashlib`, with a 12-character minimum
+for newly created or changed passwords. Sessions use random bearer values
+(not JWTs), but SQLite stores only their SHA-256 digests so a copied database
+does not contain immediately reusable cookies. Production cookies are
+`Secure`, `HttpOnly`, and `SameSite=Lax`; set `BUINEE_COOKIE_SECURE=0` only for
+plain-HTTP local development. Authenticated POST requests also enforce browser
+same-origin signals, and failed logins are throttled persistently across
+Passenger workers and restarts.
 
 ---
 
@@ -215,9 +217,11 @@ into their own company (Rufus, via `ledgerline_session`) gets a 401 from
 cookie in the same browser continues working independently of whatever the
 company cookie is doing — the two never interact.
 
-**There is no HTTP route that creates a `platform_admins` row, on purpose.**
-There are two ways to create one, both offline/startup-only, never over
-the network:
+The first owner is created through the startup bootstrap described below.
+After that, only an authenticated Command Center owner can create or manage
+additional `platform_admins` identities through the Back-office team page.
+Owners can also enable authenticator-app MFA from Settings; TOTP secrets are
+encrypted with `BUINEE_SECRET_KEY`, and recovery codes are stored as hashes.
 
 - **Shell access** (local dev, or any host with a shell/SSH tab):
   ```

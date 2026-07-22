@@ -377,7 +377,7 @@
       </div>
       <div class="sys-row">
         <span>Database</span>
-        <span class="val">${escapeHtml(system.database_path)}</span>
+        <span class="val">${system.database_ready ? 'Available' : 'Unavailable'}</span>
       </div>
     `;
   }

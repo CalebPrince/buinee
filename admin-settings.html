@@ -109,7 +109,7 @@
 
   form { display: flex; flex-direction: column; gap: 15px; }
   label { font-size: 13px; font-weight: 600; color: var(--ink-2); display: flex; flex-direction: column; gap: 6px; }
-  input[type=password] {
+  input[type=password], input[type=text] {
     padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line-strong);
     background: var(--paper); color: var(--ink); font-weight: 400;
   }
@@ -119,6 +119,9 @@
   .msg.show { display: block; }
   .msg.error { background: var(--bad-soft); color: var(--bad); }
   .msg.ok { background: var(--good-soft); color: var(--good); }
+  .panel + .panel { margin-top:18px; }
+  .secret-box { padding:12px; border-radius:9px; background:var(--surface-2); overflow-wrap:anywhere; font:600 13px ui-monospace,monospace; }
+  .recovery { white-space:pre-wrap; user-select:all; }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
 
@@ -196,13 +199,41 @@
                 <input type="password" id="currentPassword" required autocomplete="current-password">
               </label>
               <label>New password
-                <input type="password" id="newPassword" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+                <input type="password" id="newPassword" required minlength="12" autocomplete="new-password" placeholder="At least 12 characters">
               </label>
               <label>Confirm new password
                 <input type="password" id="confirmPassword" required minlength="8" autocomplete="new-password">
               </label>
               <button class="btn primary" type="submit" id="submitBtn">Change password</button>
             </form>
+          </div>
+          <div class="panel">
+            <h3>Two-step verification</h3>
+            <div class="sub" id="mfaStatus">Checking your account…</div>
+            <form id="mfaSetupForm" onsubmit="return startMfa(event)">
+              <div class="msg error" id="mfaError"></div><div class="msg ok" id="mfaOk"></div>
+              <label>Current password<input type="password" id="mfaPassword" autocomplete="current-password" required></label>
+              <button class="btn primary" type="submit">Set up authenticator</button>
+            </form>
+            <form id="mfaConfirmForm" onsubmit="return enableMfa(event)" style="display:none;margin-top:15px">
+              <div class="msg error" id="mfaConfirmError"></div>
+              <p>Add this setup key to Google Authenticator, Microsoft Authenticator, Authy, or another TOTP app.</p>
+              <div class="secret-box" id="mfaSecret"></div>
+              <a class="btn" id="mfaOpenApp" href="#">Open authenticator app</a>
+              <label>Code from the app<input type="text" id="mfaConfirmCode" inputmode="numeric" autocomplete="one-time-code" required></label>
+              <button class="btn primary" type="submit">Verify and enable</button>
+            </form>
+            <form id="mfaDisableForm" onsubmit="return disableMfa(event)" style="display:none">
+              <div class="msg error" id="mfaDisableError"></div>
+              <label>Current password<input type="password" id="mfaDisablePassword" autocomplete="current-password" required></label>
+              <label>Authenticator or recovery code<input type="text" id="mfaDisableCode" autocomplete="one-time-code" required></label>
+              <button class="btn" type="submit">Disable two-step verification</button>
+            </form>
+            <div id="mfaRecovery" style="display:none;margin-top:15px">
+              <p><b>Save these recovery codes now.</b> Each works once. They will not be shown again.</p>
+              <div class="secret-box recovery" id="mfaRecoveryCodes"></div>
+              <button class="btn" type="button" onclick="location.href='/admin/login'">I saved them — sign in again</button>
+            </div>
           </div>
         </div>
       </div>
@@ -211,6 +242,7 @@
 </div>
 
 <script>
+  let currentAdmin = null;
   function toggleTheme() {
     const root = document.documentElement;
     const cur = root.getAttribute('data-theme') ||
@@ -231,7 +263,11 @@
       admin = (await res.json()).admin;
     } catch { location.href = '/admin/login'; return; }
 
+    currentAdmin = admin;
     document.getElementById('whoLine').textContent = `Signed in as ${admin.name} · ${admin.email}`;
+    document.getElementById('mfaStatus').textContent = admin.mfa_enabled ? 'Enabled — a code is required at every sign-in.' : 'Not enabled — protect this account with an authenticator app.';
+    document.getElementById('mfaSetupForm').style.display = admin.mfa_enabled ? 'none' : 'flex';
+    document.getElementById('mfaDisableForm').style.display = admin.mfa_enabled ? 'flex' : 'none';
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
   }
@@ -271,11 +307,48 @@
       document.getElementById('currentPassword').value = '';
       document.getElementById('newPassword').value = '';
       document.getElementById('confirmPassword').value = '';
+      setTimeout(() => { location.href = '/admin/login'; }, 900);
     } catch {
       showMsg('changeError', 'Could not reach the server.');
     } finally {
       btn.disabled = false; btn.textContent = 'Change password';
     }
+    return false;
+  }
+
+  async function startMfa(ev) {
+    ev.preventDefault(); showMsg('mfaError',''); showMsg('mfaOk','');
+    try {
+      const res=await fetch('/api/admin/mfa/setup',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:document.getElementById('mfaPassword').value})});
+      const data=await res.json(); if(!res.ok){showMsg('mfaError',data.error||'Could not begin setup.');return false;}
+      document.getElementById('mfaSecret').textContent=data.secret;
+      document.getElementById('mfaOpenApp').href=data.otpauth_uri;
+      document.getElementById('mfaSetupForm').style.display='none';
+      document.getElementById('mfaConfirmForm').style.display='flex';
+    } catch { showMsg('mfaError','Could not reach the server.'); }
+    return false;
+  }
+
+  async function enableMfa(ev) {
+    ev.preventDefault(); showMsg('mfaConfirmError','');
+    try {
+      const res=await fetch('/api/admin/mfa/enable',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:document.getElementById('mfaConfirmCode').value})});
+      const data=await res.json(); if(!res.ok){showMsg('mfaConfirmError',data.error||'Could not enable verification.');return false;}
+      document.getElementById('mfaConfirmForm').style.display='none';
+      document.getElementById('mfaRecovery').style.display='block';
+      document.getElementById('mfaRecoveryCodes').textContent=(data.recovery_codes||[]).join('\n');
+      showMsg('mfaOk','Two-step verification is enabled. Save the recovery codes before signing in again.');
+    } catch { showMsg('mfaConfirmError','Could not reach the server.'); }
+    return false;
+  }
+
+  async function disableMfa(ev) {
+    ev.preventDefault(); showMsg('mfaDisableError','');
+    try {
+      const res=await fetch('/api/admin/mfa/disable',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:document.getElementById('mfaDisablePassword').value,code:document.getElementById('mfaDisableCode').value})});
+      const data=await res.json(); if(!res.ok){showMsg('mfaDisableError',data.error||'Could not disable verification.');return false;}
+      location.href='/admin/login';
+    } catch { showMsg('mfaDisableError','Could not reach the server.'); }
     return false;
   }
 
