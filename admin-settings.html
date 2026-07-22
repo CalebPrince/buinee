@@ -6,7 +6,7 @@
     --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5;
     --line: #dedad0; --line-strong: #c9c4b7;
     --ink: #101619; --ink-2: #3c4750; --ink-3: #6a747c; --ink-4: #949ba1;
-    --violet: #6b5be6; --violet-deep: #5346c4; --violet-soft: #ecebfc;
+    --violet: #0e5d57; --violet-deep: #0a4340; --violet-soft: #dfece9;
     --good: #2c7a51; --good-soft: #dff0e6; --bad: #b0301f; --bad-soft: #fbe6e2;
     --radius: 14px;
     --shadow: 0 1px 2px rgba(16,22,25,.05), 0 14px 34px rgba(16,22,25,.07);
@@ -17,7 +17,7 @@
     :root {
       --paper: #0e1315; --surface: #151b1e; --surface-2: #1c2427; --line: #262f33;
       --line-strong: #354046; --ink: #eef1f0; --ink-2: #bcc5c7; --ink-3: #8b9599; --ink-4: #6b7478;
-      --violet: #9b8ff2; --violet-deep: #b3a8ff; --violet-soft: #201c3d;
+      --violet: #4fb3a6; --violet-deep: #b3a8ff; --violet-soft: #10312e;
       --good: #4bb37c; --good-soft: #12291d; --bad: #e07a68; --bad-soft: #341714;
       --shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.4);
     }
@@ -25,14 +25,14 @@
   :root[data-theme="dark"] {
     --paper: #0e1315; --surface: #151b1e; --surface-2: #1c2427; --line: #262f33;
     --line-strong: #354046; --ink: #eef1f0; --ink-2: #bcc5c7; --ink-3: #8b9599; --ink-4: #6b7478;
-    --violet: #9b8ff2; --violet-deep: #b3a8ff; --violet-soft: #201c3d;
+    --violet: #4fb3a6; --violet-deep: #b3a8ff; --violet-soft: #10312e;
     --good: #4bb37c; --good-soft: #12291d; --bad: #e07a68; --bad-soft: #341714;
     --shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.4);
   }
   :root[data-theme="light"] {
     --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5; --line: #dedad0;
     --line-strong: #c9c4b7; --ink: #101619; --ink-2: #3c4750; --ink-3: #6a747c; --ink-4: #949ba1;
-    --violet: #6b5be6; --violet-deep: #5346c4; --violet-soft: #ecebfc;
+    --violet: #0e5d57; --violet-deep: #0a4340; --violet-soft: #dfece9;
     --good: #2c7a51; --good-soft: #dff0e6; --bad: #b0301f; --bad-soft: #fbe6e2;
     --shadow: 0 1px 2px rgba(16,22,25,.05), 0 14px 34px rgba(16,22,25,.07);
   }
@@ -60,7 +60,7 @@
   .sidebar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; padding: 0 8px; }
   .sidebar-brand .mark {
     width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
-    background: linear-gradient(140deg, var(--violet), #453aa8); color: #fff;
+    background: linear-gradient(140deg, var(--violet), #0a4340); color: #fff;
   }
   .sidebar-brand .mark svg { width: 16px; height: 16px; }
   .sidebar-brand .name { font-family: var(--serif); font-size: 18px; font-weight: 600; }
@@ -134,7 +134,7 @@
   <aside class="sidebar">
     <a class="sidebar-brand" href="/admin.html">
       <span class="mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg>
       </span>
       <span class="name">Buinee</span>
     </a>
