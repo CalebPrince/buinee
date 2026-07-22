@@ -259,11 +259,38 @@ def init_db() -> None:
                 created_at REAL NOT NULL
             );
 
+            -- Automation definitions live in code; these rows only store a
+            -- user's choice and execution history. recipe_key is deliberately
+            -- not an enum/foreign key so new recipes can be added without a
+            -- database migration.
+            CREATE TABLE IF NOT EXISTS automation_settings (
+                user_id     INTEGER NOT NULL REFERENCES users(id),
+                recipe_key  TEXT NOT NULL,
+                enabled     INTEGER NOT NULL DEFAULT 0,
+                next_run_at REAL,
+                updated_at  REAL NOT NULL,
+                PRIMARY KEY (user_id, recipe_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS automation_runs (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id),
+                company_id  INTEGER NOT NULL REFERENCES companies(id),
+                recipe_key  TEXT NOT NULL,
+                status      TEXT NOT NULL,
+                result_json TEXT NOT NULL DEFAULT '{}',
+                error       TEXT NOT NULL DEFAULT '',
+                started_at  REAL NOT NULL,
+                finished_at REAL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
             CREATE INDEX IF NOT EXISTS idx_vouchers_company ON vouchers(company_id);
             CREATE INDEX IF NOT EXISTS idx_voucher_events_company ON voucher_events(company_id);
+            CREATE INDEX IF NOT EXISTS idx_automation_due ON automation_settings(enabled, next_run_at);
+            CREATE INDEX IF NOT EXISTS idx_automation_runs_user ON automation_runs(user_id, started_at);
             """
         )
         # Chat gating first: the plans CREATE TABLE above predates those two
@@ -1420,6 +1447,83 @@ def reject_voucher(company_id: int, approver_id: int, voucher_id: int, reason: s
         )
         _log_event(conn, voucher_id, company_id, approver_id, "rejected", reason, now)
     return get_voucher(voucher_id)
+
+
+def automation_states(user_id: int) -> dict[str, dict]:
+    """Return arbitrary recipe states with their latest run, keyed by ID."""
+    with _cursor() as conn:
+        settings = conn.execute(
+            "SELECT recipe_key, enabled, next_run_at, updated_at FROM automation_settings WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+        runs = conn.execute(
+            """SELECT r.* FROM automation_runs r
+               JOIN (SELECT recipe_key, MAX(id) AS id FROM automation_runs
+                     WHERE user_id = ? GROUP BY recipe_key) latest ON latest.id = r.id""",
+            (user_id,),
+        ).fetchall()
+    out = {r["recipe_key"]: dict(r) for r in settings}
+    for row in runs:
+        item = out.setdefault(row["recipe_key"], {"recipe_key": row["recipe_key"], "enabled": 0, "next_run_at": None})
+        run = dict(row)
+        try:
+            run["result"] = json.loads(run.pop("result_json") or "{}")
+        except json.JSONDecodeError:
+            run["result"] = {}
+        item["latest_run"] = run
+    return out
+
+
+def set_automation(user_id: int, recipe_key: str, enabled: bool, next_run_at: float | None) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO automation_settings (user_id, recipe_key, enabled, next_run_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, recipe_key) DO UPDATE SET
+                 enabled = excluded.enabled, next_run_at = excluded.next_run_at,
+                 updated_at = excluded.updated_at""",
+            (user_id, recipe_key, int(enabled), next_run_at, time.time()),
+        )
+
+
+def due_automations(now: float | None = None, limit: int = 20) -> list[dict]:
+    now = now or time.time()
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT s.user_id, s.recipe_key, s.next_run_at, u.company_id
+               FROM automation_settings s JOIN users u ON u.id = s.user_id
+               WHERE s.enabled = 1 AND u.status = 'approved'
+                 AND s.next_run_at IS NOT NULL AND s.next_run_at <= ?
+               ORDER BY s.next_run_at LIMIT ?""",
+            (now, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def start_automation_run(user_id: int, company_id: int, recipe_key: str, next_run_at: float) -> int:
+    """Advance the due time before doing network work to prevent duplicate cron runs."""
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE automation_settings SET next_run_at = ?, updated_at = ? WHERE user_id = ? AND recipe_key = ?",
+            (next_run_at, now, user_id, recipe_key),
+        )
+        cur = conn.execute(
+            """INSERT INTO automation_runs
+               (user_id, company_id, recipe_key, status, started_at)
+               VALUES (?, ?, ?, 'running', ?)""",
+            (user_id, company_id, recipe_key, now),
+        )
+        return cur.lastrowid
+
+
+def finish_automation_run(run_id: int, result: dict | None = None, error: str = "") -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE automation_runs SET status = ?, result_json = ?, error = ?, finished_at = ?
+               WHERE id = ?""",
+            ("failed" if error else "complete", json.dumps(result or {}), error[:1000], time.time(), run_id),
+        )
 
 
 def platform_stats() -> dict:

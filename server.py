@@ -40,7 +40,7 @@ import re
 import sys
 import time
 import webbrowser
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from http.client import responses as HTTP_REASONS
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -371,6 +371,102 @@ def build_voucher_digest(vouchers: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# Definitions stay in code while user choices/results stay in the database.
+# Adding a recipe is one registry entry plus a runner branch; existing rows and
+# clients continue to work because recipe_key is deliberately open-ended.
+AUTOMATION_RECIPES = {
+    "morning_triage": {
+        "name": "Morning triage & brief", "schedule": "06:30 GMT · weekdays",
+        "description": "Read overnight mail, categorize it, draft replies, and list what needs attention.",
+    },
+    "invoice_crosscheck": {
+        "name": "Invoice cross-check", "schedule": "Every 15 minutes",
+        "description": "Compare incoming invoices with visible vouchers and flag differences.",
+    },
+}
+
+
+def next_automation_run(recipe_key: str, now: float | None = None) -> float:
+    current = datetime.fromtimestamp(now or time.time(), timezone.utc)
+    if recipe_key == "invoice_crosscheck":
+        return (current + timedelta(minutes=15)).timestamp()
+    candidate = current.replace(hour=6, minute=30, second=0, microsecond=0)
+    if candidate <= current:
+        candidate += timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate += timedelta(days=1)
+    return candidate.timestamp()
+
+
+def public_automations(user_id: int) -> list[dict]:
+    states = db.automation_states(user_id)
+    return [
+        {"key": key, **recipe, **states.get(key, {"enabled": 0, "next_run_at": None})}
+        for key, recipe in AUTOMATION_RECIPES.items()
+    ]
+
+
+def run_automation(user_id: int, recipe_key: str) -> dict:
+    if recipe_key not in AUTOMATION_RECIPES:
+        raise ValueError("Unknown automation.")
+    user = db.get_user(user_id)
+    if not user or user["status"] != "approved":
+        raise ValueError("This user can no longer run automations.")
+    gate = db.can_use_chat(user["company_id"])
+    if not gate["allowed"]:
+        raise ValueError(f"AI automations aren't included in the {gate['plan']} plan.")
+    cfg = load_env()
+    pub = public_user(user)
+    provider, model = resolve_provider_model(cfg, pub["company"])
+    if not provider:
+        raise ValueError("Ada isn't configured on this server yet.")
+    connection, creds = live_mailbox(user_id, cfg)
+    messages = mailbox.list_recent(cfg, connection, creds, include_body=True)
+    readable = [m for m in messages if (m.get("body") or "").strip()]
+    if not readable:
+        return {"headline": "No readable new mail", "items": [], "message_count": 0}
+
+    emails = []
+    for message in readable:
+        from_name, from_email = email.utils.parseaddr(message.get("from") or "")
+        emails.append({
+            "id": str(message.get("id") or ""), "from_name": from_name or from_email,
+            "from_email": from_email, "received": message.get("received") or "",
+            "subject": message.get("subject") or "(no subject)", "attachments": [],
+            "body": message.get("body") or "", "unread": bool(message.get("unread")),
+        })
+
+    items = providers.triage(
+        provider, model, cfg.get(PROVIDER_KEYS[provider], ""), emails,
+        briefing=pub["company"].get("briefing", ""),
+    )
+    db.increment_chat_usage(user["company_id"])
+    if recipe_key == "morning_triage":
+        important = [item for item in items if item.get("priority") != "low" or item.get("needs_reply")]
+        return {"headline": f"{len(important)} message(s) need attention", "items": important, "message_count": len(items)}
+
+    invoices = [item for item in items if item.get("category") == "invoice"]
+    visible = db.list_vouchers(user["company_id"], user["id"], user["role"])
+    for voucher_row in visible:
+        enrich_voucher(voucher_row)
+    digest = build_voucher_digest(visible)
+    if not invoices:
+        return {"headline": "No invoices found in recent mail", "items": [], "message_count": len(items)}
+    if not db.can_use_chat(user["company_id"])["allowed"]:
+        raise ValueError("The invoice scan used the last AI message available on this plan; cross-checking needs one more.")
+    invoice_ids = {item.get("id") for item in invoices}
+    docs = [{"kind": "text", "source": "attached", "name": mail["subject"], "text": mail["body"]}
+            for mail in emails if mail["id"] in invoice_ids][:3]
+    comparison = providers.chat(
+        provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
+        "Cross-check these incoming invoices against the voucher digest. List exact matches, missing vouchers, and any conflicting supplier, reference, or amount. Do not invent a match.",
+        digest, [], system=build_chat_system(pub),
+        briefing=pub["company"].get("briefing", ""), docs=docs,
+    )
+    db.increment_chat_usage(user["company_id"])
+    return {"headline": f"{len(invoices)} invoice(s) checked", "summary": comparison, "items": invoices}
+
+
 def build_chat_system(user: dict) -> str:
     label = {
         "account_assistant": "a Preparer, who prepares vouchers",
@@ -614,6 +710,12 @@ class RouteHandlerMixin:
                 return self._json({"error": str(exc)}, 400)
             return self._json({"messages": msgs})
 
+        if path == "/api/automations":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"automations": public_automations(user["id"])})
+
         if path == "/api/mailbox/connect":
             # A browser navigation, not a fetch - it ends at the provider's
             # sign-in page, so failures answer in redirects rather than JSON
@@ -685,6 +787,8 @@ class RouteHandlerMixin:
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
             "/api/mailbox/triage": self._handle_mailbox_triage,
+            "/api/automations/update": self._handle_automation_update,
+            "/api/automations/run": self._handle_automation_run,
             "/api/register": self._handle_register,
             "/api/join": self._handle_join,
             "/api/login": self._handle_login,
@@ -887,6 +991,51 @@ class RouteHandlerMixin:
             return self._json({"error": "Not signed in."}, 401)
         db.delete_mailbox_connection(user["id"])
         return self._json({"ok": True, "mailbox": public_mailbox(user["id"], load_env())})
+
+    def _handle_automation_update(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        key = str(req.get("key") or "")
+        if key not in AUTOMATION_RECIPES:
+            return self._json({"error": "Unknown automation."}, 400)
+        enabled = bool(req.get("enabled"))
+        if enabled:
+            if not db.get_mailbox_connection(user["id"]):
+                return self._json({"error": "Connect a mailbox first."}, 400)
+            gate = db.can_use_chat(user["company_id"])
+            if not gate["allowed"]:
+                return self._json({"error": f"AI automations aren't included in the {gate['plan']} plan."}, 402)
+        db.set_automation(user["id"], key, enabled, next_automation_run(key) if enabled else None)
+        return self._json({"ok": True, "automations": public_automations(user["id"])})
+
+    def _handle_automation_run(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        key = str(req.get("key") or "")
+        if key not in AUTOMATION_RECIPES:
+            return self._json({"error": "Unknown automation."}, 400)
+        run_id = db.start_automation_run(user["id"], user["company_id"], key, next_automation_run(key))
+        try:
+            result = run_automation(user["id"], key)
+            db.finish_automation_run(run_id, result=result)
+        except (ValueError, mailbox.MailboxError, providers.ProviderError) as exc:
+            db.finish_automation_run(run_id, error=str(exc))
+            return self._json({"error": str(exc)}, 400)
+        except Exception as exc:
+            print(f"  ! automation failure ({key}): {exc}")
+            db.finish_automation_run(run_id, error="Automation failed.")
+            return self._json({"error": "Automation failed."}, 500)
+        return self._json({"ok": True, "result": result, "automations": public_automations(user["id"])})
 
     def _handle_mailbox_triage(self):
         """Run Ada's structured review on one message already visible in

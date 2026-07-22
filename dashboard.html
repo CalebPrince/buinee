@@ -441,7 +441,12 @@
   .auto-when { min-width: 92px; text-align: right; }
   .auto-when .c { color: var(--ink-2); font: 11.5px var(--mono); }
   .auto-when .l { margin-top: 3px; color: var(--ink-4); font-size: 10.5px; }
+  .auto-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
   .auto-status { min-width: 82px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface-2); color: var(--ink-4); font-size: 10.5px; font-weight: 750; text-align: center; white-space: nowrap; }
+  button.auto-status { cursor: pointer; }
+  button.auto-status.enabled { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .auto-result { grid-column: 2 / -1; padding-top: 11px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12px; line-height: 1.55; }
+  .auto-result b { color: var(--ink-2); }
 
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; }
@@ -455,7 +460,8 @@
     .ada-msg .bub { max-width: calc(100% - 39px); }
     .auto { grid-template-columns: 42px minmax(0, 1fr) auto; align-items: start; }
     .auto-when { grid-column: 2; text-align: left; }
-    .auto-status { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
+    .auto-actions { grid-column: 3; grid-row: 1 / span 2; align-self: center; flex-direction: column-reverse; }
+    .auto-result { grid-column: 1 / -1; }
   }
 </style>
 
@@ -720,13 +726,15 @@
           <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
           <div class="auto-copy"><div class="t">Morning triage &amp; brief</div><div class="m">Read overnight mail, categorize it, draft replies, and list what needs your attention.</div></div>
           <div class="auto-when"><div class="c">06:30</div><div class="l">Weekdays</div></div>
-          <span class="auto-status">Coming soon</span>
+          <div class="auto-actions"><button class="btn sm" type="button" data-auto-run="morning_triage">Run now</button><button class="auto-status" type="button" data-auto-toggle="morning_triage">Off</button></div>
+          <div class="auto-result" id="autoResultMorning" hidden></div>
         </article>
         <article class="auto">
           <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></div>
           <div class="auto-copy"><div class="t">Invoice cross-check</div><div class="m">Match incoming invoices against the ledger and flag amounts, vendors, or references that do not agree.</div></div>
           <div class="auto-when"><div class="c">On arrival</div><div class="l">Real-time</div></div>
-          <span class="auto-status">Coming soon</span>
+          <div class="auto-actions"><button class="btn sm" type="button" data-auto-run="invoice_crosscheck">Run now</button><button class="auto-status" type="button" data-auto-toggle="invoice_crosscheck">Off</button></div>
+          <div class="auto-result" id="autoResultInvoice" hidden></div>
         </article>
         <article class="auto">
           <div class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 3 3 9-3 9 19-9Z"/></svg></div>
@@ -900,6 +908,7 @@
   };
   let myId = null, myRole = null, myName = '', allVouchers = [], chatHistory = [], pendingAttachments = [], assistantReady = null;
   let triageMessages = [], triageFilter = 'all', selectedTriageId = null;
+  let automationStates = {};
   const triageAnalyses = new Map();
 
   function go(view, { syncUrl = true, replace = false } = {}) {
@@ -1039,10 +1048,91 @@
     checkChatUsage();
     renderActivity();
     loadInstructions();
+    loadAutomations();
 
     document.getElementById('loading').style.display = 'none';
     go(location.hash.slice(1) || 'overview', { replace: true });
   }
+
+  // ------------------------------------------------------------ automations
+
+  async function loadAutomations() {
+    try {
+      const res = await fetch('/api/automations', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) return;
+      automationStates = Object.fromEntries((data.automations || []).map(item => [item.key, item]));
+      renderAutomations();
+    } catch {}
+  }
+
+  function automationResult(item) {
+    const run = item && item.latest_run;
+    if (!run) return '';
+    const when = run.finished_at ? new Date(run.finished_at * 1000).toLocaleString() : 'Running now';
+    if (run.status === 'failed') return `<b>Last run failed:</b> ${escapeHtml(run.error || 'Unknown error')} · ${escapeHtml(when)}`;
+    if (run.status === 'running') return '<b>Running now…</b> You can leave this page and return later.';
+    const result = run.result || {};
+    const detail = result.summary || (result.items || []).slice(0, 3).map(row => row.summary).filter(Boolean).join(' ');
+    return `<b>${escapeHtml(result.headline || 'Run complete')}</b>${detail ? ` — ${escapeHtml(detail)}` : ''}<br><span>${escapeHtml(when)}</span>`;
+  }
+
+  function renderAutomations() {
+    const resultIds = { morning_triage: 'autoResultMorning', invoice_crosscheck: 'autoResultInvoice' };
+    document.querySelectorAll('[data-auto-toggle]').forEach(button => {
+      const item = automationStates[button.dataset.autoToggle] || {};
+      button.textContent = item.enabled ? 'On' : 'Off';
+      button.classList.toggle('enabled', !!item.enabled);
+      button.setAttribute('aria-pressed', item.enabled ? 'true' : 'false');
+      button.title = item.enabled && item.next_run_at
+        ? `Next run ${new Date(item.next_run_at * 1000).toLocaleString()}`
+        : 'Enable this automation';
+      const resultBox = document.getElementById(resultIds[item.key]);
+      const html = automationResult(item);
+      if (resultBox) { resultBox.hidden = !html; resultBox.innerHTML = html; }
+    });
+  }
+
+  async function updateAutomation(key, enabled, button) {
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/automations/update', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not update this automation.'); return; }
+      automationStates = Object.fromEntries((data.automations || []).map(item => [item.key, item]));
+      renderAutomations();
+    } catch { alert('Could not reach the server.'); }
+    finally { button.disabled = false; }
+  }
+
+  async function runAutomationNow(key, button) {
+    button.disabled = true;
+    button.textContent = 'Running…';
+    try {
+      const res = await fetch('/api/automations/run', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not run this automation.'); return; }
+      automationStates = Object.fromEntries((data.automations || []).map(item => [item.key, item]));
+      renderAutomations();
+    } catch { alert('Could not reach the server.'); }
+    finally { button.disabled = false; button.textContent = 'Run now'; }
+  }
+
+  document.querySelectorAll('[data-auto-toggle]').forEach(button => button.addEventListener('click', () => {
+    const item = automationStates[button.dataset.autoToggle] || {};
+    updateAutomation(button.dataset.autoToggle, !item.enabled, button);
+  }));
+  document.querySelectorAll('[data-auto-run]').forEach(button => button.addEventListener('click', () => {
+    runAutomationNow(button.dataset.autoRun, button);
+  }));
 
   // ------------------------------------------------------- connected mailbox
 

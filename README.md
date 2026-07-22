@@ -334,11 +334,18 @@ switched client-side with no page reload:
   `.env`/cPanel env vars, unlike `outlook-agent`'s own Settings page, which
   by its own code comment stores keys in browser `localStorage` and flags
   itself as an insecure prototype pattern not meant for production.
-- **Automations** — honest empty state, not a stub hiding real toggles:
-  the mailbox connection exists, but body-aware triage and actions do not. The
-  intended scope isn't invoice-only - once built, it's meant to triage the
-  whole inbox the way `outlook-agent` already does (correspondence, drafts,
-  flagging anything accounting-relevant), not just extract invoices.
+- **Automations** — two real, read-only recipes: Morning triage & brief and
+  Invoice cross-check. Enablement and run history are stored per user; every
+  run checks that user's mailbox connection, company AI plan, and the shared
+  server-side provider configuration. Results are saved for review and no run
+  moves, sends, deletes, or marks mail as read. Recipe definitions live in
+  `AUTOMATION_RECIPES`, while `recipe_key` is open-ended in SQLite, so adding
+  another recipe does not require redesigning the persistence or API.
+  `automation_runner.py` executes due recipes and is intended for a cPanel
+  Cron Job every five minutes using the application's virtualenv Python, for
+  example: `/path/to/virtualenv/bin/python /path/to/app/automation_runner.py`.
+  The page also offers Run now for testing. Auto-file and weekly-send remain
+  visibly unavailable because they would change external state.
 - **Activity** — the real approval trail: every prepare/submit/approve/reject
   event, who did it and when, scoped by the same downward-only visibility as
   everywhere else. Backed by a genuine append-only `voucher_events` table
