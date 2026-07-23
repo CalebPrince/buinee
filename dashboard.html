@@ -288,6 +288,53 @@
   .upgrade-notice { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:17px 19px; margin-bottom:18px; border:1px solid var(--teal); border-radius:14px; background:var(--teal-soft); color:var(--ink-2); }
   .upgrade-notice h3 { margin:0 0 4px; color:var(--teal-deep); font:600 17px var(--serif); }
   .upgrade-notice p { margin:0; max-width:680px; font-size:12.5px; line-height:1.5; }
+
+  /* Connections. A tool the plan doesn't cover is dimmed and locked, never
+     hidden - somebody on the Free tier should be able to see exactly what
+     Growth would give them, which is the whole point of showing all 18. */
+  .conn-summary { font-size: 12.5px; color: var(--ink-3); margin-bottom: 16px; }
+  .conn-summary b { color: var(--ink-2); }
+  .conn-group { margin-bottom: 22px; }
+  .conn-group h2 {
+    font: 700 10.5px var(--sans); text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-3); margin-bottom: 9px;
+  }
+  .conn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 11px; }
+  .conn-card {
+    display: flex; flex-direction: column; gap: 9px; padding: 14px;
+    border: 1px solid var(--line); border-radius: 13px; background: var(--surface);
+  }
+  .conn-card.locked { background: var(--surface-2); border-style: dashed; }
+  .conn-top { display: flex; align-items: flex-start; gap: 10px; }
+  .conn-ico {
+    width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center;
+    background: var(--teal); color: #fff; font-weight: 800; font-size: 14px;
+  }
+  .conn-card.locked .conn-ico { background: var(--ink-3); }
+  .conn-name { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .conn-blurb { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; margin-top: 2px; }
+  .conn-tag {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: 2px 6px; border-radius: 20px; white-space: nowrap;
+  }
+  .conn-tag.live { background: var(--teal-soft); color: var(--teal-deep); }
+  .conn-tag.locked { background: var(--ink-3); color: #fff; }
+  .conn-tag.soon { background: var(--surface-2); color: var(--ink-3); border: 1px solid var(--line); }
+  .conn-acct {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 11.5px; padding: 7px 9px; border-radius: 8px; background: var(--surface-2);
+  }
+  .conn-acct span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conn-acct button { font-size: 11px; color: var(--bad); background: none; border: 0; cursor: pointer; font-weight: 600; flex: none; }
+  .conn-acct button.peek { color: var(--teal-deep); }
+  .conn-peek { font-size: 11.5px; border-left: 2px solid var(--line); padding-left: 9px; display: flex; flex-direction: column; gap: 6px; }
+  .conn-peek .row b { display: block; font-weight: 600; color: var(--ink); }
+  .conn-peek .row span { color: var(--ink-3); font-size: 10.5px; }
+  .conn-peek .note { color: var(--ink-3); }
+  .conn-err { font-size: 11px; color: var(--bad); }
+  .conn-act { display: flex; gap: 7px; margin-top: auto; }
+  .conn-act .btn { flex: 1; }
+  .conn-why { font-size: 11px; color: var(--ink-3); line-height: 1.4; }
   .upgrade-plans { display:flex; flex-direction:column; gap:9px; }
   .upgrade-plan { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; padding:13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); text-align:left; }
   .upgrade-plan:hover { border-color:var(--teal); background:var(--teal-soft); }
@@ -747,6 +794,11 @@
         Activity
       </button>
       <div class="nav-label eyebrow">Account</div>
+      <button class="nav-item" data-view="connections" onclick="go('connections')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Connections
+        <span class="count" id="connectionsNavCount" style="display:none"></span>
+      </button>
       <button class="nav-item" data-view="instructions" onclick="go('instructions')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         Instructions
@@ -1072,6 +1124,19 @@
       </div>
     </section>
 
+    <!-- ===== CONNECTIONS ===== -->
+    <section class="view" data-view="connections" id="viewConnections" hidden>
+      <div class="hello">
+        <div>
+          <h1>Connections</h1>
+          <p>The tools your team already works in. Connect one and Ada can read from it the same way she reads your mail — she never posts, sends, or changes anything on the other side.</p>
+        </div>
+      </div>
+      <div class="upgrade-notice" id="connectionsNotice" hidden></div>
+      <div class="conn-summary" id="connectionsSummary"></div>
+      <div id="connectionsGroups"></div>
+    </section>
+
     <!-- ===== INSTRUCTIONS ===== -->
     <section class="view" data-view="instructions" id="viewInstructions" hidden>
       <div class="hello">
@@ -1280,6 +1345,33 @@ Do not promise a payment date unless it has already been approved."></textarea>
   </div>
 </div>
 
+<!-- Trello and anything else without a usable OAuth2 flow: the person brings
+     a credential from their own account instead of consenting to an app.
+     Reuses the IMAP dialog's styles - it's the same shape of problem. -->
+<div class="imap-back" id="toolKeyBack">
+  <div class="imap-card" role="dialog" aria-modal="true" aria-labelledby="toolKeyTitle">
+    <h3 id="toolKeyTitle">Connect</h3>
+    <p class="sub">Generate an API key and token from your own account, then paste them here. Both are encrypted before storage, and Buinee only ever reads with them.</p>
+    <div class="imap-err" id="toolKeyError"></div>
+    <form id="toolKeyForm" onsubmit="return submitToolKey(event)">
+      <input type="hidden" id="toolKeyTool">
+      <label>API key
+        <input type="text" id="toolKeyKey" required autocomplete="off" placeholder="Your API key">
+      </label>
+      <label>Token
+        <input type="password" id="toolKeyToken" required autocomplete="off" placeholder="Your API token">
+      </label>
+      <label>Label <span class="hint">Optional — how this connection is shown in the list.</span>
+        <input type="text" id="toolKeyLabel" autocomplete="off" placeholder="e.g. Operations board">
+      </label>
+      <div class="imap-actions">
+        <button class="btn" type="button" onclick="closeToolKey()">Cancel</button>
+        <button class="btn primary" type="submit">Connect</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   function toggleTheme() {
     const root = document.documentElement;
@@ -1314,7 +1406,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   const CRUMB_NAMES = {
     overview: 'Overview', team: 'Team', vouchers: 'Vouchers', triage: 'Triage',
     flagged: 'Flagged', fix: 'To fix', followups: 'Follow-ups', chat: 'Ask Ada', teamchat: 'Team chat', automations: 'Automations',
-    activity: 'Activity', instructions: 'Instructions',
+    activity: 'Activity', instructions: 'Instructions', connections: 'Connections',
   };
   const STATUS_INFO = {
     draft: { label: 'Draft', cls: '' },
@@ -1346,6 +1438,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
       loadTriage(!!notificationCounts.new_mail);
     }
     if (view === 'followups') loadFollowUps();
+    if (view === 'connections') loadConnections();
     if (syncUrl) {
       const url = new URL(location.href);
       url.hash = view;
@@ -1581,6 +1674,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
     renderChatLog();
     showMailboxResult();
+    showToolResult();
     loadMailbox();
     checkChatAvailable();
     checkChatUsage();
@@ -2329,6 +2423,222 @@ Do not promise a payment date unless it has already been approved."></textarea>
     history.replaceState(null, '', url);
   }
 
+  // ------------------------------------------------------- connected tools
+
+  const TOOL_RESULTS = {
+    connected: 'Connected.',
+    denied: 'That service didn\'t grant access — the sign-in was cancelled, or an administrator has to approve Buinee for your organisation first.',
+    failed: 'Couldn\'t finish connecting. Try again.',
+    badstate: 'That sign-in link had expired or belonged to another session. Start the connection again.',
+    unknown: 'That tool isn\'t one Buinee can connect.',
+    notincluded: 'That tool isn\'t part of your current plan.',
+    unconfigured: 'That tool isn\'t set up on this deployment yet.',
+    nokey: 'Credentials can\'t be stored safely on this deployment yet, so the connection was refused.',
+  };
+
+  let toolStatus = null;
+
+  function showToolResult() {
+    const params = new URLSearchParams(location.search);
+    const code = params.get('tool');
+    if (!code) return;
+    if (TOOL_RESULTS[code]) alert(TOOL_RESULTS[code]);
+    const url = new URL(location);
+    url.searchParams.delete('tool');
+    history.replaceState(null, '', url);
+    if (code === 'connected') go('connections');
+  }
+
+  async function loadConnections() {
+    const groups = document.getElementById('connectionsGroups');
+    if (!toolStatus) groups.innerHTML = '<div class="conn-summary">Loading…</div>';
+    try {
+      const res = await fetch('/api/tools/status', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error();
+      toolStatus = await res.json();
+    } catch {
+      groups.innerHTML = '<div class="conn-summary">Could not load your connections. Refresh and try again.</div>';
+      return;
+    }
+    renderConnections();
+  }
+
+  function renderConnections() {
+    const data = toolStatus;
+    const locked = data.tools.filter(t => !t.included).length;
+
+    const notice = document.getElementById('connectionsNotice');
+    if (locked) {
+      notice.hidden = false;
+      notice.innerHTML = `<div>
+          <h3>${locked} more tool${locked === 1 ? '' : 's'} on a higher plan</h3>
+          <p>Your ${escapeHtml(data.plan_name)} plan includes ${data.included_count} of ${data.tools.length} connections. The rest are shown below so you can see what upgrading adds.</p>
+        </div>${upgradeActionHtml('Upgrade plan', 'tools')}`;
+    } else {
+      notice.hidden = true;
+    }
+
+    document.getElementById('connectionsSummary').innerHTML =
+      `<b>${data.connected_count}</b> connected · <b>${data.included_count}</b> available on your ${escapeHtml(data.plan_name)} plan`;
+    const navCount = document.getElementById('connectionsNavCount');
+    navCount.style.display = data.connected_count ? '' : 'none';
+    navCount.textContent = data.connected_count;
+
+    if (!data.secrets_ready) {
+      document.getElementById('connectionsSummary').innerHTML +=
+        `<div class="conn-err" style="margin-top:6px">${escapeHtml(data.secrets_problem)}</div>`;
+    }
+
+    document.getElementById('connectionsGroups').innerHTML = data.categories.map(cat => {
+      const inCat = data.tools.filter(t => t.category === cat.id);
+      if (!inCat.length) return '';
+      return `<div class="conn-group">
+        <h2>${escapeHtml(cat.label)}</h2>
+        <div class="conn-grid">${inCat.map(toolCardHtml).join('')}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function toolCardHtml(t) {
+    const accounts = t.connections.map(c => `
+      <div class="conn-acct">
+        <span title="${escapeHtml(c.label)}">${escapeHtml(c.label)}</span>
+        <span style="display:flex;gap:8px;flex:none">
+          ${t.readable && t.included ? `<button type="button" class="peek" onclick="previewTool(${c.id})">Preview</button>` : ''}
+          <button type="button" onclick="disconnectTool(${c.id}, '${escapeHtml(t.label)}')">Remove</button>
+        </span>
+      </div>
+      <div class="conn-peek" id="peek-${c.id}" hidden></div>
+      ${c.last_error ? `<div class="conn-err">${escapeHtml(c.last_error)}</div>` : ''}`).join('');
+
+    // Three different reasons a button might not be offered, and each gets
+    // its own sentence - "upgrade" and "we haven't registered with this
+    // vendor yet" are not the same problem and shouldn't read alike.
+    let action, tag;
+    if (!t.included && t.connections.length) {
+      // Connected under a previous plan. The connection is left in place
+      // rather than silently deleted on downgrade - that would be somebody
+      // else's data disappearing without being asked - but it says plainly
+      // that it isn't being read any more.
+      tag = '<span class="conn-tag locked">Paused</span>';
+      action = `<div class="conn-why">Your ${escapeHtml(toolStatus.plan_name)} plan no longer includes this, so Buinee has stopped reading from it. Upgrade to resume, or remove the connection.</div>
+        <div class="conn-act">${upgradeActionHtml('Upgrade plan', 'tools')}</div>`;
+    } else if (!t.included) {
+      tag = '<span class="conn-tag locked">Locked</span>';
+      action = `<div class="conn-act">${upgradeActionHtml('Unlock with an upgrade', 'tools')}</div>`;
+    } else if (!t.configured) {
+      tag = '<span class="conn-tag soon">Coming soon</span>';
+      action = '<div class="conn-why">Included in your plan. We\'re finishing the setup with this vendor — it will appear here when it\'s ready.</div>';
+    } else if (!toolStatus.secrets_ready) {
+      tag = '';
+      action = '<div class="conn-why">Connections are paused on this deployment until secure storage is configured.</div>';
+    } else if (t.auth === 'api_key') {
+      tag = t.connections.length ? '<span class="conn-tag live">Connected</span>' : '';
+      action = `<div class="conn-act"><button class="btn sm" type="button" onclick="openToolKey('${escapeHtml(t.id)}', '${escapeHtml(t.label)}')">${t.connections.length ? 'Add another' : 'Connect'}</button></div>`;
+    } else {
+      tag = t.connections.length ? '<span class="conn-tag live">Connected</span>' : '';
+      action = `<div class="conn-act"><button class="btn sm" type="button" onclick="connectTool('${escapeHtml(t.id)}')">${t.connections.length ? 'Add another' : 'Connect'}</button></div>`;
+    }
+
+    return `<div class="conn-card ${t.included ? '' : 'locked'}">
+      <div class="conn-top">
+        <span class="conn-ico">${escapeHtml(t.label[0])}</span>
+        <div style="min-width:0">
+          <div class="conn-name">${escapeHtml(t.label)} ${tag}</div>
+          <div class="conn-blurb">${escapeHtml(t.blurb)}</div>
+        </div>
+      </div>
+      ${accounts}${action}
+    </div>`;
+  }
+
+  // Proves a connection actually works, from the person's own side, without
+  // waiting for Ada to happen to need it. Read-only: there is no counterpart
+  // that writes anything back to the tool.
+  async function previewTool(connectionId) {
+    const box = document.getElementById(`peek-${connectionId}`);
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<div class="note">Reading…</div>';
+    try {
+      const res = await fetch('/api/tools/recent?connection_id=' + encodeURIComponent(connectionId),
+        { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) { box.innerHTML = `<div class="conn-err">${escapeHtml(data.error || 'Could not read from that tool.')}</div>`; return; }
+      if (!data.items.length) { box.innerHTML = '<div class="note">Connected and working — nothing recent to show.</div>'; return; }
+      box.innerHTML = data.items.slice(0, 5).map(i => `
+        <div class="row">
+          <b>${escapeHtml(i.title)}</b>
+          <span>${escapeHtml([i.subtitle, i.when ? new Date(i.when).toLocaleString() : ''].filter(Boolean).join(' · '))}</span>
+        </div>`).join('');
+    } catch {
+      box.innerHTML = '<div class="conn-err">Could not reach the server.</div>';
+    }
+  }
+
+  function connectTool(toolId) {
+    // A full navigation, not a fetch: it hands the browser to the vendor's
+    // sign-in page, which will not run inside an XHR.
+    location.href = '/api/tools/connect?tool=' + encodeURIComponent(toolId);
+  }
+
+  async function disconnectTool(connectionId, label) {
+    if (!confirm(`Remove this ${label} connection? Buinee will forget its access token — revoke it at ${label} too if you want the permission itself withdrawn.`)) return;
+    try {
+      const res = await fetch('/api/tools/disconnect', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not remove that connection.'); return; }
+      toolStatus = data.tools;
+      renderConnections();
+    } catch { alert('Could not reach the server.'); }
+  }
+
+  function openToolKey(toolId, label) {
+    document.getElementById('toolKeyTool').value = toolId;
+    document.getElementById('toolKeyTitle').textContent = `Connect ${label}`;
+    document.getElementById('toolKeyError').classList.remove('show');
+    document.getElementById('toolKeyForm').reset();
+    document.getElementById('toolKeyTool').value = toolId;
+    document.getElementById('toolKeyBack').classList.add('open');
+    document.getElementById('toolKeyKey').focus();
+  }
+
+  function closeToolKey() {
+    document.getElementById('toolKeyBack').classList.remove('open');
+    document.getElementById('toolKeyToken').value = '';
+  }
+
+  async function submitToolKey(ev) {
+    ev.preventDefault();
+    const err = document.getElementById('toolKeyError');
+    err.classList.remove('show');
+    try {
+      const res = await fetch('/api/tools/connect-key', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: document.getElementById('toolKeyTool').value,
+          key: document.getElementById('toolKeyKey').value,
+          token: document.getElementById('toolKeyToken').value,
+          label: document.getElementById('toolKeyLabel').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { err.textContent = data.error || 'Could not connect.'; err.classList.add('show'); return false; }
+      toolStatus = data.tools;
+      closeToolKey();
+      renderConnections();
+    } catch {
+      err.textContent = 'Could not reach the server.';
+      err.classList.add('show');
+    }
+    return false;
+  }
+
   // Where to send someone to withdraw the permission at the provider's end,
   // since disconnecting here only forgets our copy.
   const REVOKE_AT = {
@@ -2435,6 +2745,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (ev.key !== 'Escape') return;
     closeSourceModal();
     closeImap();
+    closeToolKey();
   });
 
   function connectMailbox(provider) {

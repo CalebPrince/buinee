@@ -66,6 +66,7 @@ import db  # noqa: E402
 import mailbox  # noqa: E402
 import providers  # noqa: E402
 import secretstore  # noqa: E402
+import tools  # noqa: E402
 import voucher  # noqa: E402
 
 # Only the local dev transport reads these - production runs under Passenger,
@@ -679,6 +680,14 @@ def load_env() -> dict:
         "BUINEE_SECRET_KEY",
         "BUINEE_COOKIE_SECURE", "BUINEE_TRUST_PROXY",
         "PAYSTACK_PUBLIC_KEY", "PAYSTACK_SECRET_KEY", "PAYSTACK_CALLBACK_URL", "PAYSTACK_WEBHOOK_URL",
+        # Two per connectable tool plus the shared callback. Generated rather
+        # than listed: this deployment configures itself through Passenger
+        # environment variables, so a key missing from here is a credential
+        # that silently does nothing in production while working locally
+        # from .env - which is the worst way to find out.
+        tools.REDIRECT_KEY,
+        *(k for t in tools.TOOL_IDS
+          for k in (tools.client_id_key(t), tools.client_secret_key(t))),
     ]:
         if os.environ.get(k):
             cfg[k] = os.environ[k]
@@ -834,6 +843,80 @@ def public_mailbox(user_id: int, cfg: dict) -> dict:
     }
 
 
+def _clean_tool_ids(raw) -> list[str]:
+    """Only ids the catalog actually knows, in catalog order. A tier granting
+    a tool that doesn't exist would show up as a permanently unconnectable
+    row on somebody's dashboard, with nothing there to explain it."""
+    if not isinstance(raw, list):
+        raise ValueError("Bad tool list.")
+    wanted = {str(x) for x in raw}
+    return [t for t in tools.TOOL_IDS if t in wanted]
+
+
+def public_tools(user: dict, cfg: dict) -> dict:
+    """Every tool in the catalog, each with the one thing that matters about
+    it right now. Never credentials.
+
+    Three separate reasons a tool might not be connectable, kept apart
+    because only one of them is anything the customer can act on:
+
+      `included`    their plan covers it - if not, that's an upgrade.
+      `configured`  this deployment holds credentials for that vendor - if
+                    not, nobody can connect it and it isn't their fault.
+      `secrets_ready` we can encrypt what comes back - if not, we decline to
+                    store a token rather than write one in the clear.
+    """
+    plan = db.plan_for_company(user["company_id"])
+    included = set(plan["tool_ids"])
+    connections = db.list_tool_connections(user["id"])
+    by_tool: dict[str, list] = {}
+    for conn in connections:
+        by_tool.setdefault(conn["tool"], []).append({
+            "id": conn["id"], "label": conn["account_label"],
+            "name": conn["account_name"], "connected_at": conn["connected_at"],
+            "last_error": conn["last_error"],
+        })
+    catalog = []
+    for entry in tools.public_catalog(cfg):
+        catalog.append(entry | {
+            "included": entry["id"] in included,
+            "connections": by_tool.get(entry["id"], []),
+        })
+    return {
+        "categories": [{"id": cid, "label": label} for cid, label in tools.CATEGORIES],
+        "tools": catalog,
+        "plan_name": plan["name"],
+        "included_count": len(included),
+        "connected_count": len(connections),
+        "secrets_ready": secretstore.is_ready(cfg),
+        "secrets_problem": secretstore.why_unavailable(cfg),
+    }
+
+
+def tool_credentials(user: dict, connection: dict, cfg: dict) -> dict:
+    """Decrypt a tool's credentials, renewing the access token first if it is
+    close to expiring. A renewal is written back straight away - a token
+    refreshed but not stored would be fetched again on the next request, and
+    vendors that rotate refresh tokens would then be handed a spent one.
+
+    Every read from a connected tool has to come through here, because this
+    is where the plan is re-checked. A downgrade leaves existing connections
+    in place rather than deleting somebody's data behind their back, and the
+    dashboard tells them it has stopped being read - this is what makes that
+    true rather than merely true-for-now.
+    """
+    if connection["tool"] not in db.plan_for_company(user["company_id"])["tool_ids"]:
+        raise tools.ToolError(
+            f"{tools.LABELS.get(connection['tool'], 'That tool')} isn't part of your "
+            "current plan, so Buinee has stopped reading from it.")
+    creds = secretstore.decrypt(cfg, connection["credentials_enc"])
+    fresh = tools.refresh(cfg, connection["tool"], creds)
+    if fresh:
+        db.update_tool_credentials(user["id"], connection["id"], secretstore.encrypt(cfg, fresh))
+        creds = fresh
+    return creds
+
+
 def current_user(handler) -> dict | None:
     return db.get_user_by_session(session_token(handler))
 
@@ -852,6 +935,7 @@ def public_user(user: dict) -> dict:
         "chat_limit": plan["chat_monthly_limit"],
         "mailbox_limit": plan["mailbox_limit"],
         "team_chat_enabled": plan["team_chat_enabled"],
+        "tool_ids": plan["tool_ids"],
     }
     company["user_count"] = db.company_user_count(user["company_id"])
     return {
@@ -1588,8 +1672,19 @@ def landing_plans_digest() -> str:
             f"- {p['name']} (plan_id: {p['id']}, {p['audience']}): {price}, {seats}, "
             f"{p['mailbox_limit']} connected mailbox(es) per user, {chat}"
             + (", team chat included" if p.get("team_chat_enabled") else "")
+            + _tools_digest(p)
         )
     return "\n".join(lines)
+
+
+def _tools_digest(plan: dict) -> str:
+    """What a tier can connect to, for Ada to answer from. Named rather than
+    counted: a visitor asking "does it work with Slack?" wants to hear Slack,
+    not "eight integrations"."""
+    labels = [tools.LABELS[t] for t in plan["tool_ids"] if t in tools.LABELS]
+    if not labels:
+        return ", no tool connections"
+    return ", connects to " + ", ".join(labels)
 
 
 LIVECHAT_DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -2068,6 +2163,69 @@ class RouteHandlerMixin:
         if path == "/api/mailbox/callback":
             return self._handle_mailbox_callback()
 
+        if path == "/api/tools/status":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json(public_tools(user, load_env()))
+
+        if path == "/api/tools/recent":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            try:
+                connection_id = int(parse_qs(urlparse(self.path).query).get("connection_id", [""])[0])
+            except (TypeError, ValueError):
+                return self._json({"error": "Choose a connection."}, 400)
+            connection = db.get_tool_connection(user["id"], connection_id)
+            if not connection:
+                return self._json({"error": "That connection is not yours."}, 404)
+            # Answered here as well as inside tool_credentials, which guards
+            # every read path: this is a billing answer, not an upstream
+            # failure, and the two shouldn't share a status code.
+            if connection["tool"] not in db.plan_for_company(user["company_id"])["tool_ids"]:
+                return self._json({"error": f"{tools.LABELS.get(connection['tool'], 'That tool')} "
+                                            "isn't part of your current plan."}, 402)
+            cfg = load_env()
+            try:
+                creds = tool_credentials(user, connection, cfg)
+                items = tools.list_recent(cfg, connection["tool"], creds)
+            except tools.ToolError as exc:
+                # Remembered against the connection so the card can explain
+                # itself later without the person having to re-trigger it.
+                db.record_tool_error(connection["id"], str(exc))
+                return self._json({"error": str(exc)}, 502)
+            except secretstore.SecretsUnavailable as exc:
+                return self._json({"error": str(exc)}, 400)
+            db.record_tool_error(connection["id"], "")
+            return self._json({"items": items, "tool": connection["tool"]})
+
+        if path == "/api/tools/connect":
+            # A browser navigation like the mailbox one, so failures answer in
+            # redirects rather than JSON nobody would ever see.
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._redirect("/login")
+            cfg = load_env()
+            tool_id = parse_qs(urlparse(self.path).query).get("tool", [""])[0]
+            entry = tools.BY_ID.get(tool_id)
+            if not entry or entry["auth"] != "oauth2":
+                return self._redirect("/dashboard?tool=unknown")
+            if tool_id not in db.plan_for_company(user["company_id"])["tool_ids"]:
+                return self._redirect("/dashboard?tool=notincluded")
+            if not tools.is_configured(cfg, tool_id):
+                return self._redirect("/dashboard?tool=unconfigured")
+            if not secretstore.is_ready(cfg):
+                return self._redirect("/dashboard?tool=nokey")
+            # Namespaced so the shared oauth_states table can't confuse a tool
+            # callback with a mailbox one - they land on different endpoints,
+            # but the state is what decides whose token endpoint gets talked to.
+            state = db.new_oauth_state(user["id"], f"tool:{tool_id}")
+            return self._redirect(tools.authorize_url(cfg, tool_id, state))
+
+        if path == "/api/tools/callback":
+            return self._handle_tool_callback()
+
         if path == "/api/plans":
             # Public and unauthenticated on purpose - pricing is marketing
             # copy, and the landing page's pricing section and register.html
@@ -2244,6 +2402,19 @@ class RouteHandlerMixin:
             if not admin: return
             return self._json({"invoices": db.list_admin_invoices(), "companies": db.list_company_choices()})
 
+        if path == "/api/admin/tools-catalog":
+            admin = self._admin_role_request("owner", "billing")
+            if not admin: return
+            cfg = load_env()
+            # `configured` and `connections` are here so the Plans page can
+            # warn before a tier is sold on a tool nobody can actually
+            # connect, and show which vendors are worth registering next.
+            return self._json({"tools": [
+                entry | {"note": tools.BY_ID[entry["id"]].get("note", ""),
+                         "connections": db.count_tool_connections(entry["id"])}
+                for entry in tools.public_catalog(cfg)
+            ], "categories": [{"id": c, "label": l} for c, l in tools.CATEGORIES]})
+
         if path == "/api/admin/ada-signups":
             admin = self._admin_role_request("owner")
             if not admin: return
@@ -2272,6 +2443,8 @@ class RouteHandlerMixin:
             "/api/demo/register": self._handle_demo_register,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
+            "/api/tools/connect-key": self._handle_tool_connect_key,
+            "/api/tools/disconnect": self._handle_tool_disconnect,
             "/api/mailbox/notifications/seen": self._handle_mailbox_notifications_seen,
             "/api/mailbox/triage": self._handle_mailbox_triage,
             "/api/automations/update": self._handle_automation_update,
@@ -2653,6 +2826,98 @@ class RouteHandlerMixin:
             return self._json({"error": "Choose a mailbox to disconnect."}, 400)
         db.delete_mailbox_connection(user["id"], connection_id)
         return self._json({"ok": True, "mailbox": public_mailbox(user["id"], load_env())})
+
+    def _handle_tool_callback(self):
+        """Where a tool vendor sends the browser back after consent.
+
+        Deliberately the same shape as _handle_mailbox_callback, including
+        the check that the browser driving the callback belongs to the user
+        the state was minted for - otherwise somebody can be walked through
+        a callback that isn't theirs and end up with a stranger's account
+        attached to their workspace.
+        """
+        params = parse_qs(urlparse(self.path).query)
+        cfg = load_env()
+
+        if params.get("error"):
+            return self._redirect("/dashboard?tool=denied")
+
+        spent = db.consume_oauth_state(params.get("state", [""])[0])
+        if not spent:
+            return self._redirect("/dashboard?tool=badstate")
+        user_id, marker = spent
+        if not marker.startswith("tool:"):
+            # A mailbox state arriving here means the two flows have been
+            # crossed somewhere; refuse rather than guess which was meant.
+            return self._redirect("/dashboard?tool=badstate")
+        tool_id = marker[len("tool:"):]
+
+        user = current_user(self)
+        if not user or user["id"] != user_id or user["status"] != "approved":
+            return self._redirect("/dashboard?tool=badstate")
+
+        # Re-checked rather than trusted from when the redirect was issued:
+        # a plan can be downgraded, or a tool withdrawn from a tier, while
+        # somebody is still sitting on the vendor's consent screen.
+        if tool_id not in db.plan_for_company(user["company_id"])["tool_ids"]:
+            return self._redirect("/dashboard?tool=notincluded")
+
+        code = params.get("code", [""])[0]
+        if not code:
+            return self._redirect("/dashboard?tool=denied")
+
+        try:
+            connection = tools.exchange_code(cfg, tool_id, code)
+            enc = secretstore.encrypt(cfg, connection["credentials"])
+        except tools.ToolError:
+            return self._redirect("/dashboard?tool=failed")
+        except secretstore.SecretsUnavailable:
+            return self._redirect("/dashboard?tool=nokey")
+
+        db.save_tool_connection(user["id"], user["company_id"], connection, enc)
+        return self._redirect("/dashboard?tool=connected")
+
+    def _handle_tool_connect_key(self):
+        """The api_key tools - Trello today. No consent screen, so it's a form
+        post, and the credential is stored only if encryption is available."""
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        tool_id = str(req.get("tool") or "")
+        entry = tools.BY_ID.get(tool_id)
+        if not entry or entry["auth"] != "api_key":
+            return self._json({"error": "That tool is not connected with a key."}, 400)
+        if tool_id not in db.plan_for_company(user["company_id"])["tool_ids"]:
+            return self._json({"error": f"{entry['label']} isn't part of your plan."}, 402)
+        cfg = load_env()
+        if not secretstore.is_ready(cfg):
+            return self._json({"error": secretstore.why_unavailable(cfg)}, 400)
+        try:
+            connection = tools.connect_api_key(
+                tool_id, str(req.get("key") or ""), str(req.get("token") or ""),
+                str(req.get("label") or ""))
+            enc = secretstore.encrypt(cfg, connection["credentials"])
+        except tools.ToolError as exc:
+            return self._json({"error": str(exc)}, 400)
+        except secretstore.SecretsUnavailable as exc:
+            return self._json({"error": str(exc)}, 400)
+        db.save_tool_connection(user["id"], user["company_id"], connection, enc)
+        return self._json({"ok": True, "tools": public_tools(user, cfg)})
+
+    def _handle_tool_disconnect(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            connection_id = int(self._body().get("connection_id"))
+        except Exception:
+            return self._json({"error": "Choose a connection to remove."}, 400)
+        db.delete_tool_connection(user["id"], connection_id)
+        return self._json({"ok": True, "tools": public_tools(user, load_env())})
 
     def _handle_mailbox_notifications_seen(self):
         user = current_user(self)
@@ -3943,6 +4208,9 @@ class RouteHandlerMixin:
                 audience=str(req.get("audience") or "team"),
                 mailbox_limit=int(req.get("mailbox_limit") or 1),
             )
+            if "tool_ids" in req:
+                db.set_plan_tools(plan["id"], _clean_tool_ids(req["tool_ids"]))
+                plan = db.get_plan(plan["id"])
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)
         return self._json({"ok": True, "plan": plan})
@@ -3975,6 +4243,11 @@ class RouteHandlerMixin:
                 chat_monthly_limit=chat_limit,
                 mailbox_limit=(int(req["mailbox_limit"]) if req.get("mailbox_limit") is not None else None),
             )
+            # Absent means "not editing the tool list", empty list means "this
+            # tier includes nothing" - so the two can't be collapsed.
+            if "tool_ids" in req:
+                db.set_plan_tools(plan_id, _clean_tool_ids(req["tool_ids"]))
+                plan = db.get_plan(plan_id)
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)
         return self._json({"ok": True, "plan": plan})

@@ -148,6 +148,25 @@
   .edit-form .btnrow { display: flex; gap: 8px; margin-top: 4px; }
   .edit-form .btnrow .btn { width: auto; flex: 1; }
 
+  .tool-picker { border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; max-height: 260px; overflow-y: auto; }
+  .tool-picker .cat { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin: 9px 0 5px; }
+  .tool-picker .cat:first-child { margin-top: 0; }
+  .tool-picker label {
+    flex-direction: row; align-items: center; gap: 7px; font-weight: 500;
+    font-size: 12.5px; color: var(--ink); padding: 2px 0;
+  }
+  .tool-picker label input { width: auto; flex: none; }
+  /* A vendor this deployment holds no credentials for can still be ticked -
+     the tier is a commercial decision and may well be made before the app
+     registration is - but it says so, so nobody sells it by accident. */
+  .tool-picker .unconfigured { color: var(--ink-3); }
+  .tool-picker .tag {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: 1px 5px; border-radius: 20px; background: var(--surface-2); color: var(--ink-3);
+  }
+  .plan-tools { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; line-height: 1.45; }
+  .plan-tools b { color: var(--ink-2); }
+
   .panel {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
     box-shadow: var(--shadow); padding: 20px;
@@ -274,6 +293,10 @@
                   <input type="number" id="newChatLimit" min="0" placeholder="Unlimited" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
                 </label>
               </div>
+              <div style="margin-bottom:14px">
+                <div style="font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px">Connected tools</div>
+                <div id="newToolPicker"></div>
+              </div>
               <button class="btn primary" type="submit" id="createBtn" style="width:auto;padding:9px 18px">Add tier</button>
             </form>
           </div>
@@ -302,7 +325,7 @@
     return d.innerHTML;
   }
 
-  let plans = [];
+  let plans = [], toolCatalog = [], toolCategories = [];
 
   async function main() {
     try {
@@ -310,6 +333,8 @@
       if (!res.ok) { location.href = '/admin/login'; return; }
     } catch { location.href = '/admin/login'; return; }
 
+    await loadToolCatalog();
+    document.getElementById('newToolPicker').innerHTML = toolPickerHtml('new', []);
     await loadPlans();
 
     document.getElementById('loading').style.display = 'none';
@@ -325,6 +350,42 @@
     } catch {
       document.getElementById('plansGrid').innerHTML = '<div class="panel">Could not load plans.</div>';
     }
+  }
+
+  async function loadToolCatalog() {
+    try {
+      const data = await (await fetch('/api/admin/tools-catalog', { credentials: 'same-origin' })).json();
+      toolCatalog = data.tools || [];
+      toolCategories = data.categories || [];
+    } catch { toolCatalog = []; toolCategories = []; }
+  }
+
+  // `prefix` namespaces the checkbox ids so the create form and every plan's
+  // edit form can each hold their own copy of the same list.
+  function toolPickerHtml(prefix, selected) {
+    if (!toolCatalog.length) return '<div class="plan-tools">Tool catalog unavailable.</div>';
+    const chosen = new Set(selected || []);
+    return `<div class="tool-picker">` + toolCategories.map(cat => {
+      const rows = toolCatalog.filter(t => t.category === cat.id).map(t => `
+        <label class="${t.configured ? '' : 'unconfigured'}">
+          <input type="checkbox" id="tool-${prefix}-${t.id}" data-tool="${escapeHtml(t.id)}" data-picker="${escapeHtml(prefix)}" ${chosen.has(t.id) ? 'checked' : ''}>
+          <span>${escapeHtml(t.label)}</span>
+          ${t.configured ? '' : '<span class="tag" title="No client credentials on this deployment yet, so nobody can connect it">Not set up</span>'}
+        </label>`).join('');
+      return rows ? `<div class="cat">${escapeHtml(cat.label)}</div>${rows}` : '';
+    }).join('') + `</div>`;
+  }
+
+  function pickedTools(prefix) {
+    return [...document.querySelectorAll(`input[data-picker="${prefix}"]:checked`)]
+      .map(el => el.dataset.tool);
+  }
+
+  function toolSummary(p) {
+    const ids = p.tool_ids || [];
+    if (!ids.length) return 'Connected tools: <b>none</b>';
+    const labels = ids.map(id => (toolCatalog.find(t => t.id === id) || {}).label || id);
+    return `Connected tools (<b>${ids.length}</b>): ${escapeHtml(labels.join(', '))}`;
   }
 
   function renderPlans() {
@@ -347,6 +408,7 @@
         <div class="plan-limit">${p.chat_enabled
             ? `AI assistant: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
             : 'AI assistant: <b>not included</b>'}</div>
+        <div class="plan-tools">${toolSummary(p)}</div>
         <div class="plan-actions">
           <button class="btn sm" onclick="toggleEdit(${p.id})">Edit</button>
         </div>
@@ -377,6 +439,9 @@
           <label>AI messages / month <span style="font-weight:400;color:var(--ink-3)">(blank = unlimited)</span>
             <input type="number" id="editChatLimit-${p.id}" value="${p.chat_monthly_limit == null ? '' : p.chat_monthly_limit}" min="0" placeholder="Unlimited">
           </label>
+          <label>Connected tools
+            ${toolPickerHtml(`edit${p.id}`, p.tool_ids)}
+          </label>
           <div class="btnrow">
             <button class="btn primary" onclick="saveEdit(${p.id})">Save</button>
             <button class="btn" onclick="toggleEdit(${p.id})">Cancel</button>
@@ -406,6 +471,7 @@
           chat_enabled: document.getElementById(`editChatEnabled-${id}`).checked,
           chat_monthly_limit: document.getElementById(`editChatLimit-${id}`).value || null,
           mailbox_limit: document.getElementById(`editMailboxLimit-${id}`).value,
+          tool_ids: pickedTools(`edit${id}`),
         }),
       });
       const data = await res.json();
@@ -453,6 +519,7 @@
           chat_monthly_limit: document.getElementById('newChatLimit').value || null,
           audience: document.getElementById('newAudience').value,
           mailbox_limit: document.getElementById('newMailboxLimit').value,
+          tool_ids: pickedTools('new'),
         }),
       });
       const data = await res.json();
@@ -466,6 +533,7 @@
       document.getElementById('newChatEnabled').checked = false;
       document.getElementById('newChatLimit').value = '';
       document.getElementById('newAudience').value = 'team';
+      document.getElementById('newToolPicker').innerHTML = toolPickerHtml('new', []);
       audienceChanged();
       await loadPlans();
     } catch {

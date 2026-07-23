@@ -562,6 +562,7 @@ def init_db() -> None:
         _seed_default_plans(conn)
         _seed_individual_plans(conn)
         _migrate_plan_mailbox_limits(conn)
+        _migrate_tool_connections(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
@@ -658,6 +659,67 @@ def _migrate_plan_mailbox_limits(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE plans ADD COLUMN mailbox_limit INTEGER NOT NULL DEFAULT 1")
         conn.execute("UPDATE plans SET mailbox_limit=3 WHERE name IN ('Starter','Solo Pro')")
         conn.execute("UPDATE plans SET mailbox_limit=10 WHERE name='Growth'")
+
+
+# What each seeded tier starts out including. Only ever applied when the
+# entitlement table is first created - once the platform owner has edited
+# these on the Plans page, their answer is the one that stands, and a later
+# deploy must not quietly put the defaults back.
+_PLAN_TOOL_SEEDS = {
+    "Free": (),
+    "Starter": ("slack", "teams", "whatsapp", "google_drive", "onedrive",
+                "dropbox", "google_calendar", "outlook_calendar"),
+    "Growth": ("slack", "teams", "whatsapp", "google_drive", "onedrive", "dropbox",
+               "notion", "jira", "asana", "clickup", "monday", "trello", "hubspot",
+               "salesforce", "pipedrive", "google_calendar", "outlook_calendar",
+               "calendly"),
+    "Solo Free": (),
+    "Solo Pro": ("slack", "whatsapp", "google_drive", "dropbox", "notion",
+                 "trello", "google_calendar", "calendly"),
+}
+
+
+def _migrate_tool_connections(conn: sqlite3.Connection) -> None:
+    """Connections to everything that isn't email, and which plan gets what.
+
+    Kept apart from mailbox_connections rather than folded into it. A mailbox
+    carries polling state, arrival records and triage on top of the
+    connection itself; these don't, and merging the two would mean teaching
+    all of that machinery to skip rows it can't handle - more risk to a
+    working feature than the duplication costs.
+    """
+    already = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='plan_tools'"
+    ).fetchone()
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS tool_connections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            company_id INTEGER NOT NULL REFERENCES companies(id),
+            tool TEXT NOT NULL,
+            account_label TEXT NOT NULL DEFAULT '',
+            account_name TEXT NOT NULL DEFAULT '',
+            credentials_enc TEXT NOT NULL,
+            scopes TEXT NOT NULL DEFAULT '',
+            connected_at REAL NOT NULL,
+            last_error TEXT NOT NULL DEFAULT '',
+            UNIQUE(user_id, tool, account_label)
+        );
+        CREATE INDEX IF NOT EXISTS idx_tool_connections_user ON tool_connections(user_id);
+        CREATE TABLE IF NOT EXISTS plan_tools (
+            plan_id INTEGER NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+            tool_id TEXT NOT NULL,
+            PRIMARY KEY (plan_id, tool_id)
+        );
+    """)
+    if already:
+        return
+    for name, tool_ids in _PLAN_TOOL_SEEDS.items():
+        row = conn.execute("SELECT id FROM plans WHERE name = ?", (name,)).fetchone()
+        if not row:
+            continue
+        conn.executemany("INSERT OR IGNORE INTO plan_tools (plan_id, tool_id) VALUES (?, ?)",
+                         [(row["id"], t) for t in tool_ids])
 
 
 def _migrate_multiple_mailboxes(conn: sqlite3.Connection) -> None:
@@ -1336,12 +1398,110 @@ def delete_mailbox_connection(user_id: int, connection_id: int | None = None) ->
                      (user_id, connection_id, connection_id))
 
 
+# ------------------------------------------------------- connected tools
+#
+# Same contract as the mailbox functions above: credentials arrive already
+# encrypted, so there is no path where this layer could write one in the
+# clear even by mistake.
+
+def save_tool_connection(user_id: int, company_id: int, connection: dict,
+                          credentials_enc: str) -> int:
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO tool_connections
+               (user_id, company_id, tool, account_label, account_name,
+                credentials_enc, scopes, connected_at, last_error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
+               ON CONFLICT(user_id, tool, account_label) DO UPDATE SET
+                 account_name = excluded.account_name,
+                 credentials_enc = excluded.credentials_enc,
+                 scopes = excluded.scopes,
+                 connected_at = excluded.connected_at,
+                 last_error = ''""",
+            (user_id, company_id, connection["tool"], connection["account_label"],
+             connection.get("account_name", ""), credentials_enc,
+             connection.get("scopes", ""), time.time()),
+        )
+        row = conn.execute(
+            "SELECT id FROM tool_connections WHERE user_id=? AND tool=? AND account_label=?",
+            (user_id, connection["tool"], connection["account_label"]),
+        ).fetchone()
+    return row["id"]
+
+
+def list_tool_connections(user_id: int) -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tool_connections WHERE user_id=? ORDER BY connected_at", (user_id,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_tool_connection(user_id: int, connection_id: int) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM tool_connections WHERE user_id=? AND id=?",
+                           (user_id, connection_id)).fetchone()
+    return dict(row) if row else None
+
+
+def update_tool_credentials(user_id: int, connection_id: int, credentials_enc: str) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE tool_connections SET credentials_enc=?, last_error='' WHERE user_id=? AND id=?",
+            (credentials_enc, user_id, connection_id))
+
+
+def record_tool_error(connection_id: int, message: str) -> None:
+    with _cursor() as conn:
+        conn.execute("UPDATE tool_connections SET last_error=? WHERE id=?",
+                     (message.strip()[:300], connection_id))
+
+
+def delete_tool_connection(user_id: int, connection_id: int) -> None:
+    with _cursor() as conn:
+        conn.execute("DELETE FROM tool_connections WHERE user_id=? AND id=?",
+                     (user_id, connection_id))
+
+
+def count_tool_connections(tool_id: str) -> int:
+    """How many people across the platform are on a given tool - the signal
+    for which vendor is worth registering with next."""
+    with _cursor() as conn:
+        return conn.execute("SELECT COUNT(*) AS n FROM tool_connections WHERE tool=?",
+                            (tool_id,)).fetchone()["n"]
+
+
 # ------------------------------------------------------------------ plans
 
 def _plan_with_entitlements(row: sqlite3.Row) -> dict:
     plan = dict(row)
     plan["team_chat_enabled"] = plan["audience"] == "team"
+    plan["tool_ids"] = plan_tool_ids(plan["id"])
     return plan
+
+
+def plan_tool_ids(plan_id: int) -> list[str]:
+    """Which tools this tier includes. The catalog lives in tools.py; which
+    slice of it a plan gets is the platform owner's call, so it lives here
+    where they can edit it."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT tool_id FROM plan_tools WHERE plan_id = ? ORDER BY tool_id", (plan_id,)
+        ).fetchall()
+    return [r["tool_id"] for r in rows]
+
+
+def set_plan_tools(plan_id: int, tool_ids: list[str]) -> None:
+    """Replace a plan's tool list wholesale - the editor sends the full set of
+    ticked boxes, so anything absent was deliberately unticked."""
+    with _cursor() as conn:
+        conn.execute("DELETE FROM plan_tools WHERE plan_id = ?", (plan_id,))
+        conn.executemany("INSERT OR IGNORE INTO plan_tools (plan_id, tool_id) VALUES (?, ?)",
+                         [(plan_id, str(t)) for t in tool_ids])
+
+
+def company_tool_ids(company_id: int) -> list[str]:
+    return plan_for_company(company_id)["tool_ids"]
 
 def list_plans() -> list[dict]:
     """Individual tiers first, then team tiers, each in its own sort_order.
@@ -2160,6 +2320,7 @@ def delete_company(company_id: int) -> None:
         conn.execute(
             "DELETE FROM user_notification_state WHERE user_id IN "
             "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute("DELETE FROM tool_connections WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM chat_usage WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM payments WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_subscriptions WHERE company_id = ?", (company_id,))

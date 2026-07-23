@@ -1005,6 +1005,103 @@ changes the mailbox. Per-email analysis and scheduled automation runs are
 deliberately read-only; they can surface issues in To fix but cannot send,
 move, delete, or mark mail as read.
 
+## Connecting other tools
+
+Everything that isn't email — Slack, Drive, Jira, the CRMs, calendars — lives
+in `tools.py`'s catalog and shares one mechanism. Eighteen vendors, all doing
+the same OAuth 2.0 authorization-code dance, so they're data rather than code:
+adding one is a new entry in `CATALOG`, not a new function.
+
+Two things gate a tool, and they are deliberately separate because only one of
+them is the customer's problem:
+
+- **Can this deployment offer it?** Does it hold a client id and secret for
+  that vendor. Registering is manual, per-vendor work — see below. Until then
+  the dashboard shows the tool as *Coming soon*.
+- **Is that company entitled to it?** Their plan. Edited on the Command
+  Center's **Plans** page, so pricing changes without a deploy. A tool the
+  plan doesn't cover shows as *Locked* with an upgrade prompt — every tier
+  sees all eighteen, because a Free workspace seeing exactly what Growth adds
+  is the point.
+
+`BUINEE_SECRET_KEY` is required before anything can be connected at all; the
+same key that protects mailbox credentials protects these. One callback,
+`/api/tools/callback`, serves every vendor — register that exact URL with each
+of them. Which tool a callback belongs to travels in the signed, single-use
+state, not the URL.
+
+A plan downgrade does **not** delete existing connections — that would be
+somebody's data disappearing without being asked. It stops them being read:
+`tool_credentials()` re-checks the plan on every read path, and the card says
+*Paused* rather than pretending nothing changed.
+
+### Registering the first three
+
+These are the least gated — create an app and go, no vendor review:
+
+- **Slack** — [api.slack.com/apps](https://api.slack.com/apps) → *Create New
+  App* → *From scratch*. Under **OAuth & Permissions** add the bot scopes
+  `channels:read`, `channels:history`, `users:read`, `team:read`, add the
+  redirect URL, then install to your workspace. Note that
+  `conversations.history` only answers for channels the app was actually added
+  to, so an installed-but-not-invited app reads nothing — that's Slack's
+  model, not a fault.
+- **Dropbox** — [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps)
+  → *Create app* → **Scoped access**. Permissions `files.metadata.read`,
+  `files.content.read`, `account_info.read`. Works immediately, but stays
+  capped at 50 users until you submit it for production.
+- **Notion** — [notion.so/my-integrations](https://www.notion.so/my-integrations)
+  → *New integration*, set it **Public** to get an OAuth client. Notion grants
+  access per-page at consent rather than by scope, so the person chooses what
+  the integration can see while connecting. Its tokens don't expire, so there
+  is nothing to refresh.
+
+**Trello** needs no registration at all — it never moved to OAuth 2.0, so each
+person pastes their own key and token from
+[trello.com/app-key](https://trello.com/app-key). It works today.
+
+Then per vendor, in cPanel Environment Variables (or `.env` locally):
+
+    TOOLS_REDIRECT_URI=https://buinee.app/api/tools/callback
+    TOOL_SLACK_CLIENT_ID=…
+    TOOL_SLACK_CLIENT_SECRET=…
+
+The ids are the ones in `tools.py`. `server.py`'s `load_env` generates these
+key names from the catalog rather than listing them, because a key missing
+from that whitelist is a credential that works locally from `.env` and
+silently does nothing under Passenger — the worst way to find out.
+
+### The longer queues
+
+Worth knowing before promising any of these to a customer:
+
+| Vendor | What gates it |
+|---|---|
+| Google Drive, Google Calendar | `drive.readonly` and `calendar.readonly` are **sensitive** scopes: fine for your own account and up to 100 test users, but production needs Google app verification |
+| WhatsApp Business | A Meta app plus Meta **business verification** before it leaves test mode — the longest lead time of the eighteen |
+| Salesforce | A Connected App; sandboxes authorize against `test.salesforce.com`, so that's a separate catalog entry if you need both |
+| Teams, OneDrive/SharePoint | Entra ID app registration — the same one as Outlook mail can be reused with scopes added. `Sites.Read.All` and `ChannelMessage.Read.All` usually need a tenant admin to consent |
+| Calendly | OAuth requires a paid Calendly plan on the customer's side |
+
+### Reading from a connected tool
+
+Connecting something that then does nothing is just a stored token, so each
+vendor gets a reader as it comes online. `tools.READERS` currently covers
+**Slack, Dropbox, Notion and Trello**; the rest can be connected but have no
+reader yet, and `can_read()` says so rather than showing a permanently empty
+list. Readers normalise to one shape — `{id, title, subtitle, when, url}` —
+so nothing downstream has to know whether an item began as a Slack message or
+a Dropbox file.
+
+Read-only by construction: there is no counterpart that writes, and every
+scope asked for at consent is a read scope. The **Preview** button on a
+connected card proves a connection works from the person's own side without
+waiting for Ada to happen to need it.
+
+**Not built yet**: feeding connected-tool content into Ada's context. The
+readers exist and are tested; wiring them into the chat prompt is the next
+step.
+
 ### Paystack payments
 
 Set `PAYSTACK_PUBLIC_KEY` and `PAYSTACK_SECRET_KEY` in cPanel Environment
