@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -711,9 +712,45 @@ READERS = {
     "trello": _read_trello,
 }
 
+# What makes a chat message worth spending a vendor round trip on. Reading
+# every connected tool on every message would add seconds of latency to
+# questions that have nothing to do with them, so a question earns the read.
+# Erring towards reading is the cheaper mistake: a needless read costs a
+# second, whereas a missed one makes Ada look like she can't see what the
+# person can plainly see is connected.
+CONTEXT_KEYWORDS = {
+    "slack": ("slack", "channel"),
+    "dropbox": ("dropbox",),
+    "notion": ("notion", "wiki"),
+    "trello": ("trello", "board", "card"),
+}
+
+# Asked about the connections in general rather than one by one.
+GENERIC_KEYWORDS = ("connected tool", "connected tools", "integration",
+                    "integrations", "my tools")
+
 
 def can_read(tool_id: str) -> bool:
     return tool_id in READERS
+
+
+def relevant_to(message: str, connected_ids) -> list[str]:
+    """Which of somebody's connected tools a message is plausibly about.
+
+    Only ever narrows to tools they actually have - naming Salesforce when
+    nothing is connected to it returns nothing rather than an empty heading
+    that invites the model to speculate.
+    """
+    text = " " + message.lower() + " "
+    connected = [t for t in connected_ids if t in READERS]
+    if any(word in text for word in GENERIC_KEYWORDS):
+        return connected
+    hits = []
+    for tool_id in connected:
+        words = CONTEXT_KEYWORDS.get(tool_id, (tool_id,))
+        if any(re.search(rf"\b{re.escape(w)}s?\b", text) for w in words):
+            hits.append(tool_id)
+    return hits
 
 
 def list_recent(cfg: dict, tool_id: str, creds: dict, limit: int = 10) -> list[dict]:

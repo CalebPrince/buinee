@@ -1098,9 +1098,27 @@ scope asked for at consent is a read scope. The **Preview** button on a
 connected card proves a connection works from the person's own side without
 waiting for Ada to happen to need it.
 
-**Not built yet**: feeding connected-tool content into Ada's context. The
-readers exist and are tested; wiring them into the chat prompt is the next
-step.
+### What Ada sees
+
+Connected-tool content reaches Ada's context the same way connected mail
+does: only when the question is plausibly about it. Reading every tool on
+every message would add seconds to questions that have nothing to do with
+them, so a question earns the read — `tools.relevant_to()` matches the
+message against the tools that person actually has connected, and returns
+nothing for "how do I approve a voucher?". At most three connections are read
+per message, five items each.
+
+Everything that comes back is text other people wrote, arriving from outside
+the product, so the block is explicitly labelled as data and tells Ada to
+ignore any instruction found inside it and say so instead. Worth keeping in
+mind when extending this: a Notion page or a Slack message is not a trusted
+input, and the same is true of the connected-mailbox block above it, which
+predates this and carries no such note.
+
+A tool that errors is skipped, its error recorded against the connection for
+the Connections card to explain later, and the answer continues without it. A
+paused tool contributes nothing and is *not* recorded as an error — being
+outside your plan isn't a broken connection.
 
 ### Paystack payments
 
