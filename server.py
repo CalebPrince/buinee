@@ -981,6 +981,18 @@ def user_reference_docs(user_id: int) -> list[dict]:
 
 _AMOUNT = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?![\w])")
 
+# For flagging a landing-chat conversation for the Command Center inbox -
+# best-effort, not validation. A false positive just means a harmless
+# unread flag; a false negative means a lead sits unflagged until someone
+# reads the inbox anyway, so these stay deliberately permissive.
+_DEMO_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_DEMO_PHONE_RE = re.compile(r"\+?\d[\d\-\s()]{6,}\d")
+_DEMO_COMPLAINT_WORDS = (
+    "complain", "complaint", "unhappy", "frustrat", "terrible", "awful",
+    "worst", "refund", "cancel", "not working", "broken", "disappointed",
+    "angry", "scam", "unacceptable", "poor service", "bad experience",
+)
+
 
 def maybe_compute(message: str) -> dict | None:
     """If the visitor gave an invoice total and a vatable portion, compute it.
@@ -1793,20 +1805,47 @@ class RouteHandlerMixin:
         if not message:
             return self._json({"error": "Say something first."}, 400)
 
-        cfg = load_env()
-        provider = active_provider(cfg)
-        if not provider:
-            reference = report_application_error(
-                "ada.demo.configuration", "No AI provider is configured for the public demo")
-            return self._json(
-                {"error": ada_unavailable(reference)}, 503)
-
+        session_id = str(req.get("session_id") or "").strip()[:64]
         history = []
         for t in (req.get("history") or [])[-MAX_HISTORY:]:
             role = "assistant" if t.get("role") == "assistant" else "user"
             text = str(t.get("content") or "").strip()[:1500]
             if text:
                 history.append({"role": role, "content": text})
+
+        def record(reply_text: str | None) -> None:
+            # Best-effort: a visitor who leaves contact details or a
+            # complaint shouldn't be lost just because the AI provider was
+            # briefly down, so this records the exchange on every exit path,
+            # not only a successful reply - and never breaks the actual
+            # response to the visitor if it fails.
+            if not session_id:
+                return
+            try:
+                lines = [f"{'Ada' if t['role'] == 'assistant' else 'Visitor'}: {t['content']}" for t in history]
+                lines.append(f"Visitor: {message}")
+                if reply_text:
+                    lines.append(f"Ada: {reply_text}")
+                email = _DEMO_EMAIL_RE.search(message)
+                phone = _DEMO_PHONE_RE.search(message)
+                complaint = any(word in message.lower() for word in _DEMO_COMPLAINT_WORDS)
+                db.save_landing_chat_session(
+                    session_id, "\n".join(lines),
+                    contact_email=email.group(0) if email else "",
+                    contact_phone=phone.group(0) if phone else "",
+                    should_flag=bool(email or phone or complaint),
+                )
+            except Exception as exc:
+                print(f"  ! could not save landing chat session: {exc}")
+
+        cfg = load_env()
+        provider = active_provider(cfg)
+        if not provider:
+            reference = report_application_error(
+                "ada.demo.configuration", "No AI provider is configured for the public demo")
+            record(None)
+            return self._json(
+                {"error": ada_unavailable(reference)}, 503)
 
         computed = maybe_compute(message)
         model = cfg.get("CLERK_MODEL", "").strip() or providers.DEFAULT_MODELS[provider]
@@ -1819,12 +1858,15 @@ class RouteHandlerMixin:
             )
         except providers.ProviderError as exc:
             reference = report_application_error("ada.demo.provider", exc)
+            record(None)
             return self._json({"error": ada_unavailable(reference)}, 503)
         except Exception as exc:
             print(f"  ! demo failure: {exc}")
             reference = report_application_error("ada.demo.server", exc)
+            record(None)
             return self._json({"error": ada_unavailable(reference)}, 500)
 
+        record(reply)
         return self._json({"reply": reply, "computed": bool(computed)})
 
     # ---------------------------------------------------------------- auth
@@ -2953,7 +2995,10 @@ class RouteHandlerMixin:
             return
         try:
             req = self._body()
-            db.update_admin_inbox_state(int(req.get("item_id")), str(req.get("state") or ""))
+            db.update_admin_inbox_state(
+                int(req.get("item_id")), str(req.get("state") or ""),
+                item_type=str(req.get("item_type") or "interaction"),
+            )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Could not update inbox item."}, 400)
         return self._json({"ok": True})

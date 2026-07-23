@@ -184,6 +184,22 @@ def init_db() -> None:
                 state TEXT NOT NULL DEFAULT 'unread', updated_at REAL NOT NULL,
                 PRIMARY KEY (item_type,item_id)
             );
+            -- One row per anonymous visitor conversation with the public
+            -- landing-page Ada demo (see server.py's _handle_demo). No
+            -- company_id - there isn't one yet, this is someone deciding
+            -- whether to register at all - so these live in their own table
+            -- and get folded into the Command Center inbox alongside
+            -- crm_interactions rather than forcing a company relationship
+            -- that doesn't exist.
+            CREATE TABLE IF NOT EXISTS landing_chat_sessions (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_key   TEXT NOT NULL UNIQUE,
+                transcript    TEXT NOT NULL DEFAULT '',
+                contact_email TEXT NOT NULL DEFAULT '',
+                contact_phone TEXT NOT NULL DEFAULT '',
+                created_at    REAL NOT NULL,
+                updated_at    REAL NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS admin_invoices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_number TEXT NOT NULL UNIQUE,
                 company_id INTEGER NOT NULL REFERENCES companies(id), customer_name TEXT NOT NULL,
@@ -1798,6 +1814,32 @@ def clear_application_errors() -> None:
         conn.execute("DELETE FROM application_errors")
 
 
+def list_landing_chat_sessions() -> list[dict]:
+    """Anonymous public-demo conversations (see save_landing_chat_session),
+    reshaped to the same fields list_admin_inbox's crm_interactions rows
+    have, so the Command Center can show both side by side."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT ls.*, COALESCE(s.state,'unread') AS state
+               FROM landing_chat_sessions ls
+               LEFT JOIN admin_inbox_states s ON s.item_type='livechat' AND s.item_id=ls.id
+               ORDER BY ls.updated_at DESC LIMIT 500"""
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        first_line = next((line for line in d["transcript"].splitlines() if line.strip()), "")
+        subject = first_line.removeprefix("Visitor: ")[:80] or "Live chat conversation"
+        out.append({
+            "id": d["id"], "company_id": None, "company_name": "Buinee website",
+            "contact_id": None, "contact_name": d["contact_email"] or d["contact_phone"] or "",
+            "source": "livechat", "direction": "inbound",
+            "subject": subject, "body": d["transcript"],
+            "author_name": "", "occurred_at": d["updated_at"], "state": d["state"],
+        })
+    return out
+
+
 def list_admin_inbox() -> list[dict]:
     with _cursor() as conn:
         rows = conn.execute(
@@ -1811,19 +1853,65 @@ def list_admin_inbox() -> list[dict]:
                WHERE i.interaction_type IN ('email','message','call','meeting')
                ORDER BY i.occurred_at DESC LIMIT 500"""
         ).fetchall()
-    return [dict(r) for r in rows]
+    items = [dict(r) for r in rows] + list_landing_chat_sessions()
+    items.sort(key=lambda x: x["occurred_at"], reverse=True)
+    return items
 
 
-def update_admin_inbox_state(item_id: int, state: str) -> None:
+def update_admin_inbox_state(item_id: int, state: str, item_type: str = "interaction") -> None:
     if state not in ("unread", "read", "flagged", "archived"):
         raise AuthError("Choose a valid inbox state.")
+    if item_type not in ("interaction", "livechat"):
+        raise AuthError("Not a valid inbox item type.")
+    table = "crm_interactions" if item_type == "interaction" else "landing_chat_sessions"
     with _cursor() as conn:
-        if not conn.execute("SELECT id FROM crm_interactions WHERE id=?", (item_id,)).fetchone():
+        if not conn.execute(f"SELECT id FROM {table} WHERE id=?", (item_id,)).fetchone():
             raise AuthError("Inbox item not found.")
         conn.execute("""INSERT INTO admin_inbox_states(item_type,item_id,state,updated_at)
-                        VALUES('interaction',?,?,?) ON CONFLICT(item_type,item_id)
+                        VALUES(?,?,?,?) ON CONFLICT(item_type,item_id)
                         DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at""",
-                     (item_id, state, time.time()))
+                     (item_type, item_id, state, time.time()))
+
+
+def save_landing_chat_session(session_key: str, transcript: str, contact_email: str = "",
+                              contact_phone: str = "", should_flag: bool = False) -> dict:
+    """Upsert the running transcript for one anonymous landing-page Ada
+    conversation - called after every exchange, so the whole conversation is
+    always current in the Command Center inbox, not just its first message.
+    should_flag elevates it to 'flagged' the first time contact details or
+    complaint language show up, without undoing an admin's own read/archived
+    choice on a later message in the same conversation."""
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO landing_chat_sessions
+               (session_key, transcript, contact_email, contact_phone, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(session_key) DO UPDATE SET
+                   transcript = excluded.transcript,
+                   contact_email = CASE WHEN excluded.contact_email != '' THEN excluded.contact_email
+                                        ELSE landing_chat_sessions.contact_email END,
+                   contact_phone = CASE WHEN excluded.contact_phone != '' THEN excluded.contact_phone
+                                        ELSE landing_chat_sessions.contact_phone END,
+                   updated_at = excluded.updated_at""",
+            (session_key, transcript, contact_email, contact_phone, now, now),
+        )
+        row = conn.execute(
+            "SELECT * FROM landing_chat_sessions WHERE session_key = ?", (session_key,)
+        ).fetchone()
+        if should_flag:
+            current = conn.execute(
+                "SELECT state FROM admin_inbox_states WHERE item_type='livechat' AND item_id=?",
+                (row["id"],),
+            ).fetchone()
+            if not current or current["state"] in ("unread", "read"):
+                conn.execute(
+                    """INSERT INTO admin_inbox_states(item_type,item_id,state,updated_at)
+                       VALUES('livechat',?,'flagged',?) ON CONFLICT(item_type,item_id)
+                       DO UPDATE SET state='flagged',updated_at=excluded.updated_at""",
+                    (row["id"], now),
+                )
+    return dict(row)
 
 
 def list_admin_invoices() -> list[dict]:

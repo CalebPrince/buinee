@@ -950,6 +950,19 @@
 
   function adaLandingKey() { return "buinee.landingAdaConversation"; }
 
+  // A stable id so the whole conversation groups into one Command Center
+  // inbox thread, instead of one row per message.
+  function getLandingAdaSessionId() {
+    const key = "buinee.landingAdaSessionId";
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(key, id);
+    }
+    return id;
+  }
+
   function loadLandingAda() {
     try {
       const saved = JSON.parse(localStorage.getItem(adaLandingKey()) || "[]");
@@ -1066,6 +1079,7 @@
         body: JSON.stringify({
           message: text,
           history: adaLandingHistory.slice(0, -1).map(({ role, content }) => ({ role, content })),
+          session_id: getLandingAdaSessionId(),
         }),
       });
       const data = await res.json();
