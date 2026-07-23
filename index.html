@@ -491,6 +491,13 @@
   .ada-auto-btn:hover { color: var(--teal); border-color: var(--teal); }
   .ada-auto-btn svg { width: 16px; height: 16px; }
   .ada-auto-btn.on { color: #fff; background: var(--teal); border-color: var(--teal); }
+  /* Voice input: let the visitor dictate their message */
+  .ada-mic-btn { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; display: grid; place-items: center; background: transparent; color: var(--ink-3); cursor: pointer; transition: color .15s, background .15s; }
+  .ada-mic-btn:hover { color: var(--teal); background: var(--teal-soft); }
+  .ada-mic-btn svg { width: 16px; height: 16px; }
+  .ada-mic-btn.listening { color: #fff; background: var(--bad); }
+  .ada-mic-btn.listening svg { animation: adaMicPulse 1s ease-in-out infinite; }
+  @keyframes adaMicPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
   @media (max-width: 480px) {
     .ada-panel { right: 12px; left: 12px; width: auto; bottom: 84px; }
     .ada-launcher { right: 16px; bottom: 16px; }
@@ -980,6 +987,7 @@
   <form class="ada-panel-foot" onsubmit="return sendLandingAda(event)">
     <div class="ada-panel-box">
       <textarea id="adaPanelInput" rows="1" placeholder="Ask a question…" oninput="adaAutoGrow(this)" onkeydown="adaPanelKey(event)"></textarea>
+      <button class="ada-mic-btn" type="button" id="adaMicBtn" aria-label="Dictate your message" title="Speak your message" onclick="adaMicToggle(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
       <button class="ada-panel-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
     </div>
   </form>
@@ -1271,6 +1279,45 @@
     btn.title = on ? "Auto-read is on — new replies play aloud" : "Auto-read Ada's new replies aloud";
   }
 
+  // ---- Ada mic: let the visitor speak their message (UK English) ----
+  const AdaMic = (function () {
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    let rec = null, listening = false, btn = null;
+    function setState(on) {
+      listening = on;
+      if (btn) {
+        btn.classList.toggle("listening", on);
+        btn.setAttribute("aria-label", on ? "Stop dictation" : "Dictate your message");
+      }
+    }
+    function stop() { if (rec) { try { rec.stop(); } catch {} } }
+    function toggle(input, button, grow) {
+      if (!Rec || !input) return;
+      if (listening) { stop(); return; }
+      try { AdaVoice.stop(); } catch {}
+      btn = button;
+      const base = input.value ? input.value.replace(/\s*$/, "") + " " : "";
+      rec = new Rec();
+      rec.lang = "en-GB";
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (e) => {
+        let t = "";
+        for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+        input.value = (base + t).replace(/\s+/g, " ").replace(/^\s+/, "");
+        if (grow) grow(input);
+      };
+      rec.onend = () => { setState(false); input.focus(); };
+      rec.onerror = () => setState(false);
+      try { rec.start(); setState(true); } catch { setState(false); }
+    }
+    return { supported: () => !!Rec, toggle, stop };
+  })();
+
+  function adaMicToggle(btn) {
+    AdaMic.toggle(document.getElementById("adaPanelInput"), btn, adaAutoGrow);
+  }
+
   // One delegated listener survives the log being re-rendered on every message.
   (function initAdaVoice() {
     const log = document.getElementById("adaPanelLog");
@@ -1283,6 +1330,8 @@
       AdaVoice.toggle(bub.textContent, btn);
     });
     syncAdaAutoReadBtn(document.getElementById("adaAutoReadBtn"));
+    const mic = document.getElementById("adaMicBtn");
+    if (mic && !AdaMic.supported()) mic.style.display = "none";
   })();
 
   function renderLandingAdaLog() {

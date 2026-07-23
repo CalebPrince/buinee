@@ -626,6 +626,13 @@
   .ada-auto-btn:hover { color: var(--ochre); border-color: var(--ochre); }
   .ada-auto-btn svg { width: 15px; height: 15px; flex: none; }
   .ada-auto-btn.on { color: #fff; background: var(--ochre); border-color: var(--ochre); }
+  /* Voice input: let the user dictate their message */
+  .ada-mic-btn { flex: none; width: 32px; height: 32px; border: 0; border-radius: 8px; display: grid; place-items: center; background: transparent; color: var(--ink-3); cursor: pointer; margin-bottom: 1px; transition: color .15s, background .15s; }
+  .ada-mic-btn:hover { color: var(--ochre); background: var(--ochre-soft); }
+  .ada-mic-btn svg { width: 17px; height: 17px; }
+  .ada-mic-btn.listening { color: #fff; background: var(--bad); }
+  .ada-mic-btn.listening svg { animation: adaMicPulse 1s ease-in-out infinite; }
+  @keyframes adaMicPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
   .ada-starters { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; width: 100%; }
   .ada-starters[hidden] { display: none; }
   .ada-starter { padding: 12px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink-2); text-align: left; font-size: 12.5px; transition: .12s; }
@@ -1042,6 +1049,7 @@
               </button>
               <input type="file" id="chatFile" accept=".txt,.md,.csv" multiple hidden onchange="attachChatFiles(event)">
               <textarea id="chatInput" rows="1" placeholder="Ask Ada about your inbox, invoices, or a reply to draft…" oninput="autoGrowChat(this)" onkeydown="chatKey(event)"></textarea>
+              <button class="ada-mic-btn" type="button" id="adaMicBtn" aria-label="Dictate your message" title="Speak your message" onclick="adaMicToggle(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
               <button class="ada-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
             </div>
             <div class="ada-composer-foot">
@@ -3844,6 +3852,45 @@ Do not promise a payment date unless it has already been approved."></textarea>
     btn.title = on ? "Auto-read is on — new replies play aloud" : "Auto-read Ada's new replies aloud";
   }
 
+  // ---- Ada mic: let the user speak their message (UK English) ----
+  const AdaMic = (function () {
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    let rec = null, listening = false, btn = null;
+    function setState(on) {
+      listening = on;
+      if (btn) {
+        btn.classList.toggle('listening', on);
+        btn.setAttribute('aria-label', on ? 'Stop dictation' : 'Dictate your message');
+      }
+    }
+    function stop() { if (rec) { try { rec.stop(); } catch {} } }
+    function toggle(input, button, grow) {
+      if (!Rec || !input) return;
+      if (listening) { stop(); return; }
+      try { AdaVoice.stop(); } catch {}
+      btn = button;
+      const base = input.value ? input.value.replace(/\s*$/, '') + ' ' : '';
+      rec = new Rec();
+      rec.lang = 'en-GB';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (e) => {
+        let t = '';
+        for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+        input.value = (base + t).replace(/\s+/g, ' ').replace(/^\s+/, '');
+        if (grow) grow(input);
+      };
+      rec.onend = () => { setState(false); input.focus(); };
+      rec.onerror = () => setState(false);
+      try { rec.start(); setState(true); } catch { setState(false); }
+    }
+    return { supported: () => !!Rec, toggle, stop };
+  })();
+
+  function adaMicToggle(btn) {
+    AdaMic.toggle(document.getElementById('chatInput'), btn, autoGrowChat);
+  }
+
   // One delegated listener survives the log being re-rendered on every message.
   (function initAdaVoice() {
     const log = document.getElementById('chatLog');
@@ -3858,6 +3905,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
       AdaVoice.toggle(clone.textContent, btn);
     });
     syncAdaAutoReadBtn(document.getElementById('adaAutoReadBtn'));
+    const mic = document.getElementById('adaMicBtn');
+    if (mic && !AdaMic.supported()) mic.style.display = 'none';
   })();
 
   function renderChatLog() {
