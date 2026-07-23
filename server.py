@@ -403,15 +403,6 @@ SITE_CONTENT_SCHEMA = {
          "default": "Your approval, service and escalation rules\nYour documents and response templates\n"
                      "Your vocabulary, customers, teams and processes"},
 
-        {"key": "integrations_eyebrow", "label": "Integrations eyebrow", "type": "text",
-         "default": "Connect what you already use"},
-        {"key": "integrations_headline", "label": "Integrations headline", "type": "text",
-         "default": "Your team's tools, right where the work happens."},
-        {"key": "integrations_subtext", "label": "Integrations subtext", "type": "paragraph",
-         "default": "Once someone's in, they connect Slack, Drive, Trello and the rest from their own "
-                     "workstation in a couple of clicks. Buinee reads alongside them — nothing here "
-                     "replaces the tools your team already relies on."},
-
         {"key": "trust_eyebrow", "label": "Trust eyebrow", "type": "text", "default": "Built for dependable work"},
         {"key": "trust_headline", "label": "Trust headline", "type": "text",
          "default": "AI can assist. Your rules and records remain in control."},
