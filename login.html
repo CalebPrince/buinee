@@ -1,6 +1,15 @@
 <meta charset="utf-8">
 <title>Sign in — Buinee</title>
 <meta name="description" content="Sign in to your Buinee workspace.">
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem("buinee-theme");
+      var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {}
+  })();
+</script>
 <style>
   :root {
     --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5;
@@ -284,9 +293,9 @@
 <script>
   function toggleTheme() {
     const root = document.documentElement;
-    const cur = root.getAttribute('data-theme') ||
-      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('buinee-theme', next);
   }
 
   async function submitLogin(ev) {

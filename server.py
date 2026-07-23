@@ -233,6 +233,7 @@ STATIC_PAGES = {
     "/admin/login": "admin-login.html",
     "/admin/settings": "admin-settings.html",
     "/admin/ada": "admin-ada.html",
+    "/admin/site-settings": "admin-site-settings.html",
 }
 
 LEGACY_PAGE_REDIRECTS = {
@@ -259,6 +260,7 @@ LEGACY_PAGE_REDIRECTS = {
     "/admin-login.html": "/admin/login",
     "/admin-settings.html": "/admin/settings",
     "/admin-ada.html": "/admin/ada",
+    "/admin-site-settings.html": "/admin/site-settings",
 }
 
 # --- public-endpoint limits ------------------------------------------------
@@ -987,6 +989,10 @@ _AMOUNT = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?!
 # reads the inbox anyway, so these stay deliberately permissive.
 _DEMO_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _DEMO_PHONE_RE = re.compile(r"\+?\d[\d\-\s()]{6,}\d")
+_DEMO_NAME_RE = re.compile(
+    r"(?i:my name(?:'s| is)|i'?m|i am|this is|name'?s)\s+"
+    r"([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})"
+)
 _DEMO_COMPLAINT_WORDS = (
     "complain", "complaint", "unhappy", "frustrat", "terrible", "awful",
     "worst", "refund", "cancel", "not working", "broken", "disappointed",
@@ -1062,6 +1068,16 @@ those figures and mention this is the same engine the product uses, never
 recompute it yourself. Offer this only if they're curious about the vouchers
 workflow specifically, not as your main pitch.
 
+Getting their details - do this early, not as an afterthought:
+As soon as it's clear you're talking to someone genuinely interested in
+Buinee for their business (not just idly asking what it is), get their name
+and a way to reach them - phone number, email, or both - before going deep
+into a long back-and-forth. Ask naturally, in one line, framed as "so
+someone can follow up if we get cut off" - not as a cold form. Still answer
+whatever they just asked first; don't dodge a direct question to demand
+contact details before responding to it. If they decline or dodge, don't
+push twice - answer their question anyway.
+
 Rules for you:
 - Be brief. Two or three sentences unless they asked for detail. You are on a
   landing page, not in a meeting.
@@ -1125,6 +1141,39 @@ def landing_plans_digest() -> str:
             + (", team chat included" if p.get("team_chat_enabled") else "")
         )
     return "\n".join(lines)
+
+
+LIVECHAT_DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def is_livechat_online(settings: dict, now: float | None = None) -> bool:
+    """Whether the landing page's Ask Ada widget should show as online.
+
+    Times in the schedule are plain HH:MM with no timezone conversion -
+    Ghana is UTC+0 year-round (no DST), so treating 'now' as UTC already
+    matches Ghana local time without pulling in a timezone library."""
+    mode = settings.get("livechat_mode", "schedule")
+    if mode == "always_on":
+        return True
+    if mode == "always_off":
+        return False
+    try:
+        schedule = json.loads(settings.get("livechat_schedule_json") or "{}")
+    except (TypeError, ValueError):
+        return True
+    if not schedule:
+        return True  # never configured - don't silently take the widget offline
+    dt = datetime.fromtimestamp(now if now is not None else time.time(), timezone.utc)
+    entry = schedule.get(LIVECHAT_DAYS[dt.weekday()])
+    if not entry or not entry.get("enabled"):
+        return False
+    try:
+        start_h, start_m = (int(x) for x in str(entry.get("start", "00:00")).split(":")[:2])
+        end_h, end_m = (int(x) for x in str(entry.get("end", "23:59")).split(":")[:2])
+    except ValueError:
+        return False
+    now_minutes = dt.hour * 60 + dt.minute
+    return start_h * 60 + start_m <= now_minutes < end_h * 60 + end_m
 
 
 def paystack_config(cfg: dict) -> dict:
@@ -1576,6 +1625,11 @@ class RouteHandlerMixin:
             # both need the real, current tiers rather than hardcoded copies.
             return self._json({"plans": db.list_plans()})
 
+        if path == "/api/livechat/status":
+            # Public and unauthenticated - the landing widget polls this to
+            # show an online/offline badge before anyone signs in.
+            return self._json({"online": is_livechat_online(db.get_platform_settings())})
+
         if path == "/api/admin/me":
             admin = current_admin(self)
             if not admin:
@@ -1594,6 +1648,17 @@ class RouteHandlerMixin:
                 "current": {"provider": provider, "model": model},
                 "saved": {"provider": settings["ai_provider"], "model": settings["ai_model"] or ""},
                 "briefing": settings["ai_briefing"] or "",
+            })
+
+        if path == "/api/admin/site-settings":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            settings = db.get_platform_settings()
+            return self._json({
+                "livechat_mode": settings["livechat_mode"],
+                "livechat_schedule": json.loads(settings["livechat_schedule_json"] or "{}"),
+                "livechat_online": is_livechat_online(settings),
             })
 
         if path == "/api/admin/overview":
@@ -1759,6 +1824,7 @@ class RouteHandlerMixin:
             "/api/admin/chat": self._handle_admin_chat,
             "/api/admin/ai-settings/model": self._handle_admin_set_ai_model,
             "/api/admin/ai-settings/briefing": self._handle_admin_set_ai_briefing,
+            "/api/admin/site-settings/livechat": self._handle_admin_set_livechat_settings,
             "/api/admin/mfa/setup": self._handle_admin_mfa_setup,
             "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
             "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
@@ -1782,6 +1848,7 @@ class RouteHandlerMixin:
             "/api/admin/team/reset-password": self._handle_admin_team_reset_password,
             "/api/admin/errors/clear": self._handle_admin_errors_clear,
             "/api/admin/inbox/state": self._handle_admin_inbox_state,
+            "/api/admin/inbox/delete": self._handle_admin_inbox_delete,
             "/api/admin/invoices/create": self._handle_admin_invoice_create,
             "/api/admin/invoices/status": self._handle_admin_invoice_status,
         }
@@ -1826,11 +1893,13 @@ class RouteHandlerMixin:
                 lines.append(f"Visitor: {message}")
                 if reply_text:
                     lines.append(f"Ada: {reply_text}")
+                name = _DEMO_NAME_RE.search(message)
                 email = _DEMO_EMAIL_RE.search(message)
                 phone = _DEMO_PHONE_RE.search(message)
                 complaint = any(word in message.lower() for word in _DEMO_COMPLAINT_WORDS)
                 db.save_landing_chat_session(
                     session_id, "\n".join(lines),
+                    contact_name=name.group(1) if name else "",
                     contact_email=email.group(0) if email else "",
                     contact_phone=phone.group(0) if phone else "",
                     should_flag=bool(email or phone or complaint),
@@ -2881,6 +2950,30 @@ class RouteHandlerMixin:
         db.record_admin_activity(admin, "ai_briefing_changed", "platform_settings", 1, "")
         return self._json({"ok": True, "settings": settings})
 
+    def _handle_admin_set_livechat_settings(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body(max_len=4000)
+            mode = str(req.get("mode") or "schedule")
+            schedule = req.get("schedule") or {}
+            if not isinstance(schedule, dict):
+                raise ValueError
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            settings = db.set_livechat_settings(mode, schedule)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        db.record_admin_activity(admin, "livechat_settings_changed", "platform_settings", 1, mode)
+        return self._json({
+            "ok": True,
+            "livechat_mode": settings["livechat_mode"],
+            "livechat_schedule": json.loads(settings["livechat_schedule_json"] or "{}"),
+            "livechat_online": is_livechat_online(settings),
+        })
+
     def _handle_admin_delete_company(self):
         admin = self._admin_role_request("owner")
         if not admin:
@@ -3000,6 +3093,20 @@ class RouteHandlerMixin:
             )
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Could not update inbox item."}, 400)
+        return self._json({"ok": True})
+
+    def _handle_admin_inbox_delete(self):
+        admin = self._admin_role_request("owner", "operations", "support")
+        if not admin:
+            return
+        try:
+            req = self._body()
+            db.delete_admin_inbox_item(
+                int(req.get("item_id")), item_type=str(req.get("item_type") or "interaction"),
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Could not delete inbox item."}, 400)
+        db.record_admin_activity(admin, "deleted", "inbox_item", details=f"item_type={req.get('item_type')}")
         return self._json({"ok": True})
 
     def _handle_admin_invoice_create(self):

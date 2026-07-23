@@ -169,10 +169,12 @@ def init_db() -> None:
                 created_at   REAL NOT NULL
             );
             CREATE TABLE IF NOT EXISTS platform_settings (
-                id           INTEGER PRIMARY KEY CHECK (id = 1),
-                ai_provider  TEXT,
-                ai_model     TEXT NOT NULL DEFAULT '',
-                ai_briefing  TEXT NOT NULL DEFAULT ''
+                id                     INTEGER PRIMARY KEY CHECK (id = 1),
+                ai_provider            TEXT,
+                ai_model               TEXT NOT NULL DEFAULT '',
+                ai_briefing            TEXT NOT NULL DEFAULT '',
+                livechat_mode          TEXT NOT NULL DEFAULT 'schedule',
+                livechat_schedule_json TEXT NOT NULL DEFAULT '{}'
             );
             CREATE TABLE IF NOT EXISTS application_errors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL DEFAULT 'application',
@@ -195,6 +197,7 @@ def init_db() -> None:
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_key   TEXT NOT NULL UNIQUE,
                 transcript    TEXT NOT NULL DEFAULT '',
+                contact_name  TEXT NOT NULL DEFAULT '',
                 contact_email TEXT NOT NULL DEFAULT '',
                 contact_phone TEXT NOT NULL DEFAULT '',
                 created_at    REAL NOT NULL,
@@ -562,6 +565,7 @@ def init_db() -> None:
         _migrate_platform_admin_roles(conn)
         _migrate_hashed_sessions(conn)
         _migrate_platform_settings(conn)
+        _migrate_landing_chat_contact_name(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -720,11 +724,43 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN briefing TEXT NOT NULL DEFAULT ''")
 
 
+# Mon-Fri, 08:00-18:00 - a sensible starting point until an owner visits
+# Site Settings and changes it. Times are plain HH:MM with no timezone
+# conversion - Ghana runs UTC+0 year-round (no DST), so treating these as
+# UTC directly already matches Ghana local time.
+DEFAULT_LIVECHAT_SCHEDULE = {
+    "mon": {"enabled": True, "start": "08:00", "end": "18:00"},
+    "tue": {"enabled": True, "start": "08:00", "end": "18:00"},
+    "wed": {"enabled": True, "start": "08:00", "end": "18:00"},
+    "thu": {"enabled": True, "start": "08:00", "end": "18:00"},
+    "fri": {"enabled": True, "start": "08:00", "end": "18:00"},
+    "sat": {"enabled": False, "start": "08:00", "end": "18:00"},
+    "sun": {"enabled": False, "start": "08:00", "end": "18:00"},
+}
+
+
 def _migrate_platform_settings(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(platform_settings)").fetchall()]
+    if "livechat_mode" not in cols:
+        conn.execute("ALTER TABLE platform_settings ADD COLUMN livechat_mode TEXT NOT NULL DEFAULT 'schedule'")
+    if "livechat_schedule_json" not in cols:
+        conn.execute(
+            "ALTER TABLE platform_settings ADD COLUMN livechat_schedule_json TEXT NOT NULL DEFAULT '{}'")
+        conn.execute(
+            "UPDATE platform_settings SET livechat_schedule_json = ? WHERE livechat_schedule_json = '{}'",
+            (json.dumps(DEFAULT_LIVECHAT_SCHEDULE),),
+        )
     conn.execute(
-        "INSERT OR IGNORE INTO platform_settings (id, ai_provider, ai_model, ai_briefing) "
-        "VALUES (1, NULL, '', '')"
+        "INSERT OR IGNORE INTO platform_settings (id, ai_provider, ai_model, ai_briefing, "
+        "livechat_mode, livechat_schedule_json) VALUES (1, NULL, '', '', 'schedule', ?)",
+        (json.dumps(DEFAULT_LIVECHAT_SCHEDULE),),
     )
+
+
+def _migrate_landing_chat_contact_name(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(landing_chat_sessions)").fetchall()]
+    if "contact_name" not in cols:
+        conn.execute("ALTER TABLE landing_chat_sessions ADD COLUMN contact_name TEXT NOT NULL DEFAULT ''")
 
 
 def _migrate_team_message_recipient(conn: sqlite3.Connection) -> None:
@@ -1832,12 +1868,27 @@ def list_landing_chat_sessions() -> list[dict]:
         subject = first_line.removeprefix("Visitor: ")[:80] or "Live chat conversation"
         out.append({
             "id": d["id"], "company_id": None, "company_name": "Buinee website",
-            "contact_id": None, "contact_name": d["contact_email"] or d["contact_phone"] or "",
+            "contact_id": None,
+            "contact_name": d["contact_name"] or d["contact_email"] or d["contact_phone"] or "",
             "source": "livechat", "direction": "inbound",
             "subject": subject, "body": d["transcript"],
             "author_name": "", "occurred_at": d["updated_at"], "state": d["state"],
         })
     return out
+
+
+def delete_admin_inbox_item(item_id: int, item_type: str = "interaction") -> None:
+    if item_type not in ("interaction", "livechat"):
+        raise AuthError("Not a valid inbox item type.")
+    table = "crm_interactions" if item_type == "interaction" else "landing_chat_sessions"
+    with _cursor() as conn:
+        if not conn.execute(f"SELECT id FROM {table} WHERE id=?", (item_id,)).fetchone():
+            raise AuthError("Inbox item not found.")
+        conn.execute(f"DELETE FROM {table} WHERE id=?", (item_id,))
+        conn.execute(
+            "DELETE FROM admin_inbox_states WHERE item_type=? AND item_id=?",
+            (item_type, item_id),
+        )
 
 
 def list_admin_inbox() -> list[dict]:
@@ -1873,8 +1924,9 @@ def update_admin_inbox_state(item_id: int, state: str, item_type: str = "interac
                      (item_type, item_id, state, time.time()))
 
 
-def save_landing_chat_session(session_key: str, transcript: str, contact_email: str = "",
-                              contact_phone: str = "", should_flag: bool = False) -> dict:
+def save_landing_chat_session(session_key: str, transcript: str, contact_name: str = "",
+                              contact_email: str = "", contact_phone: str = "",
+                              should_flag: bool = False) -> dict:
     """Upsert the running transcript for one anonymous landing-page Ada
     conversation - called after every exchange, so the whole conversation is
     always current in the Command Center inbox, not just its first message.
@@ -1885,16 +1937,18 @@ def save_landing_chat_session(session_key: str, transcript: str, contact_email: 
     with _cursor() as conn:
         conn.execute(
             """INSERT INTO landing_chat_sessions
-               (session_key, transcript, contact_email, contact_phone, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?)
+               (session_key, transcript, contact_name, contact_email, contact_phone, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(session_key) DO UPDATE SET
                    transcript = excluded.transcript,
+                   contact_name = CASE WHEN excluded.contact_name != '' THEN excluded.contact_name
+                                       ELSE landing_chat_sessions.contact_name END,
                    contact_email = CASE WHEN excluded.contact_email != '' THEN excluded.contact_email
                                         ELSE landing_chat_sessions.contact_email END,
                    contact_phone = CASE WHEN excluded.contact_phone != '' THEN excluded.contact_phone
                                         ELSE landing_chat_sessions.contact_phone END,
                    updated_at = excluded.updated_at""",
-            (session_key, transcript, contact_email, contact_phone, now, now),
+            (session_key, transcript, contact_name, contact_email, contact_phone, now, now),
         )
         row = conn.execute(
             "SELECT * FROM landing_chat_sessions WHERE session_key = ?", (session_key,)
@@ -3517,7 +3571,30 @@ def platform_alert_counts() -> dict:
 def get_platform_settings() -> dict:
     with _cursor() as conn:
         row = conn.execute("SELECT * FROM platform_settings WHERE id = 1").fetchone()
-    return dict(row) if row else {"id": 1, "ai_provider": None, "ai_model": "", "ai_briefing": ""}
+    return dict(row) if row else {
+        "id": 1, "ai_provider": None, "ai_model": "", "ai_briefing": "",
+        "livechat_mode": "schedule", "livechat_schedule_json": json.dumps(DEFAULT_LIVECHAT_SCHEDULE),
+    }
+
+
+def set_livechat_settings(mode: str, schedule: dict) -> dict:
+    if mode not in ("schedule", "always_on", "always_off"):
+        raise AuthError("Not a valid live chat mode.")
+    days = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+    if set(schedule.keys()) - days:
+        raise AuthError("Not a valid schedule.")
+    cleaned = {}
+    for day in days:
+        entry = schedule.get(day) or {"enabled": False, "start": "08:00", "end": "18:00"}
+        start = str(entry.get("start") or "08:00")[:5]
+        end = str(entry.get("end") or "18:00")[:5]
+        cleaned[day] = {"enabled": bool(entry.get("enabled")), "start": start, "end": end}
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE platform_settings SET livechat_mode = ?, livechat_schedule_json = ? WHERE id = 1",
+            (mode, json.dumps(cleaned)),
+        )
+    return get_platform_settings()
 
 
 def set_platform_ai_model(provider: str | None, model: str) -> dict:

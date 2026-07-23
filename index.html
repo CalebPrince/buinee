@@ -1,6 +1,18 @@
 <meta charset="utf-8">
 <title>Buinee — the workspace your team already works like</title>
 <meta name="description" content="Bring team communication, documents, tasks, approvals, customer work and AI assistance into one secure business workspace.">
+<script>
+  // Applied before first paint, and before any CSS below, so there's no
+  // flash of the wrong theme when a saved choice differs from the OS
+  // preference the CSS media query below would otherwise match.
+  (function () {
+    try {
+      var saved = localStorage.getItem("buinee-theme");
+      var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {}
+  })();
+</script>
 <style>
   :root {
     --paper: #f6f4ef;
@@ -336,6 +348,18 @@
   }
   .ada-launcher-badge.hidden { display: none; }
   @keyframes adaBadgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  .ada-launcher-status {
+    position: absolute; bottom: 3px; right: 3px; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--ink-4); border: 2px solid var(--paper);
+  }
+  .ada-launcher-status.online { background: var(--good); }
+  #adaPanelStatus { display: flex; align-items: center; gap: 5px; }
+  #adaPanelStatus .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-4); flex: none; }
+  #adaPanelStatus .status-dot.online { background: var(--good); }
+  .ada-offline-notice {
+    background: var(--warn-soft); border: 1px solid var(--warn); color: var(--ink-2);
+    border-radius: 10px; padding: 9px 12px; font-size: 12px; line-height: 1.5; margin-bottom: 12px;
+  }
   .ada-panel {
     position: fixed; right: 22px; bottom: 92px; z-index: 60; width: 360px; max-width: calc(100vw - 32px);
     height: min(520px, calc(100vh - 140px)); background: var(--surface); border: 1px solid var(--line);
@@ -798,13 +822,14 @@
 
 <button class="ada-launcher" id="adaLauncherBtn" type="button" aria-label="Chat with Ada" onclick="toggleAdaPanel()">
   <span class="ada-launcher-badge" id="adaLauncherBadge">1</span>
+  <span class="ada-launcher-status" id="adaLauncherStatus"></span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path id="adaLauncherIcon" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
 </button>
 
 <div class="ada-panel" id="adaPanel" role="dialog" aria-label="Chat with Ada">
   <div class="ada-panel-head">
     <span class="av">A</span>
-    <div><b>Ask Ada</b><span>Questions about Buinee, answered live</span></div>
+    <div><b>Ask Ada</b><span id="adaPanelStatus"><span class="status-dot" id="adaPanelStatusDot"></span><span id="adaPanelStatusText">Questions about Buinee, answered live</span></span></div>
     <button class="ada-panel-close" type="button" aria-label="Close" onclick="toggleAdaPanel(false)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
@@ -826,15 +851,19 @@
 </div>
 
 <script>
-  function toggleTheme() {
-    const root = document.documentElement;
-    const now = root.getAttribute("data-theme");
-    const prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = now ? (now === "dark" ? "light" : "dark") : (prefersDark ? "light" : "dark");
-    root.setAttribute("data-theme", next);
-    document.getElementById("themeIco").innerHTML = next === "dark"
+  function applyThemeIcon(theme) {
+    document.getElementById("themeIco").innerHTML = theme === "dark"
       ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
       : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  }
+  applyThemeIcon(document.documentElement.getAttribute("data-theme"));
+
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("buinee-theme", next);
+    applyThemeIcon(next);
   }
 
   // ---- pricing ----
@@ -976,6 +1005,24 @@
     localStorage.setItem(adaLandingKey(), JSON.stringify(adaLandingHistory.slice(-30)));
   }
 
+  let adaOnline = true;
+  async function refreshAdaStatus() {
+    try {
+      const res = await fetch("/api/livechat/status");
+      const data = await res.json();
+      adaOnline = !!data.online;
+    } catch { adaOnline = true; }
+    const launcherDot = document.getElementById("adaLauncherStatus");
+    if (launcherDot) launcherDot.classList.toggle("online", adaOnline);
+    const panelDot = document.getElementById("adaPanelStatusDot");
+    if (panelDot) panelDot.classList.toggle("online", adaOnline);
+    const panelText = document.getElementById("adaPanelStatusText");
+    if (panelText) panelText.textContent = adaOnline ? "Online now" : "Currently offline";
+    if (adaPanelOpen) renderLandingAdaLog();
+  }
+  refreshAdaStatus();
+  setInterval(refreshAdaStatus, 120000);
+
   function escapeHtmlAda(s) {
     const d = document.createElement("div");
     d.textContent = s ?? "";
@@ -989,7 +1036,8 @@
   function renderLandingAdaLog() {
     const box = document.getElementById("adaPanelLog");
     const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee — what it does, pricing, or how to get your team started.</div></div>";
-    box.innerHTML = welcome + adaLandingHistory.map(m => {
+    const offlineNotice = adaOnline ? "" : "<div class=\"ada-offline-notice\">We're offline right now, but I can still help — ask away, and if you leave your name and a way to reach you, our team will follow up as soon as we're back.</div>";
+    box.innerHTML = offlineNotice + welcome + adaLandingHistory.map(m => {
       const mine = m.role === "user";
       return `<div class="ada-panel-msg ${mine ? "me" : "ai"}"><div class="bub">${mine ? escapeHtmlAda(m.content) : adaChatMarkdown(m.content)}</div></div>`;
     }).join("");

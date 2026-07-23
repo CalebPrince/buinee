@@ -1,6 +1,6 @@
 <meta charset="utf-8">
-<title>Ask Ada — Command Center — Buinee</title>
-<meta name="description" content="Chat with Ada about companies, payments, pipeline, and everything else your Command Center role can see.">
+<title>Site Settings — Command Center — Buinee</title>
+<meta name="description" content="Control when the public Ask Ada live chat widget shows as online.">
 <style>
   :root {
     --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5;
@@ -55,7 +55,7 @@
   a { color: inherit; }
   h1,h2,h3 { margin: 0; font-weight: 600; letter-spacing: -.02em; }
   p { margin: 0; }
-  button { font-family: inherit; font-size: inherit; }
+  button, input { font-family: inherit; font-size: inherit; }
   :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px; }
 
   .shell { display: flex; height: 100vh; height: 100dvh; }
@@ -80,8 +80,13 @@
   .sidebar-link.active { background: var(--violet-soft); color: var(--violet); }
   .sidebar-foot { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 3px; }
 
-  .content { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-  main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .content { flex: 1; min-width: 0; }
+  main { padding: 40px 0 70px; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 28px; }
+  .hero-line { margin-bottom: 24px; }
+  .hero-line .eyebrow { font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; font-weight: 700; color: var(--violet); }
+  .hero-line h1 { font-family: var(--serif); font-size: 26px; margin: 8px 0 6px; }
+  .hero-line p { font-size: 14.5px; color: var(--ink-2); }
 
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -90,50 +95,45 @@
     background: var(--surface); color: var(--ink); white-space: nowrap;
   }
   .btn:hover { border-color: var(--violet); color: var(--violet); }
-  .btn.sm { padding: 6px 11px; font-size: 12.5px; }
+  .btn.primary { background: var(--violet); color: #fff; border-color: transparent; }
+  .btn.primary:hover { background: var(--teal-deep); }
+  .btn.primary:disabled { opacity: .6; cursor: default; }
 
-  .icobtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; color: var(--ink-2); transition: .12s; }
-  .icobtn:hover { background: var(--surface-2); color: var(--ink); }
-  .icobtn svg { width: 17px; height: 17px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+  .panel + .panel { margin-top: 18px; }
+  .panel h3 { font-size: 15.5px; margin-bottom: 4px; }
+  .panel .sub { font-size: 12.5px; color: var(--ink-3); margin-bottom: 18px; }
 
-  /* Ask Ada - mirrors dashboard.html's Ada chat view, adapted for the Command Center shell. */
-  .ada-chat-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .ada-chatwrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-  .ada-chat-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 26px 28px; }
-  .ada-chat-inner { width: 100%; max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-  .ada-chat-log { display: flex; flex-direction: column; gap: 16px; }
-  .ada-msg { display: flex; gap: 11px; }
-  .ada-msg .bub { max-width: 78%; padding: 11px 14px; border-radius: 13px; font-size: 13.5px; line-height: 1.6; overflow-wrap: anywhere; }
-  .ada-msg .av { width: 28px; height: 28px; border-radius: 9px; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; }
-  .ada-msg.ai .av { background: linear-gradient(135deg, var(--ochre), #8e4214); }
-  .ada-msg.ai .bub { background: var(--surface); border: 1px solid var(--line); border-top-left-radius: 4px; }
-  .ada-msg.me { flex-direction: row-reverse; }
-  .ada-msg.me .av { border-radius: 50%; background: linear-gradient(135deg, var(--teal), var(--teal-deep)); }
-  .ada-msg.me .bub { background: var(--teal); color: #fff; border-top-right-radius: 4px; }
-  .ada-msg .meta { display: block; margin-top: 8px; color: var(--ink-4); font: 10.5px var(--mono); }
-  .ada-starters { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; width: 100%; }
-  .ada-starters[hidden] { display: none; }
-  .ada-starter { padding: 12px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink-2); text-align: left; font-size: 12.5px; transition: .12s; }
-  .ada-starter b { display: block; margin-bottom: 2px; color: var(--ink); font-size: 13px; }
-  .ada-starter:hover { border-color: var(--ochre); background: var(--ochre-soft); color: var(--ochre); }
-  .ada-composer { flex: none; padding: 14px 28px 18px; border-top: 1px solid var(--line); background: var(--surface); }
-  .ada-composer-inner { max-width: 780px; margin: 0 auto; }
-  .ada-attach-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-  .ada-attach-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 8px; background: var(--surface-2); color: var(--ink-2); font-size: 11.5px; }
-  .ada-attach-chip button { border: 0; background: transparent; color: var(--ink-3); padding: 0; }
-  .ada-box { display: flex; align-items: flex-end; gap: 9px; padding: 8px 8px 8px 13px; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--paper); transition: border-color .12s, box-shadow .12s; }
-  .ada-box:focus-within { border-color: var(--ochre); box-shadow: 0 0 0 3px var(--ochre-soft); }
-  .ada-box textarea { flex: 1; max-height: 140px; padding: 4px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: 13.5px/1.55 var(--sans); }
-  .ada-send { width: 34px; height: 34px; border: 0; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--ochre); color: #fff; }
-  .ada-send:hover { background: #8e4214; }
-  .ada-send svg { width: 16px; height: 16px; }
-  .ada-composer-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; flex-wrap: wrap; color: var(--ink-4); font-size: 11px; }
-  .typing { display: flex; align-items: center; gap: 5px; padding: 4px 2px; }
-  .typing i { width: 7px; height: 7px; border-radius: 50%; display: block; background: var(--ochre); animation: blink 1.3s ease-in-out infinite; }
-  .typing i:nth-child(2) { animation-delay: .18s; }
-  .typing i:nth-child(3) { animation-delay: .36s; }
-  @keyframes blink { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
-  @media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .55; } }
+  form { display: flex; flex-direction: column; gap: 15px; }
+  label { font-size: 13px; font-weight: 600; color: var(--ink-2); display: flex; flex-direction: column; gap: 6px; }
+  input[type=time] { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--paper); color: var(--ink); font-weight: 400; width: 110px; }
+  input:focus { border-color: var(--violet); }
+
+  .msg { font-size: 13.5px; padding: 10px 13px; border-radius: 9px; display: none; }
+  .msg.show { display: block; }
+  .msg.error { background: var(--bad-soft); color: var(--bad); }
+  .msg.ok { background: var(--good-soft); color: var(--good); }
+
+  .status-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); margin-bottom: 18px; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .status-dot.online { background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+  .status-dot.offline { background: var(--ink-4); box-shadow: 0 0 0 3px var(--surface); }
+  .status-row b { font-size: 13.5px; }
+  .status-row span { display: block; font-size: 11.5px; color: var(--ink-3); }
+
+  .mode-options { display: flex; flex-direction: column; gap: 8px; }
+  .mode-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+  .mode-option:has(input:checked) { border-color: var(--violet); background: var(--violet-soft); }
+  .mode-option input { margin-top: 3px; }
+  .mode-option div { display: flex; flex-direction: column; gap: 2px; }
+  .mode-option b { font-size: 13.5px; color: var(--ink); }
+  .mode-option span { font-size: 12px; color: var(--ink-3); font-weight: 400; }
+
+  .schedule-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .schedule-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 6px 8px; }
+  .schedule-table td { padding: 7px 8px; border-top: 1px solid var(--line); }
+  .schedule-table .day-name { font-weight: 600; }
+  .schedule-table.disabled { opacity: .5; pointer-events: none; }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
 
@@ -142,7 +142,7 @@
     .sidebar-brand { justify-content: center; padding: 0; }
     .sidebar-brand .name, .sidebar-tag, .sidebar-link .label { display: none; }
     .sidebar-link { justify-content: center; padding: 10px; }
-    .ada-starters { grid-template-columns: 1fr; }
+    .schedule-table { display: block; overflow-x: auto; }
   }
 </style>
 
@@ -168,49 +168,66 @@
 
   <div class="content">
     <main>
-      <div id="loading">Loading Ada…</div>
-
-      <section class="ada-chat-view" id="viewChat" hidden>
-        <div class="ada-chatwrap">
-          <div class="ada-chat-scroll" id="chatScroll">
-            <div class="ada-chat-inner">
-              <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn sm" type="button" onclick="clearAdaConversation()">Clear conversation</button></div>
-              <div class="ada-chat-log" id="chatLog"></div>
-              <div class="ada-starters" id="adaStarters">
-                <button class="ada-starter" type="button" onclick="primeAda(&quot;Which companies are behind on payment or need attention right now?&quot;)"><b>Companies needing attention</b>Payment issues, pending approvals, flagged accounts</button>
-                <button class="ada-starter" type="button" onclick="primeAda(&quot;Summarize recent pipeline activity and where deals stand.&quot;)"><b>Pipeline summary</b>Where deals stand and what moved recently</button>
-                <button class="ada-starter" type="button" onclick="primeAda(&quot;What is unread in the support inbox right now?&quot;)"><b>Support inbox</b>What is unread and needs a reply</button>
-                <button class="ada-starter" type="button" onclick="primeAda(&quot;Give me a quick read on overall platform health.&quot;)"><b>Platform health</b>Companies, plans, and anything flagged</button>
-              </div>
-            </div>
+      <div class="wrap">
+        <div id="loading">Loading…</div>
+        <div id="content" style="display:none">
+          <div class="hero-line">
+            <span class="eyebrow">Site settings</span>
+            <h1>Live chat</h1>
+            <p>Control when the "Ask Ada" widget on the public site shows as online.</p>
           </div>
-          <form class="ada-composer" onsubmit="return sendChat(event)">
-            <div class="ada-composer-inner">
-              <div class="ada-attach-row" id="chatAttachRow"></div>
-              <div class="ada-box">
-                <button class="icobtn" type="button" onclick="document.getElementById('chatFile').click()" title="Attach a document" aria-label="Attach a document" style="width:32px;height:32px;flex:none;margin-bottom:1px">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                </button>
-                <input type="file" id="chatFile" accept=".txt,.md,.csv" multiple hidden onchange="attachChatFiles(event)">
-                <textarea id="chatInput" rows="1" placeholder="Ask Ada about companies, payments, pipeline…" oninput="autoGrowChat(this)" onkeydown="chatKey(event)"></textarea>
-                <button class="ada-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
-              </div>
-              <div class="ada-composer-foot">
-                <span>Ada never changes anything in the Command Center on her own.</span>
-                <span>Grounded in your role's view · Enter to send</span>
+
+          <div class="panel">
+            <div class="status-row">
+              <span class="status-dot" id="statusDot"></span>
+              <div>
+                <b id="statusText">Checking…</b>
+                <span id="statusSub"></span>
               </div>
             </div>
-          </form>
+
+            <div id="livechatReadonly" style="display:none"></div>
+
+            <form id="livechatForm" onsubmit="return saveLivechat(event)" style="display:none">
+              <div class="msg error" id="livechatError"></div>
+              <div class="msg ok" id="livechatOk"></div>
+
+              <label>Mode
+                <div class="mode-options">
+                  <label class="mode-option">
+                    <input type="radio" name="mode" value="schedule" checked onchange="onModeChange()">
+                    <div><b>Follow schedule</b><span>Online only during the hours set below</span></div>
+                  </label>
+                  <label class="mode-option">
+                    <input type="radio" name="mode" value="always_on" onchange="onModeChange()">
+                    <div><b>Always online</b><span>Ignore the schedule, always show as available</span></div>
+                  </label>
+                  <label class="mode-option">
+                    <input type="radio" name="mode" value="always_off" onchange="onModeChange()">
+                    <div><b>Always offline</b><span>Ignore the schedule, always show as unavailable</span></div>
+                  </label>
+                </div>
+              </label>
+
+              <label>Weekly schedule
+                <table class="schedule-table" id="scheduleTable">
+                  <thead><tr><th></th><th>Active</th><th>From</th><th>To</th></tr></thead>
+                  <tbody id="scheduleBody"></tbody>
+                </table>
+              </label>
+
+              <button class="btn primary" type="submit" id="saveBtn">Save live chat settings</button>
+            </form>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   </div>
 </div>
 
 <script>
   let currentAdmin = null;
-  let chatHistory = [];
-  let pendingAttachments = [];
+  const DAY_LABELS = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
 
   function toggleTheme() {
     const root = document.documentElement;
@@ -226,147 +243,94 @@
     location.href = '/admin/login';
   }
 
-  function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
+  function showMsg(id, text) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.classList.toggle('show', !!text);
   }
 
-  function initials(name) {
-    return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-  }
-
-  function chatMarkdown(text) {
-    return escapeHtml(text)
-      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-      .replace(/(^|\s)\*(?!\s)(.+?)\*(?=\s|$|[.,!?])/g, '$1<i>$2</i>')
-      .replace(/\n/g, '<br>');
-  }
-
-  function adaConversationKey() {
-    return `buinee.adminAdaConversation.${currentAdmin.id}`;
-  }
-
-  function loadAdaConversation() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(adaConversationKey()) || '[]');
-      chatHistory = Array.isArray(saved)
-        ? saved.filter(item => item && ['user', 'assistant'].includes(item.role) && typeof item.content === 'string').slice(-50)
-        : [];
-    } catch { chatHistory = []; }
-  }
-
-  function saveAdaConversation() {
-    if (!currentAdmin) return;
-    localStorage.setItem(adaConversationKey(), JSON.stringify(chatHistory.slice(-50)));
-  }
-
-  function clearAdaConversation() {
-    if (!confirm('Clear your conversation with Ada? This only removes your own saved Ada chat.')) return;
-    chatHistory = [];
-    pendingAttachments = [];
-    localStorage.removeItem(adaConversationKey());
-    renderChatAttachments();
-    renderChatLog();
-  }
-
-  function renderChatLog() {
-    const box = document.getElementById('chatLog');
-    const first = (currentAdmin.name || '').split(/\s+/)[0] || 'there';
-    const welcome = `<div class="ada-msg ai"><div class="av">A</div><div class="bub">Hi ${escapeHtml(first)} — I'm <b>Ada</b>. Ask me about companies, payments, the pipeline, or anything else your Command Center role can see.</div></div>`;
-    box.innerHTML = welcome + chatHistory.map(m => {
-      const mine = m.role === 'user';
-      const docs = (m.docs || []).length
-        ? `<span class="meta">Attached: ${m.docs.map(escapeHtml).join(', ')}</span>` : '';
-      return `<div class="ada-msg ${mine ? 'me' : 'ai'}"><div class="av">${mine ? escapeHtml(initials(currentAdmin.name || 'You')) : 'A'}</div><div class="bub">${mine ? escapeHtml(m.content).replace(/\n/g, '<br>') : chatMarkdown(m.content)}${docs}</div></div>`;
+  function renderScheduleRows(schedule) {
+    const body = document.getElementById('scheduleBody');
+    body.innerHTML = Object.keys(DAY_LABELS).map(day => {
+      const entry = schedule[day] || { enabled: false, start: '08:00', end: '18:00' };
+      return `<tr>
+        <td class="day-name">${DAY_LABELS[day]}</td>
+        <td><input type="checkbox" id="day-${day}-enabled" ${entry.enabled ? 'checked' : ''}></td>
+        <td><input type="time" id="day-${day}-start" value="${entry.start}"></td>
+        <td><input type="time" id="day-${day}-end" value="${entry.end}"></td>
+      </tr>`;
     }).join('');
-    const starters = document.getElementById('adaStarters');
-    if (starters) starters.hidden = chatHistory.length > 0;
-    const scroll = document.getElementById('chatScroll');
-    scroll.scrollTop = scroll.scrollHeight;
   }
 
-  function autoGrowChat(input) {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  function onModeChange() {
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    document.getElementById('scheduleTable').classList.toggle('disabled', mode !== 'schedule');
   }
 
-  function chatKey(ev) {
-    if (ev.key === 'Enter' && !ev.shiftKey) {
-      ev.preventDefault();
-      ev.target.closest('form').requestSubmit();
+  function renderStatus(online) {
+    document.getElementById('statusDot').className = 'status-dot ' + (online ? 'online' : 'offline');
+    document.getElementById('statusText').textContent = online ? 'Online right now' : 'Offline right now';
+    document.getElementById('statusSub').textContent = online
+      ? 'Visitors see the live chat widget as available.'
+      : 'Visitors see the live chat widget as unavailable.';
+  }
+
+  async function loadSiteSettings() {
+    let data;
+    try {
+      data = await (await fetch('/api/admin/site-settings', { credentials: 'same-origin' })).json();
+    } catch {
+      document.getElementById('statusText').textContent = 'Could not load settings.';
+      return;
+    }
+    renderStatus(data.livechat_online);
+
+    const isOwner = currentAdmin.role === 'owner';
+    const readonly = document.getElementById('livechatReadonly');
+    const form = document.getElementById('livechatForm');
+    if (isOwner) {
+      readonly.style.display = 'none';
+      form.style.display = 'flex';
+      document.querySelector(`input[name="mode"][value="${data.livechat_mode}"]`).checked = true;
+      renderScheduleRows(data.livechat_schedule || {});
+      onModeChange();
+    } else {
+      form.style.display = 'none';
+      readonly.style.display = 'block';
+      const modeLabels = { schedule: 'Follows the weekly schedule', always_on: 'Always online', always_off: 'Always offline' };
+      readonly.textContent = (modeLabels[data.livechat_mode] || data.livechat_mode) + '. Only the owner can change this.';
     }
   }
 
-  function attachChatFiles(ev) {
-    const files = [...ev.target.files].slice(0, Math.max(0, 3 - pendingAttachments.length));
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        pendingAttachments.push({ name: file.name, text: String(reader.result || '').slice(0, 20000) });
-        renderChatAttachments();
-      };
-      reader.readAsText(file);
-    });
-    ev.target.value = '';
-  }
-
-  function renderChatAttachments() {
-    document.getElementById('chatAttachRow').innerHTML = pendingAttachments.map((file, index) => `
-      <span class="ada-attach-chip">📎 ${escapeHtml(file.name)}<button type="button" onclick="removeAttachment(${index})" aria-label="Remove ${escapeHtml(file.name)}">×</button></span>
-    `).join('');
-  }
-
-  function removeAttachment(index) {
-    pendingAttachments.splice(index, 1);
-    renderChatAttachments();
-  }
-
-  function primeAda(prompt) {
-    const input = document.getElementById('chatInput');
-    input.value = prompt;
-    autoGrowChat(input);
-    input.focus();
-  }
-
-  async function sendChat(ev) {
+  async function saveLivechat(ev) {
     ev.preventDefault();
-    const input = document.getElementById('chatInput');
-    const text = input.value.trim();
-    if (!text && !pendingAttachments.length) return false;
-
-    const attachments = pendingAttachments.slice();
-    const message = text || 'Please assess the attached document.';
-    chatHistory.push({ role: 'user', content: message, docs: attachments.map(file => file.name) });
-    saveAdaConversation();
-    input.value = '';
-    autoGrowChat(input);
-    pendingAttachments = [];
-    renderChatAttachments();
-    renderChatLog();
-    const box = document.getElementById('chatLog');
-    box.insertAdjacentHTML('beforeend', '<div class="ada-msg ai" id="chatPending"><div class="av">A</div><div class="bub" aria-label="Ada is typing"><span class="typing"><i></i><i></i><i></i></span></div></div>');
-    const scroll = document.getElementById('chatScroll');
-    scroll.scrollTop = scroll.scrollHeight;
-
+    showMsg('livechatError', ''); showMsg('livechatOk', '');
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const schedule = {};
+    for (const day of Object.keys(DAY_LABELS)) {
+      schedule[day] = {
+        enabled: document.getElementById(`day-${day}-enabled`).checked,
+        start: document.getElementById(`day-${day}-start`).value || '08:00',
+        end: document.getElementById(`day-${day}-end`).value || '18:00',
+      };
+    }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      const res = await fetch('/api/admin/chat', {
+      const res = await fetch('/api/admin/site-settings/livechat', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          history: chatHistory.slice(0, -1).map(({ role, content }) => ({ role, content })),
-          docs: attachments,
-        }),
+        body: JSON.stringify({ mode, schedule }),
       });
       const data = await res.json();
-      chatHistory.push({ role: 'assistant', content: res.ok ? data.reply : (data.error || 'Could not reach the assistant.') });
-      saveAdaConversation();
+      if (!res.ok) { showMsg('livechatError', data.error || 'Could not save.'); return false; }
+      showMsg('livechatOk', 'Saved.');
+      renderStatus(data.livechat_online);
     } catch {
-      chatHistory.push({ role: 'assistant', content: 'Could not reach the server.' });
-      saveAdaConversation();
+      showMsg('livechatError', 'Could not reach the server.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save live chat settings';
     }
-    renderChatLog();
     return false;
   }
 
@@ -374,15 +338,14 @@
     let admin;
     try {
       const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
-      if (!res.ok) throw new Error();
+      if (!res.ok) { location.href = '/admin/login'; return; }
       admin = (await res.json()).admin;
     } catch { location.href = '/admin/login'; return; }
 
     currentAdmin = admin;
-    loadAdaConversation();
-    renderChatLog();
+    await loadSiteSettings();
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('viewChat').hidden = false;
+    document.getElementById('content').style.display = 'block';
   }
 
   main();
