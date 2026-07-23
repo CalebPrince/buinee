@@ -235,6 +235,33 @@
               <button class="btn" type="button" onclick="location.href='/admin/login'">I saved them — sign in again</button>
             </div>
           </div>
+          <div class="panel">
+            <h3>Ask Ada's AI provider</h3>
+            <div class="sub">Which AI answers Ask Ada in the Command Center. This applies platform-wide, for every admin role — not per-person.</div>
+            <div id="aiProviderReadonly"></div>
+            <form id="aiProviderForm" style="display:none" onsubmit="return saveAiProvider(event)">
+              <div class="msg error" id="aiProviderError"></div><div class="msg ok" id="aiProviderOk"></div>
+              <label>Provider
+                <select id="aiProviderSelect"></select>
+              </label>
+              <label>Model <span style="font-weight:400;color:var(--ink-3)">(optional — leave blank for the provider's default)</span>
+                <input type="text" id="aiProviderModel" placeholder="e.g. gemini-2.5-pro">
+              </label>
+              <button class="btn primary" type="submit">Save provider</button>
+            </form>
+          </div>
+          <div class="panel">
+            <h3>Ada's instructions</h3>
+            <div class="sub">Custom instructions folded into every Command Center Ada conversation, for every admin role.</div>
+            <div id="aiBriefingReadonly"></div>
+            <form id="aiBriefingForm" style="display:none" onsubmit="return saveAiBriefing(event)">
+              <div class="msg error" id="aiBriefingError"></div><div class="msg ok" id="aiBriefingOk"></div>
+              <label>Instructions
+                <textarea id="aiBriefingInput" rows="6" placeholder="Example: Report figures in GHS unless asked otherwise. Flag any company more than 30 days without a payment as at risk." style="padding:10px 12px;border-radius:9px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);font:inherit;resize:vertical"></textarea>
+              </label>
+              <button class="btn primary" type="submit">Save instructions</button>
+            </form>
+          </div>
         </div>
       </div>
     </main>
@@ -270,6 +297,100 @@
     document.getElementById('mfaDisableForm').style.display = admin.mfa_enabled ? 'flex' : 'none';
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
+    loadAiSettings();
+  }
+
+  const PROVIDER_LABELS = { anthropic: 'Anthropic (Claude)', google: 'Google (Gemini)', openrouter: 'OpenRouter' };
+
+  async function loadAiSettings() {
+    const isOwner = currentAdmin.role === 'owner';
+    let settings;
+    try {
+      settings = await (await fetch('/api/admin/ai-settings', { credentials: 'same-origin' })).json();
+    } catch {
+      document.getElementById('aiProviderReadonly').textContent = 'Could not load AI settings.';
+      return;
+    }
+
+    const providerReadonly = document.getElementById('aiProviderReadonly');
+    const providerForm = document.getElementById('aiProviderForm');
+    if (isOwner) {
+      providerReadonly.style.display = 'none';
+      providerForm.style.display = 'flex';
+      const select = document.getElementById('aiProviderSelect');
+      const modelInput = document.getElementById('aiProviderModel');
+      const configured = settings.configured || [];
+      const defaultLabel = settings.current.provider
+        ? `Use server default (currently ${PROVIDER_LABELS[settings.current.provider] || settings.current.provider})`
+        : 'Use server default (nothing configured yet)';
+      select.innerHTML = `<option value="">${defaultLabel}</option>`
+        + configured.map(p => `<option value="${p}">${PROVIDER_LABELS[p] || p}</option>`).join('');
+      select.value = settings.saved.provider || '';
+      modelInput.value = settings.saved.model || '';
+      if (!configured.length) {
+        select.disabled = true;
+        modelInput.disabled = true;
+        document.querySelector('#aiProviderForm button').disabled = true;
+        showMsg('aiProviderError', 'No AI provider is configured on this server at all yet — nothing to choose from.');
+      }
+    } else {
+      providerForm.style.display = 'none';
+      providerReadonly.style.display = 'block';
+      providerReadonly.textContent = settings.current.provider
+        ? `Currently using ${PROVIDER_LABELS[settings.current.provider] || settings.current.provider}${settings.current.model ? ` (${settings.current.model})` : ''}. Only the owner can change this.`
+        : 'No AI provider is configured on this server yet. Only the owner can change this once one is.';
+    }
+
+    const briefingReadonly = document.getElementById('aiBriefingReadonly');
+    const briefingForm = document.getElementById('aiBriefingForm');
+    if (isOwner) {
+      briefingReadonly.style.display = 'none';
+      briefingForm.style.display = 'flex';
+      document.getElementById('aiBriefingInput').value = settings.briefing || '';
+    } else {
+      briefingForm.style.display = 'none';
+      briefingReadonly.style.display = 'block';
+      briefingReadonly.textContent = settings.briefing || 'No custom instructions set yet. Only the owner can add them.';
+    }
+  }
+
+  async function saveAiProvider(ev) {
+    ev.preventDefault();
+    showMsg('aiProviderError', ''); showMsg('aiProviderOk', '');
+    const provider = document.getElementById('aiProviderSelect').value;
+    const model = document.getElementById('aiProviderModel').value;
+    try {
+      const res = await fetch('/api/admin/ai-settings/model', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: provider || null, model }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMsg('aiProviderError', data.error || 'Could not save.'); return false; }
+      showMsg('aiProviderOk', 'Saved.');
+      loadAiSettings();
+    } catch {
+      showMsg('aiProviderError', 'Could not reach the server.');
+    }
+    return false;
+  }
+
+  async function saveAiBriefing(ev) {
+    ev.preventDefault();
+    showMsg('aiBriefingError', ''); showMsg('aiBriefingOk', '');
+    try {
+      const res = await fetch('/api/admin/ai-settings/briefing', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefing: document.getElementById('aiBriefingInput').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMsg('aiBriefingError', data.error || 'Could not save.'); return false; }
+      showMsg('aiBriefingOk', 'Saved.');
+    } catch {
+      showMsg('aiBriefingError', 'Could not reach the server.');
+    }
+    return false;
   }
 
   function showMsg(id, text) {

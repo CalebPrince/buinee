@@ -339,6 +339,25 @@ def resolve_provider_model(cfg: dict, company: dict) -> tuple[str | None, str]:
     return provider, model
 
 
+def resolve_admin_provider_model(cfg: dict) -> tuple[str | None, str]:
+    """The Command Center's own chat provider/model preference - same
+    fallback behavior as resolve_provider_model, but reading the platform-
+    wide setting instead of one company's."""
+    settings = db.get_platform_settings()
+    configured = configured_providers(cfg)
+    provider = settings.get("ai_provider")
+    if provider not in configured:
+        provider = active_provider(cfg)
+    if not provider:
+        return None, ""
+    model = (
+        (settings.get("ai_model") or "").strip()
+        or cfg.get("CLERK_MODEL", "").strip()
+        or providers.DEFAULT_MODELS[provider]
+    )
+    return provider, model
+
+
 def rate_limited(key: str, max_hits: int = MAX_TURNS, window: int = WINDOW_SECONDS) -> bool:
     now = time.time()
     seen = [t for t in _hits.get(key, []) if now - t < window]
@@ -1459,6 +1478,20 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"admin": public_admin(admin)})
 
+        if path == "/api/admin/ai-settings":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            cfg = load_env()
+            settings = db.get_platform_settings()
+            provider, model = resolve_admin_provider_model(cfg)
+            return self._json({
+                "configured": configured_providers(cfg),
+                "current": {"provider": provider, "model": model},
+                "saved": {"provider": settings["ai_provider"], "model": settings["ai_model"] or ""},
+                "briefing": settings["ai_briefing"] or "",
+            })
+
         if path == "/api/admin/overview":
             admin = current_admin(self)
             if not admin:
@@ -1614,6 +1647,8 @@ class RouteHandlerMixin:
             "/api/admin/logout": self._handle_admin_logout,
             "/api/admin/change-password": self._handle_admin_change_password,
             "/api/admin/chat": self._handle_admin_chat,
+            "/api/admin/ai-settings/model": self._handle_admin_set_ai_model,
+            "/api/admin/ai-settings/briefing": self._handle_admin_set_ai_briefing,
             "/api/admin/mfa/setup": self._handle_admin_mfa_setup,
             "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
             "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
@@ -2630,13 +2665,12 @@ class RouteHandlerMixin:
             return self._json({"error": "Say something first."}, 400)
 
         cfg = load_env()
-        provider = active_provider(cfg)
+        provider, model = resolve_admin_provider_model(cfg)
         if not provider:
             reference = report_application_error(
                 "ada.admin_chat.configuration", "No AI provider is configured",
                 context=f"admin_id={admin['id']} role={admin.get('role')}")
             return self._json({"error": ada_unavailable(reference)}, 503)
-        model = cfg.get("CLERK_MODEL", "").strip() or providers.DEFAULT_MODELS[provider]
 
         history = []
         for t in (req.get("history") or [])[-MAX_HISTORY:]:
@@ -2659,7 +2693,9 @@ class RouteHandlerMixin:
             reply = providers.chat(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, build_admin_digest(admin), history,
-                system=build_admin_chat_system(admin), docs=docs or None,
+                system=build_admin_chat_system(admin),
+                briefing=db.get_platform_settings().get("ai_briefing") or "",
+                docs=docs or None,
             )
         except providers.ProviderError as exc:
             reference = report_application_error(
@@ -2672,6 +2708,38 @@ class RouteHandlerMixin:
             return self._json({"error": ada_unavailable(reference)}, 500)
 
         return self._json({"reply": reply})
+
+    def _handle_admin_set_ai_model(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        provider = req.get("provider")
+        cfg = load_env()
+        if provider and provider not in configured_providers(cfg):
+            return self._json({"error": "That provider isn't configured on this server."}, 400)
+        try:
+            settings = db.set_platform_ai_model(provider, str(req.get("model") or ""))
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        db.record_admin_activity(admin, "ai_model_changed", "platform_settings", 1,
+                                 settings["ai_provider"] or "server default")
+        return self._json({"ok": True, "settings": settings})
+
+    def _handle_admin_set_ai_briefing(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body(max_len=8000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        settings = db.set_platform_ai_briefing(str(req.get("briefing") or ""))
+        db.record_admin_activity(admin, "ai_briefing_changed", "platform_settings", 1, "")
+        return self._json({"ok": True, "settings": settings})
 
     def _handle_admin_delete_company(self):
         admin = self._admin_role_request("owner")

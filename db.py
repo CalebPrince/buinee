@@ -168,6 +168,12 @@ def init_db() -> None:
                 details      TEXT NOT NULL DEFAULT '',
                 created_at   REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS platform_settings (
+                id           INTEGER PRIMARY KEY CHECK (id = 1),
+                ai_provider  TEXT,
+                ai_model     TEXT NOT NULL DEFAULT '',
+                ai_briefing  TEXT NOT NULL DEFAULT ''
+            );
             CREATE TABLE IF NOT EXISTS application_errors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL DEFAULT 'application',
                 severity TEXT NOT NULL DEFAULT 'error', message TEXT NOT NULL,
@@ -539,6 +545,7 @@ def init_db() -> None:
         _migrate_user_onboarding(conn)
         _migrate_platform_admin_roles(conn)
         _migrate_hashed_sessions(conn)
+        _migrate_platform_settings(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -695,6 +702,13 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN model_model TEXT")
     if "briefing" not in cols:
         conn.execute("ALTER TABLE companies ADD COLUMN briefing TEXT NOT NULL DEFAULT ''")
+
+
+def _migrate_platform_settings(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO platform_settings (id, ai_provider, ai_model, ai_briefing) "
+        "VALUES (1, NULL, '', '')"
+    )
 
 
 def _migrate_team_message_recipient(conn: sqlite3.Connection) -> None:
@@ -3325,3 +3339,36 @@ def platform_stats() -> dict:
         "by_status": {r["status"]: r["n"] for r in by_status},
         "by_role": {r["role"]: r["n"] for r in by_role},
     }
+
+
+def get_platform_settings() -> dict:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM platform_settings WHERE id = 1").fetchone()
+    return dict(row) if row else {"id": 1, "ai_provider": None, "ai_model": "", "ai_briefing": ""}
+
+
+def set_platform_ai_model(provider: str | None, model: str) -> dict:
+    """The Command Center's own chat provider preference - separate from any
+    company's, since Ada in the Command Center is grounded in platform data,
+    not a company's vouchers. `provider` must be a known provider or None to
+    fall back to the server's default (see resolve_admin_provider_model)."""
+    provider = (provider or "").strip().lower() or None
+    if provider is not None and provider not in AI_PROVIDERS:
+        raise AuthError("Not a known AI provider.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE platform_settings SET ai_provider = ?, ai_model = ? WHERE id = 1",
+            (provider, model.strip()),
+        )
+    return get_platform_settings()
+
+
+def set_platform_ai_briefing(briefing: str) -> dict:
+    """Custom instructions folded into every Command Center Ada conversation,
+    regardless of the admin's role - see providers.with_briefing."""
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE platform_settings SET ai_briefing = ? WHERE id = 1",
+            (briefing.strip()[:4000],),
+        )
+    return get_platform_settings()
