@@ -120,6 +120,28 @@
   .icobtn:hover { color: var(--teal); border-color: var(--teal); }
   .icobtn svg { width: 17px; height: 17px; }
 
+  /* ---------------- mobile drawer ---------------- */
+  .nav-toggle { display: none; }
+  .drawer-backdrop {
+    position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45);
+    opacity: 0; pointer-events: none; transition: opacity .3s;
+  }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 71;
+    width: min(86vw, 340px); background: var(--surface); border-left: 1px solid var(--line);
+    box-shadow: var(--shadow-lg); display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform .4s cubic-bezier(.16,1,.3,1);
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head { display: flex; align-items: center; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+  .drawer-head .spacer { flex: 1; }
+  .drawer-links { display: flex; flex-direction: column; padding: 14px 10px; overflow-y: auto; }
+  .drawer-links a { padding: 13px 12px; border-radius: 9px; font-size: 15px; font-weight: 600; color: var(--ink-2); text-decoration: none; }
+  .drawer-links a:hover { background: var(--surface-2); color: var(--teal); }
+  .drawer-foot { margin-top: auto; padding: 16px 20px 22px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .drawer-foot .btn { width: 100%; }
+
   /* ---------------- hero ---------------- */
   .hero { padding: 76px 0 40px; }
   .hero-grid { display: grid; grid-template-columns: 1.02fr .98fr; gap: 56px; align-items: center; }
@@ -289,6 +311,8 @@
     .roles, .trust, .chain { grid-template-columns: 1fr; }
     .step { border-left: 3px solid var(--line); }
     .nav-links { display: none; }
+    .nav-toggle { display: grid; }
+    .nav .wrap > a.btn { display: none; }
     .hero { padding-top: 46px; }
     section { padding: 56px 0; }
     .cta-band { padding: 38px 22px; }
@@ -304,6 +328,14 @@
   }
   .ada-launcher:hover { transform: scale(1.05); }
   .ada-launcher svg { width: 24px; height: 24px; }
+  .ada-launcher-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: 999px; background: var(--ochre); color: #fff; font: 700 11px var(--sans);
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px var(--paper);
+    animation: adaBadgePulse 1.8s ease-in-out infinite;
+  }
+  .ada-launcher-badge.hidden { display: none; }
+  @keyframes adaBadgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
   .ada-panel {
     position: fixed; right: 22px; bottom: 92px; z-index: 60; width: 360px; max-width: calc(100vw - 32px);
     height: min(520px, calc(100vh - 140px)); background: var(--surface); border: 1px solid var(--line);
@@ -368,8 +400,35 @@
     </button>
     <a class="btn ghost sm" href="/login">Sign in</a>
     <a class="btn primary sm" href="#pricing">Get started</a>
+    <button class="icobtn nav-toggle" onclick="toggleDrawer()" aria-label="Toggle navigation" aria-expanded="false" aria-controls="navDrawer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
   </div>
 </header>
+
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="toggleDrawer(false)"></div>
+<div class="drawer" id="navDrawer" role="dialog" aria-label="Navigation menu">
+  <div class="drawer-head">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg></span>
+    <span class="brand-name">Buinee</span>
+    <span class="spacer"></span>
+    <button class="icobtn" onclick="toggleDrawer(false)" aria-label="Close menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <nav class="drawer-links">
+    <a href="#how">How it works</a>
+    <a href="#roles">Roles</a>
+    <a href="#workspace">Workspace</a>
+    <a href="#agents">AI agents</a>
+    <a href="#trust">Trust</a>
+    <a href="#pricing">Pricing</a>
+  </nav>
+  <div class="drawer-foot">
+    <a class="btn ghost" href="/login">Sign in</a>
+    <a class="btn primary" href="#pricing">Get started</a>
+  </div>
+</div>
 
 <main id="top">
 
@@ -738,7 +797,8 @@
 </footer>
 
 <button class="ada-launcher" id="adaLauncherBtn" type="button" aria-label="Chat with Ada" onclick="toggleAdaPanel()">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  <span class="ada-launcher-badge" id="adaLauncherBadge">1</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path id="adaLauncherIcon" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
 </button>
 
 <div class="ada-panel" id="adaPanel" role="dialog" aria-label="Chat with Ada">
@@ -869,6 +929,22 @@
     });
   });
 
+  // ---- mobile drawer ----
+  let drawerOpen = false;
+  function toggleDrawer(force) {
+    drawerOpen = typeof force === "boolean" ? force : !drawerOpen;
+    document.getElementById("navDrawer").classList.toggle("open", drawerOpen);
+    document.getElementById("drawerBackdrop").classList.toggle("open", drawerOpen);
+    document.querySelector(".nav-toggle").setAttribute("aria-expanded", String(drawerOpen));
+    document.body.style.overflow = drawerOpen ? "hidden" : "";
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && drawerOpen) toggleDrawer(false);
+  });
+  document.querySelectorAll(".drawer-links a, .drawer-foot a").forEach(a => {
+    a.addEventListener("click", () => toggleDrawer(false));
+  });
+
   // ---- Ask Ada (public demo widget) ----
   let adaLandingHistory = [];
 
@@ -929,11 +1005,39 @@
     input.focus();
   }
 
+  const ADA_CHAT_ICON = "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z";
+  const ADA_CLOSE_ICON = "M18 6 6 18M6 6l12 12";
+
+  function playAdaChime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      [660, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + i * 0.09);
+        gain.gain.linearRampToValueAtTime(0.18, now + i * 0.09 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.09 + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.09);
+        osc.stop(now + i * 0.09 + 0.24);
+      });
+      setTimeout(() => ctx.close(), 500);
+    } catch {}
+  }
+
   let adaPanelOpen = false;
   function toggleAdaPanel(force) {
     adaPanelOpen = typeof force === "boolean" ? force : !adaPanelOpen;
     document.getElementById("adaPanel").classList.toggle("open", adaPanelOpen);
+    document.getElementById("adaLauncherIcon").setAttribute("d", adaPanelOpen ? ADA_CLOSE_ICON : ADA_CHAT_ICON);
+    document.getElementById("adaLauncherBtn").setAttribute("aria-label", adaPanelOpen ? "Close chat with Ada" : "Chat with Ada");
     if (adaPanelOpen) {
+      document.getElementById("adaLauncherBadge").classList.add("hidden");
+      playAdaChime();
       loadLandingAda();
       renderLandingAdaLog();
       document.getElementById("adaPanelInput").focus();
