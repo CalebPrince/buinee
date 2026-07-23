@@ -1256,6 +1256,12 @@ def admin_alerts(admin: dict, cfg: dict) -> dict:
     attention widget already shows everyone); errors and payments are only
     included for the roles that can already see the Error log / Payments
     pages, matching the same _admin_role_request allow-lists used there."""
+    # Runs on every poll regardless of who's looking, since a compromised or
+    # tampered back-office account needs locking fast - not only when an
+    # owner's tab happens to be the one open. The finding itself is only
+    # ever surfaced to owners, below, since they're the only role that can
+    # act on it from the Back-office Team page.
+    db.check_role_integrity()
     counts = db.platform_alert_counts()
     role = admin.get("role", "owner")
     alerts = []
@@ -1291,6 +1297,10 @@ def admin_alerts(admin: dict, cfg: dict) -> dict:
         alerts.append({"key": "ada_pending", "n": counts["ada_pending"],
                        "title": "Ada-registered signups awaiting review", "copy": "Created via the landing chat",
                        "href": "/admin/companies"})
+    if role == "owner" and counts["security_lockouts"]:
+        alerts.append({"key": "security_lockouts", "n": counts["security_lockouts"],
+                       "title": "Ada locked a back-office account", "copy": "Role/status didn't match the audit trail",
+                       "href": "/admin/team"})
     return {"alerts": alerts, "total": sum(a["n"] for a in alerts)}
 
 

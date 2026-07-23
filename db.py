@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -2239,6 +2240,74 @@ def update_platform_admin(admin_id: int, role: str, status: str, actor_id: int) 
     return _get_admin(admin_id)
 
 
+_ROLE_LOG_RE = re.compile(r"Role:\s*(\w+)(?:;\s*status:\s*(\w+))?")
+
+
+def check_role_integrity() -> list[dict]:
+    """The back office's only guard against a back-office account holding
+    access it was never granted: every real role/status change goes through
+    update_platform_admin, which is owner-gated and always logs what it did
+    in the same request - so a live role/status that disagrees with the last
+    thing logged for that account didn't come from the app. It came from
+    somewhere else (direct database access, a bug that skipped the gate),
+    which is exactly what this is watching for.
+
+    A bootstrapped or CLI-created admin has no log entry at all to compare
+    against - that's normal, not evidence of anything, so it's skipped
+    rather than flagged. And this never locks the sole remaining active
+    owner: that would leave nobody able to reach the Back-office Team page
+    to fix it, trading one problem for a worse one.
+
+    Auto-locking sets status to inactive and drops sessions, same as an
+    owner deactivating someone by hand - reversible from that same page.
+    Called from admin_alerts(), so it runs on every Command Center page's
+    periodic poll rather than needing a separate scheduler."""
+    findings = []
+    with _cursor() as conn:
+        admins = conn.execute("SELECT id, name, role, status FROM platform_admins").fetchall()
+        for admin in admins:
+            log_row = conn.execute(
+                """SELECT details FROM admin_activity_log
+                   WHERE entity_type = 'admin' AND entity_id = ? AND action IN ('created', 'updated')
+                   ORDER BY created_at DESC, id DESC LIMIT 1""",
+                (str(admin["id"]),),
+            ).fetchone()
+            if not log_row:
+                continue
+            m = _ROLE_LOG_RE.search(log_row["details"] or "")
+            if not m:
+                continue
+            logged_role, logged_status = m.group(1), (m.group(2) or "active")
+            if logged_role == admin["role"] and logged_status == admin["status"]:
+                continue
+
+            owners_active = conn.execute(
+                "SELECT COUNT(*) AS n FROM platform_admins WHERE role = 'owner' AND status = 'active'"
+            ).fetchone()["n"]
+            is_sole_active_owner = admin["role"] == "owner" and admin["status"] == "active" and owners_active <= 1
+            locked = False
+            if not is_sole_active_owner and admin["status"] == "active":
+                conn.execute("UPDATE platform_admins SET status = 'inactive' WHERE id = ?", (admin["id"],))
+                conn.execute("DELETE FROM admin_sessions WHERE admin_id = ?", (admin["id"],))
+                locked = True
+
+            details = (f"Live role/status is {admin['role']}/{admin['status']}, but the last logged "
+                       f"change for this account recorded {logged_role}/{logged_status}.")
+            if is_sole_active_owner:
+                details += " Not auto-locked - this is the only active owner."
+            findings.append({
+                "admin_id": admin["id"], "name": admin["name"], "locked": locked, "details": details,
+            })
+
+    for finding in findings:
+        record_admin_activity(
+            {"id": None, "name": "Ada", "email": ""},
+            "auto_locked" if finding["locked"] else "integrity_flagged",
+            "admin", finding["admin_id"], finding["name"], finding["details"],
+        )
+    return findings
+
+
 def reset_platform_admin_password(admin_id: int, new_password: str) -> None:
     if not _get_admin(admin_id):
         raise AuthError("Team member not found.")
@@ -3776,6 +3845,20 @@ def platform_alert_counts() -> dict:
         ada_pending = conn.execute(
             "SELECT COUNT(*) AS n FROM users WHERE status = 'ada_pending'"
         ).fetchone()["n"]
+        # Stays true for as long as the account remains locked and unreviewed
+        # - once an owner reactivates it from the Team page, that action logs
+        # a fresh 'updated' entry, which becomes the most recent one and this
+        # stops matching. Not just "was ever auto-locked", which would never
+        # clear even after the account is fixed.
+        security_lockouts = conn.execute(
+            """SELECT COUNT(*) AS n FROM platform_admins p
+               WHERE p.status = 'inactive' AND EXISTS (
+                   SELECT 1 FROM admin_activity_log l
+                   WHERE l.entity_type = 'admin' AND l.entity_id = CAST(p.id AS TEXT)
+                     AND l.action = 'auto_locked'
+                     AND l.id = (SELECT MAX(l2.id) FROM admin_activity_log l2
+                                 WHERE l2.entity_type = 'admin' AND l2.entity_id = l.entity_id))"""
+        ).fetchone()["n"]
     return {
         "pending_access": pending_access,
         "missing_supervisor": missing_supervisor,
@@ -3783,6 +3866,7 @@ def platform_alert_counts() -> dict:
         "recent_errors": recent_errors,
         "failed_payments": failed_payments,
         "ada_pending": ada_pending,
+        "security_lockouts": security_lockouts,
     }
 
 
