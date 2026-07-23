@@ -149,6 +149,19 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     padding: 3px 7px; border-radius: 20px; background: var(--teal-soft); color: var(--teal-deep); white-space: nowrap;
   }
+  .ada-signup-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px dashed var(--line);
+  }
+  .ada-signup-row:last-child { border-bottom: none; }
+  .ada-signup-row .who b { display: block; font-size: 13.5px; }
+  .ada-signup-row .who span { display: block; font-size: 12px; color: var(--ink-3); }
+  .ada-signup-row .actions { display: flex; gap: 8px; flex: none; }
+  .ada-signup-row .actions button {
+    padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--line-strong);
+  }
+  .ada-signup-row .approve { background: var(--teal); color: #fff; border-color: transparent; }
+  .ada-signup-row .reject { background: var(--surface); color: var(--bad); border-color: var(--bad); }
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     padding: 8px 14px; border-radius: 9px; font-size: 13px; font-weight: 600;
@@ -327,6 +340,12 @@
             <p>Open a company to manage its customer profile, primary contact, relationship owner, plan, team, and access requests in one place.</p>
           </div>
 
+          <div class="panel" id="adaSignupsPanel" style="display:none">
+            <h3 style="margin:0 0 4px">Ada-registered signups awaiting review</h3>
+            <p style="margin:0 0 14px;font-size:13px;color:var(--ink-3)">Free-plan workspaces created through the landing chat — nobody has confirmed there's a real business behind these yet.</p>
+            <div id="adaSignupsList"></div>
+          </div>
+
           <div class="lifecycle-board" id="lifecycleBoard" aria-label="Customer lifecycle stages"></div>
           <div class="lifecycle-all"><button class="btn sm" id="showAllLifecycle" type="button" onclick="setLifecycleFilter('all')">Show all accounts</button></div>
 
@@ -374,10 +393,13 @@
 
   let allPlans = [];
 
+  let currentAdmin = null;
+
   async function main() {
     try {
       const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
       if (!res.ok) { location.href = '/admin/login'; return; }
+      currentAdmin = (await res.json()).admin;
     } catch { location.href = '/admin/login'; return; }
 
     let overview;
@@ -396,9 +418,49 @@
 
     renderCompanies(overview.companies);
     renderLifecycleBoard();
+    if (currentAdmin.role === 'owner') loadAdaSignups();
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
+  }
+
+  async function loadAdaSignups() {
+    let data;
+    try {
+      data = await (await fetch('/api/admin/ada-signups', { credentials: 'same-origin' })).json();
+    } catch { return; }
+    const signups = data.signups || [];
+    const panel = document.getElementById('adaSignupsPanel');
+    if (!signups.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    document.getElementById('adaSignupsList').innerHTML = signups.map(s => `
+      <div class="ada-signup-row" id="adaSignup-${s.company_id}">
+        <div class="who">
+          <b>${escapeHtml(s.company_name)}</b>
+          <span>${escapeHtml(s.name)} · ${escapeHtml(s.email)} · ${escapeHtml(s.plan_name || '')} plan</span>
+        </div>
+        <div class="actions">
+          <button class="approve" onclick="reviewAdaSignup(${s.company_id}, 'approve')">Approve</button>
+          <button class="reject" onclick="reviewAdaSignup(${s.company_id}, 'reject')">Reject</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function reviewAdaSignup(companyId, action) {
+    const row = document.getElementById(`adaSignup-${companyId}`);
+    row.querySelectorAll('button').forEach(b => b.disabled = true);
+    try {
+      const res = await fetch('/api/admin/ada-signups/review', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_id: companyId, action }),
+      });
+      if (!res.ok) { row.querySelectorAll('button').forEach(b => b.disabled = false); return; }
+      location.reload();
+    } catch {
+      row.querySelectorAll('button').forEach(b => b.disabled = false);
+    }
   }
 
   let lastCompanies = [], lifecycleFilter = 'all';

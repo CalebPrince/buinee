@@ -407,6 +407,32 @@
   .ada-panel-msg.ai .bub { background: var(--surface-2); border: 1px solid var(--line); border-top-left-radius: 4px; }
   .ada-panel-msg.me { flex-direction: row-reverse; }
   .ada-panel-msg.me .bub { background: var(--teal); color: #fff; border-top-right-radius: 4px; }
+  .ada-reg-card {
+    border: 1px solid var(--teal); border-radius: 12px; background: var(--teal-soft);
+    padding: 13px 14px; font-size: 12.5px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .ada-reg-card .t { font-weight: 700; color: var(--teal-deep); font-size: 13px; }
+  .ada-reg-card .row { display: flex; justify-content: space-between; gap: 8px; color: var(--ink-2); }
+  .ada-reg-card .row b { color: var(--ink); font-weight: 600; }
+  .ada-reg-card input[type=password] {
+    padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--surface); color: var(--ink); font-size: 12.5px; width: 100%;
+  }
+  .ada-reg-card label.terms { display: flex; align-items: flex-start; gap: 7px; font-size: 11.5px; color: var(--ink-2); }
+  .ada-reg-card label.terms input { margin-top: 2px; flex: none; }
+  .ada-reg-card label.terms a { color: var(--teal-deep); font-weight: 600; }
+  .ada-reg-card button {
+    padding: 9px 12px; border-radius: 9px; border: 0; background: var(--teal); color: #fff;
+    font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .ada-reg-card button:disabled { opacity: .6; cursor: default; }
+  .ada-reg-card .err { color: var(--bad); font-size: 11.5px; display: none; }
+  .ada-reg-card .err.show { display: block; }
+  .ada-reg-card .ok { display: flex; flex-direction: column; gap: 8px; }
+  .ada-reg-card .ok a.pay {
+    display: inline-flex; align-items: center; justify-content: center; padding: 9px 12px;
+    border-radius: 9px; background: var(--teal); color: #fff; font-weight: 700; text-decoration: none;
+  }
   .ada-starters-mini { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
   .ada-starter-mini { text-align: left; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-2); font-size: 12px; cursor: pointer; }
   .ada-starter-mini:hover { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
@@ -836,6 +862,10 @@
   </div>
   <div class="ada-panel-scroll" id="adaPanelScroll">
     <div class="ada-panel-log" id="adaPanelLog"></div>
+    <!-- Kept outside the log because renderLandingAdaLog() rewrites that whole
+         node on every message and on the 2-minute status poll - a half-typed
+         password must not vanish underneath the visitor. -->
+    <div id="adaRegSlot"></div>
     <div class="ada-starters-mini" id="adaStartersMini">
       <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;What is Buinee, in a nutshell?&quot;)">What is Buinee, in a nutshell?</button>
       <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;How much does it cost?&quot;)">How much does it cost?</button>
@@ -1137,11 +1167,125 @@
       const data = await res.json();
       adaLandingHistory.push({ role: "assistant", content: res.ok ? data.reply : (data.error || "Could not reach the assistant.") });
       saveLandingAda();
+      renderLandingAdaLog();
+      if (res.ok && data.register_draft) renderAdaRegisterCard(data.register_draft);
     } catch {
       adaLandingHistory.push({ role: "assistant", content: "Could not reach the server." });
       saveLandingAda();
+      renderLandingAdaLog();
     }
-    renderLandingAdaLog();
+    return false;
+  }
+
+  // ---- Ada registering a company mid-chat ----
+  let adaRegisterDone = false;
+
+  function renderAdaRegisterCard(draft) {
+    // One workspace per visit. If Ada emits a second marker after a signup has
+    // already gone through, ignore it rather than replacing the confirmation
+    // with a form that would try to register the same email twice.
+    if (adaRegisterDone) return;
+    const priceLine = draft.price > 0
+      ? `${draft.currency} ${Number(draft.price).toLocaleString()}/month`
+      : "Free";
+    const box = document.getElementById("adaRegSlot");
+    box.innerHTML = "";
+    box.insertAdjacentHTML("beforeend", `
+      <div class="ada-reg-card" id="adaRegCard">
+        <div class="t">Set a password to finish creating your workspace</div>
+        <div class="row"><span>Name</span><b>${escapeHtmlAda(draft.name)}</b></div>
+        <div class="row"><span>Email</span><b>${escapeHtmlAda(draft.email)}</b></div>
+        ${draft.company_name ? `<div class="row"><span>Company</span><b>${escapeHtmlAda(draft.company_name)}</b></div>` : ""}
+        <div class="row"><span>Plan</span><b>${escapeHtmlAda(draft.plan_name)} · ${priceLine}</b></div>
+        <form onsubmit="return submitAdaRegister(event)">
+          <input type="password" id="adaRegPassword" placeholder="Choose a password (12+ characters)" minlength="12" required autocomplete="new-password" style="margin-bottom:9px">
+          <label class="terms"><input type="checkbox" id="adaRegTerms" required><span>I agree to Buinee's <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
+          <div class="err" id="adaRegErr"></div>
+          <button type="submit" id="adaRegSubmit" style="margin-top:9px;width:100%">Create my workspace</button>
+        </form>
+      </div>`);
+    document.getElementById("adaPanelScroll").scrollTop = 1e9;
+    document.getElementById("adaRegCard").dataset.draft = JSON.stringify(draft);
+  }
+
+  async function submitAdaRegister(ev) {
+    ev.preventDefault();
+    const card = document.getElementById("adaRegCard");
+    const draft = JSON.parse(card.dataset.draft);
+    const errEl = document.getElementById("adaRegErr");
+    errEl.classList.remove("show");
+    const password = document.getElementById("adaRegPassword").value;
+    const termsOk = document.getElementById("adaRegTerms").checked;
+    if (!termsOk) {
+      errEl.textContent = "Agree to the Terms of Use and Privacy Policy to continue.";
+      errEl.classList.add("show");
+      return false;
+    }
+    const btn = document.getElementById("adaRegSubmit");
+    btn.disabled = true; btn.textContent = "Creating your workspace…";
+    try {
+      const res = await fetch("/api/demo/register", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name, email: draft.email, company_name: draft.company_name,
+          plan_id: draft.plan_id, password, terms_accepted: termsOk,
+          allow_duplicate_name: !!draft.allow_duplicate_name,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 409 && data.duplicate_name) {
+        // Somebody already registered this company name. It's usually the same
+        // business signing up twice, so say so and make them confirm rather
+        // than silently creating a second workspace with an identical name.
+        errEl.textContent = data.error || "A company with that name already exists.";
+        errEl.classList.add("show");
+        card.dataset.draft = JSON.stringify({ ...draft, allow_duplicate_name: true });
+        btn.disabled = false; btn.textContent = "This is a different company — continue";
+        return false;
+      }
+      if (res.status === 503) {
+        // The account exists but Paystack wouldn't open. Retrying the form
+        // would only fail on "that email is already registered", so close it
+        // out and send them somewhere that can actually finish the payment.
+        adaRegisterDone = true;
+        card.innerHTML = `<div class="ok">
+          <div class="t">Your workspace was created</div>
+          <div>${escapeHtmlAda(data.error || "Payment could not start.")}
+            Sign in at <a href="/login">/login</a> to finish paying.</div>
+        </div>`;
+        return false;
+      }
+      if (!res.ok) {
+        errEl.textContent = data.error || "Something went wrong.";
+        errEl.classList.add("show");
+        btn.disabled = false; btn.textContent = "Create my workspace";
+        return false;
+      }
+      adaRegisterDone = true;
+      if (data.payment_required) {
+        card.innerHTML = data.authorization_url
+          ? `<div class="ok">
+              <div class="t">Almost there — one step left</div>
+              <div>Your workspace is ready. Pay securely to activate it:</div>
+              <a class="pay" href="${escapeHtmlAda(data.authorization_url)}" target="_blank" rel="noopener">Pay securely with Paystack</a>
+            </div>`
+          : `<div class="ok">
+              <div class="t">Your workspace is ready</div>
+              <div>We couldn't open the payment page from here — sign in at
+                <a href="/login">/login</a> and you'll be taken straight to it.</div>
+            </div>`;
+      } else {
+        card.innerHTML = `<div class="ok">
+          <div class="t">You're all set</div>
+          <div>${escapeHtmlAda(data.message || "Your workspace has been created and is pending review.")}</div>
+        </div>`;
+      }
+    } catch {
+      errEl.textContent = "Could not reach the server.";
+      errEl.classList.add("show");
+      btn.disabled = false; btn.textContent = "Create my workspace";
+    }
     return false;
   }
 </script>

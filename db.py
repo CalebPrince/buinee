@@ -1069,7 +1069,7 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         raise AuthError("That doesn't look like an email address.")
     if len(password) < 12:
         raise AuthError("Password must be at least 12 characters.")
-    if initial_status not in ("approved", "payment_pending"):
+    if initial_status not in ("approved", "payment_pending", "ada_pending"):
         raise AuthError("Not a valid registration status.")
     if get_user_by_email(email):
         raise AuthError("An account with that email already exists.")
@@ -1097,6 +1097,48 @@ def register_company(company_name: str, name: str, email: str, password: str, ro
         user_id = cur.lastrowid
 
     return get_user(user_id) | {"company": {"id": company_id, "name": company_name}}
+
+
+def list_ada_pending_signups() -> list[dict]:
+    """Free-plan companies Ada registered on the landing page, awaiting a
+    platform owner's review before they go live - a stricter gate than a
+    normal free registration gets, since nobody has verified there's a real
+    business behind it yet."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT u.id AS user_id, u.name, u.email, u.role, u.created_at,
+                      c.id AS company_id, c.name AS company_name, p.name AS plan_name
+               FROM users u JOIN companies c ON c.id = u.company_id
+               LEFT JOIN plans p ON p.id = c.plan_id
+               WHERE u.status = 'ada_pending'
+               ORDER BY u.created_at DESC"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def approve_ada_signup(company_id: int) -> None:
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT id FROM users WHERE company_id = ? AND status = 'ada_pending'",
+            (company_id,),
+        ).fetchone()
+        if not row:
+            raise AuthError("No pending Ada signup found for that company.")
+        conn.execute("UPDATE users SET status = 'approved' WHERE id = ?", (row["id"],))
+
+
+def reject_ada_signup(company_id: int) -> None:
+    """Ada-registered signups are brand-new companies with nothing else
+    attached yet, so rejecting one removes the whole company rather than
+    just the user - there's no other data or teammates to preserve."""
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT id FROM users WHERE company_id = ? AND status = 'ada_pending'",
+            (company_id,),
+        ).fetchone()
+        if not row:
+            raise AuthError("No pending Ada signup found for that company.")
+    delete_company(company_id)
 
 
 # ------------------------------------------------------- connected mailboxes
@@ -1554,6 +1596,10 @@ def authenticate(email: str, password: str) -> dict:
     if user["status"] == "pending":
         raise AuthError(
             "Your account is waiting for a supervisor at your company to approve it."
+        )
+    if user["status"] == "ada_pending":
+        raise AuthError(
+            "Your account is still being reviewed by our team - we'll email you once it's approved."
         )
     return user
 
@@ -3566,12 +3612,16 @@ def platform_alert_counts() -> dict:
         failed_payments = conn.execute(
             "SELECT COUNT(*) AS n FROM payments WHERE status = 'failed' AND created_at > ?", (cutoff_payments,)
         ).fetchone()["n"]
+        ada_pending = conn.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE status = 'ada_pending'"
+        ).fetchone()["n"]
     return {
         "pending_access": pending_access,
         "missing_supervisor": missing_supervisor,
         "needs_team_plan": needs_team_plan,
         "recent_errors": recent_errors,
         "failed_payments": failed_payments,
+        "ada_pending": ada_pending,
     }
 
 

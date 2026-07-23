@@ -1194,6 +1194,10 @@ def admin_alerts(admin: dict, cfg: dict) -> dict:
         alerts.append({"key": "failed_payments", "n": counts["failed_payments"],
                        "title": "Failed payments in the last 24 hours", "copy": "Check Payments",
                        "href": "/admin/payments"})
+    if role == "owner" and counts["ada_pending"]:
+        alerts.append({"key": "ada_pending", "n": counts["ada_pending"],
+                       "title": "Ada-registered signups awaiting review", "copy": "Created via the landing chat",
+                       "href": "/admin/companies"})
     return {"alerts": alerts, "total": sum(a["n"] for a in alerts)}
 
 
@@ -1379,6 +1383,40 @@ _DEMO_COMPLAINT_WORDS = (
     "angry", "scam", "unacceptable", "poor service", "bad experience",
 )
 
+_ADA_REGISTER_RE = re.compile(r"\[\[ADA_REGISTER\]\](.*?)\[\[/ADA_REGISTER\]\]", re.S)
+
+
+def extract_ada_register(reply: str) -> tuple[str, dict | None]:
+    """Split Ada's marker (if any) out of her reply, and turn it into a
+    validated registration draft the frontend can act on. The marker is
+    never shown to the visitor - present or malformed, it's always stripped
+    before the reply leaves this function, so a bad marker degrades to
+    "the offer just doesn't appear" rather than a broken-looking reply."""
+    m = _ADA_REGISTER_RE.search(reply)
+    if not m:
+        return reply, None
+    cleaned = (reply[:m.start()] + reply[m.end():]).strip()
+    try:
+        raw = json.loads(m.group(1))
+        name = str(raw.get("name") or "").strip()[:120]
+        email = str(raw.get("email") or "").strip().lower()[:180]
+        company_name = str(raw.get("company_name") or "").strip()[:120]
+        plan_id = int(raw.get("plan_id"))
+    except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
+        return cleaned, None
+    if len(name) < 2 or "@" not in email:
+        return cleaned, None
+    plan = db.get_plan(plan_id)
+    if not plan:
+        return cleaned, None
+    if plan["audience"] != "individual" and len(company_name) < 2:
+        return cleaned, None
+    return cleaned, {
+        "name": name, "email": email, "company_name": company_name,
+        "plan_id": plan_id, "plan_name": plan["name"], "audience": plan["audience"],
+        "price": plan["price"], "currency": plan["currency"],
+    }
+
 
 def maybe_compute(message: str) -> dict | None:
     """If the visitor gave an invoice total and a vatable portion, compute it.
@@ -1458,6 +1496,36 @@ whatever they just asked first; don't dodge a direct question to demand
 contact details before responding to it. If they decline or dodge, don't
 push twice - answer their question anyway.
 
+Registering them yourself - you can actually do this, not just describe it:
+Once someone has clearly decided to sign up (not just asking questions - they
+said something like "let's do it" or "sign me up" or picked a plan), you can
+create their workspace right in this chat, instead of sending them to the
+registration page. To do that you need, gathered naturally over the
+conversation rather than as a form:
+- Their name.
+- Their email.
+- Which plan (match it to one of the plan_id values in the pricing list
+  above - never invent an id, never guess one if you're unsure which plan
+  they mean, just ask).
+- A company name - but only if the plan is a team plan. Solo/individual
+  plans don't need one; if they haven't given one, leave it blank rather
+  than asking for it.
+Do not ask for or accept a password here under any circumstances, even if
+they offer one - passwords are never handled in chat. Once you have
+everything above and they've confirmed they want to proceed, tell them
+their workspace is being set up and that a secure box will appear right
+here in the chat for them to set a password and finish - then, as the very
+last thing in your reply, on its own, emit exactly this and nothing else
+around it:
+[[ADA_REGISTER]]{"name":"...","email":"...","company_name":"...","plan_id":0}[[/ADA_REGISTER]]
+with the real values filled in (company_name as "" for a solo plan). This
+marker is never shown to the visitor and you should never mention it,
+describe it, or explain that you're "generating a code" - it's invisible
+plumbing, not something to narrate. Emit it once per signup, not on every
+later reply. If registration fails for a reason you're told about (for
+example a company by that name already exists), explain it in plain terms
+and suggest registering directly at /register instead.
+
 Rules for you:
 - Be brief. Two or three sentences unless they asked for detail. You are on a
   landing page, not in a meeting.
@@ -1467,8 +1535,9 @@ Rules for you:
   that only exists once their company is registered and they're signed in.
   If someone describes an account problem, direct them to register or sign in
   rather than trying to solve it.
-- If they seem convinced, point them at registering their company. Do not
-  push it into every reply."""
+- If they seem convinced but haven't said they're ready to sign up right now,
+  point them at registering their company (either you doing it here, or the
+  registration page). Do not push it into every reply."""
 
 
 def build_system(computed: dict | None) -> str:
@@ -1516,7 +1585,7 @@ def landing_plans_digest() -> str:
         else:
             chat = f"{p['chat_monthly_limit']} AI assistant messages/month"
         lines.append(
-            f"- {p['name']} ({p['audience']}): {price}, {seats}, "
+            f"- {p['name']} (plan_id: {p['id']}, {p['audience']}): {price}, {seats}, "
             f"{p['mailbox_limit']} connected mailbox(es) per user, {chat}"
             + (", team chat included" if p.get("team_chat_enabled") else "")
         )
@@ -2175,6 +2244,11 @@ class RouteHandlerMixin:
             if not admin: return
             return self._json({"invoices": db.list_admin_invoices(), "companies": db.list_company_choices()})
 
+        if path == "/api/admin/ada-signups":
+            admin = self._admin_role_request("owner")
+            if not admin: return
+            return self._json({"signups": db.list_ada_pending_signups()})
+
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
@@ -2195,6 +2269,7 @@ class RouteHandlerMixin:
             return self._json({"error": "This request did not come from Buinee."}, 403)
         handlers = {
             "/api/demo": self._handle_demo,
+            "/api/demo/register": self._handle_demo_register,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
             "/api/mailbox/notifications/seen": self._handle_mailbox_notifications_seen,
@@ -2257,6 +2332,7 @@ class RouteHandlerMixin:
             "/api/admin/inbox/state": self._handle_admin_inbox_state,
             "/api/admin/inbox/delete": self._handle_admin_inbox_delete,
             "/api/admin/site-content/save": self._handle_admin_site_content_save,
+            "/api/admin/ada-signups/review": self._handle_admin_ada_signup_review,
             "/api/admin/invoices/create": self._handle_admin_invoice_create,
             "/api/admin/invoices/status": self._handle_admin_invoice_status,
         }
@@ -2342,8 +2418,83 @@ class RouteHandlerMixin:
             record(None)
             return self._json({"error": ada_unavailable(reference)}, 500)
 
+        reply, register_draft = extract_ada_register(reply)
         record(reply)
-        return self._json({"reply": reply, "computed": bool(computed)})
+        resp = {"reply": reply, "computed": bool(computed)}
+        if register_draft:
+            resp["register_draft"] = register_draft
+        return self._json(resp)
+
+    def _handle_demo_register(self):
+        """Ada registering a company on a visitor's behalf, mid-chat. Shares
+        the same rate limiter as the real registration form (this is just a
+        second door into the same room) and the same db.register_company/
+        initialize_plan_payment logic - the only real difference is that a
+        free-plan signup here starts life as 'ada_pending' rather than
+        'approved', since nobody has verified there's a real business behind
+        it the way a normal free registration implicitly gets by not needing
+        any review at all. A paid plan is unaffected: the Paystack gate
+        already does that job."""
+        if rate_limited(f"auth:{client_ip(self)}", max_hits=20, window=600):
+            return self._json({"error": "Too many attempts — try again shortly."}, 429)
+        if rate_limited(f"demo:{client_ip(self)}"):
+            return self._json({"error": "Too many attempts — try again shortly."}, 429)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+
+        if req.get("terms_accepted") is not True:
+            return self._json({"error": "You must agree to the Terms of Use and Privacy Policy."}, 400)
+        try:
+            plan_id = int(req.get("plan_id"))
+        except (TypeError, ValueError):
+            plan_id = None
+        plan = db.get_plan(plan_id) if plan_id is not None else None
+        if not plan:
+            return self._json({"error": "Choose a valid pricing plan."}, 400)
+        payment_required = float(plan["price"]) > 0
+
+        try:
+            user = db.register_company(
+                str(req.get("company_name") or ""),
+                str(req.get("name") or ""),
+                str(req.get("email") or ""),
+                str(req.get("password") or ""),
+                "finance_supervisor",
+                plan_id=plan_id,
+                allow_duplicate_name=bool(req.get("allow_duplicate_name")),
+                initial_status="payment_pending" if payment_required else "ada_pending",
+            )
+        except db.DuplicateCompanyError as exc:
+            return self._json({"error": str(exc), "duplicate_name": True, "company": exc.company}, 409)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+
+        db.record_terms_acceptance(user["id"], TERMS_VERSION)
+        db.record_admin_activity(
+            {"id": None, "name": "Ada", "email": ""}, "registered", "company", user["company"]["id"],
+            user["company"]["name"], details=f"Registered via landing chat, plan={plan['name']}")
+
+        if not payment_required:
+            return self._json({
+                "ok": True, "payment_required": False,
+                "message": "Your workspace has been created and is pending a quick review by our team "
+                           "before it goes live - we'll email you once it's approved.",
+            })
+
+        token = db.create_session(user["id"])
+        try:
+            payment = initialize_plan_payment(user, plan, load_env())
+        except ValueError as exc:
+            return self._json(
+                {"error": f"Your account was created, but payment could not start: {exc}"}, 503,
+                [("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
+            )
+        return self._json(
+            {"ok": True, "payment_required": True, "authorization_url": payment.get("authorization_url") or ""},
+            extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
+        )
 
     # ---------------------------------------------------------------- auth
 
@@ -2728,7 +2879,7 @@ class RouteHandlerMixin:
             user = db.authenticate(email_address, str(req.get("password") or ""))
         except db.AuthError as exc:
             db.record_login_failure("user", client_ip(self), email_address)
-            if "waiting for a supervisor" in str(exc):
+            if str(exc).startswith("Your account is"):
                 return self._json({"error": str(exc)}, 401)
             return self._json({"error": "Email or password is incorrect."}, 401)
         db.clear_login_failures("user", email_address)
@@ -3423,6 +3574,31 @@ class RouteHandlerMixin:
             db.delete_company(company_id)
             db.record_admin_activity(admin, "deleted", "company", company_id,
                                      details="Company and related records permanently removed")
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True})
+
+    def _handle_admin_ada_signup_review(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body()
+            company_id = int(req.get("company_id"))
+            action = str(req.get("action") or "")
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad request."}, 400)
+        if action not in ("approve", "reject"):
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            if action == "approve":
+                db.approve_ada_signup(company_id)
+                db.record_admin_activity(admin, "approved", "company", company_id,
+                                         details="Ada-registered signup approved")
+            else:
+                db.reject_ada_signup(company_id)
+                db.record_admin_activity(admin, "rejected", "company", company_id,
+                                         details="Ada-registered signup rejected and removed")
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
