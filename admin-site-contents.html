@@ -197,6 +197,7 @@
     { key: 'register', label: 'Register page' },
     { key: 'login', label: 'Login page' },
     { key: 'legal', label: 'Legal pages' },
+    { key: 'contact', label: 'Contact info' },
   ];
 
   function esc(s) {
@@ -217,6 +218,7 @@
       ['refunds_', 'Refund Policy'], ['security_', 'Security'],
       ['team_', 'Register form'], ['solo_', 'Register form'], ['tab_', 'Register form'],
       ['company_caption', 'Register form'], ['reg_', 'Register form'],
+      ['faq_', 'FAQ'], ['contact_', 'Contact details'], ['social_', 'Social links'],
     ];
     for (const [prefix, label] of map) if (key.startsWith(prefix)) return label;
     return 'Other';
@@ -258,6 +260,9 @@
     }
     if (f.type === 'html') {
       return `<label>${esc(f.label)}<textarea id="${id}" rows="16" class="mono">${esc(f.value)}</textarea><span class="hint">Raw HTML, used as-is on the legal page.</span></label>`;
+    }
+    if (f.type === 'qa_list') {
+      return `<label>${esc(f.label)}<textarea id="${id}" rows="14">${esc(f.value)}</textarea><span class="hint">One question per "Q:" line, followed by its answer on one or more "A:" lines. Add or remove pairs freely.</span></label>`;
     }
     return `<label>${esc(f.label)}<input type="text" id="${id}" value="${esc(f.value)}"></label>`;
   }

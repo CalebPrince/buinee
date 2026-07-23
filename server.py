@@ -213,6 +213,7 @@ STATIC_PAGES = {
     "/": "index.html",
     "/register": "register.html",
     "/login": "login.html",
+    "/contact": "contact.html",
     "/privacy": "legal.html",
     "/terms": "legal.html",
     "/cookies": "legal.html",
@@ -241,6 +242,7 @@ LEGACY_PAGE_REDIRECTS = {
     "/index.html": "/",
     "/register.html": "/register",
     "/login.html": "/login",
+    "/contact.html": "/contact",
     "/privacy.html": "/privacy",
     "/terms.html": "/terms",
     "/cookies.html": "/cookies",
@@ -431,6 +433,33 @@ SITE_CONTENT_SCHEMA = {
         {"key": "pricing_aud_individual", "label": "Pricing toggle: individual", "type": "text", "default": "Just me"},
         {"key": "pricing_aud_team", "label": "Pricing toggle: team", "type": "text", "default": "My team"},
 
+        {"key": "faq_eyebrow", "label": "FAQ eyebrow", "type": "text", "default": "Questions"},
+        {"key": "faq_headline", "label": "FAQ headline", "type": "text", "default": "Things people usually ask first."},
+        {"key": "faq_subtext", "label": "FAQ subtext", "type": "paragraph",
+         "default": "Can't find what you need here? Ask Ada in the corner, or get in touch directly."},
+        {"key": "faq_items", "label": "FAQ questions and answers", "type": "qa_list",
+         "default": "Q: What exactly is Buinee?\n"
+                     "A: A single workspace for the work behind your business - team chat, documents, "
+                     "tasks, approvals, customer follow-ups and an AI assistant, in one place instead of "
+                     "scattered across separate tools.\n"
+                     "Q: Do I need a team to use it, or can I work alone?\n"
+                     "A: Either. The solo plans give one person the same workspace without any of the "
+                     "team-management features; team plans add roles, approvals and visibility across "
+                     "everyone you invite.\n"
+                     "Q: How does everyone else join my company's workspace?\n"
+                     "A: They register with your company's name and their own details, then a Supervisor "
+                     "approves the request. Nobody gets in on the strength of the company name alone.\n"
+                     "Q: What can the AI assistant actually do?\n"
+                     "A: It answers questions grounded in your own workspace data, drafts replies, reads "
+                     "documents you hand it, and flags what needs attention - but it never sends, approves "
+                     "or changes a record without a person choosing to.\n"
+                     "Q: Is my company's data visible to other companies on Buinee?\n"
+                     "A: No. Every record is scoped to the company that created it - no document, figure or "
+                     "conversation is visible outside your own workspace.\n"
+                     "Q: Can I change plans later?\n"
+                     "A: Yes - moving between solo and team plans, or up and down tiers, doesn't require "
+                     "setting anything up twice."},
+
         {"key": "cta_headline", "label": "Closing CTA headline", "type": "text",
          "default": "Start with the work your team handles every day."},
         {"key": "cta_subtext", "label": "Closing CTA subtext", "type": "paragraph",
@@ -518,11 +547,28 @@ SITE_CONTENT_SCHEMA = {
         {"key": "security_intro", "label": "Security — intro", "type": "paragraph", "default": ""},
         {"key": "security_body", "label": "Security — full text (HTML)", "type": "html", "default": ""},
     ],
+    "contact": [
+        {"key": "contact_eyebrow", "label": "Contact page eyebrow", "type": "text", "default": "Get in touch"},
+        {"key": "contact_headline", "label": "Contact page headline", "type": "text",
+         "default": "We're here when you need us."},
+        {"key": "contact_intro", "label": "Contact page intro", "type": "paragraph",
+         "default": "Questions about pricing, onboarding, or something not working right? Reach us any of "
+                     "these ways."},
+        {"key": "contact_email", "label": "Contact email", "type": "text", "default": "hello@buinee.app"},
+        {"key": "contact_phone", "label": "Contact phone number", "type": "text", "default": "+233 20 000 0000"},
+        {"key": "contact_whatsapp", "label": "WhatsApp number (digits only, with country code)", "type": "text",
+         "default": "233200000000"},
+        {"key": "contact_address", "label": "Physical address (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "social_twitter", "label": "X / Twitter URL (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "social_linkedin", "label": "LinkedIn URL (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "social_facebook", "label": "Facebook URL (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "social_instagram", "label": "Instagram URL (leave blank to hide)", "type": "text", "default": ""},
+    ],
 }
 
-CMS_PAGE_ROUTES = {"/": "index", "/register": "register", "/login": "login"}
+CMS_PAGE_ROUTES = {"/": "index", "/register": "register", "/login": "login", "/contact": "contact"}
 
-_CMS_TOKEN_RE = re.compile(r"\{\{cms:([a-z0-9_]+)\}\}")
+_CMS_TOKEN_RE = re.compile(r"\{\{cms:(?:([a-z0-9_]+)\.)?([a-z0-9_]+)\}\}")
 _CMS_JSON_TOKEN_RE = re.compile(r"\{\{cms_json:([a-z0-9_]+)\}\}")
 
 
@@ -544,26 +590,53 @@ def _render_cms_value(field_type: str, value: str) -> str:
     if field_type == "bullets":
         lines = [ln.strip() for ln in value.split("\n") if ln.strip()]
         return "".join(f"<li>{CMS_CHECK_SVG}{html.escape(ln)}</li>" for ln in lines)
+    if field_type == "qa_list":
+        items = []
+        question, answer = None, []
+        for raw_line in value.split("\n"):
+            line = raw_line.strip()
+            if line.lower().startswith("q:"):
+                if question is not None:
+                    items.append((question, " ".join(answer).strip()))
+                question, answer = line[2:].strip(), []
+            elif line.lower().startswith("a:"):
+                answer.append(line[2:].strip())
+            elif line:
+                answer.append(line)
+        if question is not None:
+            items.append((question, " ".join(answer).strip()))
+        return "".join(
+            f'<details class="faq-item"><summary>{html.escape(q)}'
+            f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+            f'<path d="m6 9 6 6 6-6"/></svg></summary>'
+            f'<div class="faq-a">{html.escape(a)}</div></details>'
+            for q, a in items if q
+        )
     if field_type == "paragraph":
         return html.escape(value).replace("\n", "<br>")
     return html.escape(value)
 
 
 def render_site_content(page: str, raw_html: bytes) -> bytes:
-    """Replace {{cms:key}} / {{cms_json:page}} tokens in a static page's HTML
-    with admin-edited copy (falling back to the schema default), escaping
-    every value so saved content can never inject markup into the public site."""
+    """Replace {{cms:key}} / {{cms:page.key}} / {{cms_json:page}} tokens in a
+    static page's HTML with admin-edited copy (falling back to the schema
+    default), escaping every value so saved content can never inject markup
+    into the public site. A token may name a different page than the one
+    being rendered (e.g. index.html's footer pulling from the "contact"
+    page) so the same saved value shows up everywhere it's used."""
     if page not in SITE_CONTENT_SCHEMA:
         return raw_html
-    values = site_content_effective(page)
+    values_cache = {page: site_content_effective(page)}
     text = raw_html.decode("utf-8")
 
     def repl_token(m: re.Match) -> str:
-        key = m.group(1)
-        return _render_cms_value(_cms_field_type(page, key), values.get(key, ""))
+        ref_page, key = m.group(1) or page, m.group(2)
+        if ref_page not in values_cache:
+            values_cache[ref_page] = site_content_effective(ref_page) if ref_page in SITE_CONTENT_SCHEMA else {}
+        return _render_cms_value(_cms_field_type(ref_page, key), values_cache[ref_page].get(key, ""))
 
     def repl_json(m: re.Match) -> str:
-        return json.dumps(values) if m.group(1) == page else m.group(0)
+        return json.dumps(values_cache[page]) if m.group(1) == page else m.group(0)
 
     text = _CMS_TOKEN_RE.sub(repl_token, text)
     text = _CMS_JSON_TOKEN_RE.sub(repl_json, text)
