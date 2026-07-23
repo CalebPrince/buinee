@@ -480,6 +480,17 @@
   .ada-typing i:nth-child(2) { animation-delay: .18s; }
   .ada-typing i:nth-child(3) { animation-delay: .36s; }
   @keyframes adaBlink { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+  /* Voice: hear Ada's replies aloud (UK English, female) */
+  .ada-voice-btn { align-self: flex-end; flex: none; width: 24px; height: 24px; margin-bottom: 2px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); cursor: pointer; display: grid; place-items: center; opacity: .55; transition: opacity .15s, color .15s, background .15s; }
+  .ada-voice-btn:hover { opacity: 1; color: var(--teal); background: var(--teal-soft); }
+  .ada-voice-btn svg { width: 14px; height: 14px; }
+  .ada-voice-btn.speaking { opacity: 1; color: var(--teal); background: var(--teal-soft); }
+  .ada-voice-btn.speaking svg { animation: adaVoicePulse 1s ease-in-out infinite; }
+  @keyframes adaVoicePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+  .ada-auto-btn { flex: none; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink-3); cursor: pointer; display: grid; place-items: center; transition: color .15s, background .15s, border-color .15s; }
+  .ada-auto-btn:hover { color: var(--teal); border-color: var(--teal); }
+  .ada-auto-btn svg { width: 16px; height: 16px; }
+  .ada-auto-btn.on { color: #fff; background: var(--teal); border-color: var(--teal); }
   @media (max-width: 480px) {
     .ada-panel { right: 12px; left: 12px; width: auto; bottom: 84px; }
     .ada-launcher { right: 16px; bottom: 16px; }
@@ -946,7 +957,10 @@
   <div class="ada-panel-head">
     <span class="av">A</span>
     <div><b>Ask Ada</b><span id="adaPanelStatus"><span class="status-dot" id="adaPanelStatusDot"></span><span id="adaPanelStatusText">Questions about Buinee, answered live</span></span></div>
-    <button class="ada-panel-close" type="button" aria-label="Close" onclick="toggleAdaPanel(false)">
+    <button class="ada-auto-btn" type="button" id="adaAutoReadBtn" aria-pressed="false" title="Auto-read Ada's new replies aloud" onclick="toggleAdaAutoRead(this)" style="margin-left:auto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+    </button>
+    <button class="ada-panel-close" type="button" aria-label="Close" onclick="toggleAdaPanel(false)" style="margin-left:6px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
@@ -1158,13 +1172,126 @@
     return escapeHtmlAda(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
   }
 
+  // ---- Ada voice: read her replies aloud in a UK English female voice ----
+  const AdaVoice = (function () {
+    const synth = window.speechSynthesis || null;
+    let voice = null, autoRead = false, activeBtn = null;
+    const AUTO_KEY = "buinee.adaAutoRead";
+
+    function pickVoice() {
+      if (!synth) return null;
+      const voices = synth.getVoices();
+      if (!voices.length) return null;
+      const FEMALE = /(female|zira|susan|hazel|libby|sonia|maisie|serena|kate|stephanie|amy|emma|fiona|martha|samantha|karen|moira|tessa|veena|catherine|allison|ava|joanna|salli|kendra|kimberly)/i;
+      const MALE = /\b(male|david|mark|george|daniel|james|guy|ryan|richard|eric|arthur|paul|fred|albert)\b/i;
+      const gb = voices.filter(v => /en[-_]?gb/i.test(v.lang));
+      const en = voices.filter(v => /^en/i.test(v.lang));
+      return gb.find(v => FEMALE.test(v.name))
+        || gb.find(v => !MALE.test(v.name))
+        || gb[0]
+        || en.find(v => FEMALE.test(v.name))
+        || en.find(v => !MALE.test(v.name))
+        || en[0]
+        || voices.find(v => FEMALE.test(v.name))
+        || voices[0] || null;
+    }
+    function ensureVoice() { if (!voice) voice = pickVoice(); return voice; }
+    if (synth) {
+      ensureVoice();
+      try { synth.onvoiceschanged = () => { voice = pickVoice(); }; } catch {}
+    }
+    try { autoRead = localStorage.getItem(AUTO_KEY) === "1"; } catch {}
+
+    function clean(text) {
+      return String(text || "")
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+        .replace(/[*_`#>]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    function setState(btn, on) {
+      if (!btn) return;
+      btn.classList.toggle("speaking", on);
+      btn.setAttribute("aria-label", on ? "Stop reading" : "Hear this reply aloud");
+    }
+    function stop() {
+      if (synth) synth.cancel();
+      setState(activeBtn, false);
+      activeBtn = null;
+    }
+    function play(text, btn) {
+      if (!synth) return;
+      synth.cancel();
+      const words = clean(text);
+      if (!words) return;
+      setState(activeBtn, false);
+      activeBtn = btn || null;
+      const u = new SpeechSynthesisUtterance(words);
+      const v = ensureVoice();
+      if (v) u.voice = v;
+      u.lang = (v && v.lang) || "en-GB";
+      u.rate = 1; u.pitch = 1;
+      u.onstart = () => setState(activeBtn, true);
+      u.onend = u.onerror = () => { if (activeBtn === btn) { setState(btn, false); activeBtn = null; } };
+      synth.speak(u);
+    }
+    return {
+      supported: () => !!synth,
+      toggle(text, btn) {
+        if (!synth) return;
+        if (btn && activeBtn === btn && (synth.speaking || synth.pending)) { stop(); return; }
+        play(text, btn);
+      },
+      auto(text) { if (autoRead) play(text, null); },
+      stop,
+      isAuto: () => autoRead,
+      setAuto(on) {
+        autoRead = !!on;
+        try { localStorage.setItem(AUTO_KEY, autoRead ? "1" : "0"); } catch {}
+        if (!autoRead) stop();
+      },
+    };
+  })();
+
+  const ADA_VOICE_BTN = AdaVoice.supported()
+    ? '<button class="ada-voice-btn" type="button" aria-label="Hear this reply aloud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19.5 5a9 9 0 0 1 0 14"/></svg></button>'
+    : "";
+
+  function toggleAdaAutoRead(btn) {
+    AdaVoice.setAuto(!AdaVoice.isAuto());
+    syncAdaAutoReadBtn(btn);
+  }
+  function syncAdaAutoReadBtn(btn) {
+    if (!btn) return;
+    if (!AdaVoice.supported()) { btn.style.display = "none"; return; }
+    const on = AdaVoice.isAuto();
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = on ? "Auto-read is on — new replies play aloud" : "Auto-read Ada's new replies aloud";
+  }
+
+  // One delegated listener survives the log being re-rendered on every message.
+  (function initAdaVoice() {
+    const log = document.getElementById("adaPanelLog");
+    if (log) log.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".ada-voice-btn");
+      if (!btn) return;
+      const msg = btn.closest(".ada-panel-msg");
+      const bub = msg && msg.querySelector(".bub");
+      if (!bub) return;
+      AdaVoice.toggle(bub.textContent, btn);
+    });
+    syncAdaAutoReadBtn(document.getElementById("adaAutoReadBtn"));
+  })();
+
   function renderLandingAdaLog() {
     const box = document.getElementById("adaPanelLog");
-    const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee — what it does, pricing, or how to get your team started.</div></div>";
+    const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee — what it does, pricing, or how to get your team started.</div>" + ADA_VOICE_BTN + "</div>";
     const offlineNotice = adaOnline ? "" : "<div class=\"ada-offline-notice\">We're offline right now. Send a message and leave a way to reach you, and our team will follow up as soon as we're back.</div>";
     box.innerHTML = offlineNotice + welcome + adaLandingHistory.map(m => {
       const mine = m.role === "user";
-      return `<div class="ada-panel-msg ${mine ? "me" : "ai"}"><div class="bub">${mine ? escapeHtmlAda(m.content) : adaChatMarkdown(m.content)}</div></div>`;
+      return `<div class="ada-panel-msg ${mine ? "me" : "ai"}"><div class="bub">${mine ? escapeHtmlAda(m.content) : adaChatMarkdown(m.content)}</div>${mine ? "" : ADA_VOICE_BTN}</div>`;
     }).join("");
     const starters = document.getElementById("adaStartersMini");
     if (starters) starters.style.display = adaLandingHistory.length ? "none" : "flex";
@@ -1310,6 +1437,7 @@
       adaLandingHistory.push({ role: "assistant", content: res.ok ? data.reply : (data.error || "Could not reach the assistant.") });
       saveLandingAda();
       renderLandingAdaLog();
+      if (res.ok && data.reply) AdaVoice.auto(data.reply);
       if (res.ok && data.register_draft) renderAdaRegisterCard(data.register_draft);
     } catch {
       adaLandingHistory.push({ role: "assistant", content: "Could not reach the server." });
