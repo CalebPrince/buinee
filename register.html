@@ -425,9 +425,27 @@
         </label>
         <label id="regRoleLabel">Your role
           <select id="regRole" required>
-            <option value="finance_supervisor" selected>Supervisor — I oversee the workspace</option>
-            <option value="senior_accountant">Approver — approves and signs</option>
-            <option value="account_assistant">Preparer — prepares vouchers and letters</option>
+            <optgroup label="Supervisor — oversees the workspace">
+              <option value="finance_supervisor" selected>Owner / Managing Director</option>
+              <option value="finance_supervisor">CEO / Founder</option>
+              <option value="finance_supervisor">Finance Director</option>
+              <option value="finance_supervisor">Other — I oversee the whole workspace</option>
+            </optgroup>
+            <optgroup label="Approver — approves and signs">
+              <option value="senior_accountant">Finance Manager</option>
+              <option value="senior_accountant">Senior Accountant</option>
+              <option value="senior_accountant">Head of Department</option>
+              <option value="senior_accountant">Branch Manager</option>
+              <option value="senior_accountant">Other — I approve and sign</option>
+            </optgroup>
+            <optgroup label="Preparer — prepares vouchers and letters">
+              <option value="account_assistant">Accounts Assistant</option>
+              <option value="account_assistant">Cashier</option>
+              <option value="account_assistant">Store / Inventory Officer</option>
+              <option value="account_assistant">Junior Accountant</option>
+              <option value="account_assistant">Administrative Officer</option>
+              <option value="account_assistant">Other — I prepare vouchers and letters</option>
+            </optgroup>
           </select>
         </label>
         <label>Work email
@@ -466,9 +484,27 @@
         <label>Your role
           <select id="joinRole" required>
             <option value="">Choose one</option>
-            <option value="account_assistant">Preparer — prepares vouchers and letters</option>
-            <option value="senior_accountant">Approver — approves and signs</option>
-            <option value="finance_supervisor">Supervisor — only if nobody holds this role yet</option>
+            <optgroup label="Preparer — prepares vouchers and letters">
+              <option value="account_assistant">Accounts Assistant</option>
+              <option value="account_assistant">Cashier</option>
+              <option value="account_assistant">Store / Inventory Officer</option>
+              <option value="account_assistant">Junior Accountant</option>
+              <option value="account_assistant">Administrative Officer</option>
+              <option value="account_assistant">Other — I prepare vouchers and letters</option>
+            </optgroup>
+            <optgroup label="Approver — approves and signs">
+              <option value="senior_accountant">Finance Manager</option>
+              <option value="senior_accountant">Senior Accountant</option>
+              <option value="senior_accountant">Head of Department</option>
+              <option value="senior_accountant">Branch Manager</option>
+              <option value="senior_accountant">Other — I approve and sign</option>
+            </optgroup>
+            <optgroup label="Supervisor — only if nobody holds this role yet">
+              <option value="finance_supervisor">Owner / Managing Director</option>
+              <option value="finance_supervisor">CEO / Founder</option>
+              <option value="finance_supervisor">Finance Director</option>
+              <option value="finance_supervisor">Other — I oversee the whole workspace</option>
+            </optgroup>
           </select>
         </label>
         <label class="terms-check"><input type="checkbox" id="joinTerms" required><span>I agree to Buinee’s <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
