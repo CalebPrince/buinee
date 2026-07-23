@@ -773,6 +773,48 @@ def build_admin_digest(admin: dict) -> str:
     return "\n\n".join(parts)
 
 
+def admin_alerts(admin: dict, cfg: dict) -> dict:
+    """Periodic, role-scoped 'is anything not working well' signals for the
+    Command Center's banner - deliberately cheap (platform_alert_counts is
+    COUNT(*)-only) since the client polls this every few minutes. Every role
+    sees the base signals (identical to what the Overview page's one-time
+    attention widget already shows everyone); errors and payments are only
+    included for the roles that can already see the Error log / Payments
+    pages, matching the same _admin_role_request allow-lists used there."""
+    counts = db.platform_alert_counts()
+    role = admin.get("role", "owner")
+    alerts = []
+    if counts["pending_access"]:
+        alerts.append({"key": "pending_access", "n": counts["pending_access"],
+                       "title": "Pending access requests", "copy": "Across all companies",
+                       "href": "/admin/companies"})
+    if counts["missing_supervisor"]:
+        alerts.append({"key": "missing_supervisor", "n": counts["missing_supervisor"],
+                       "title": "No supervisor assigned", "copy": "Companies without an approver",
+                       "href": "/admin/companies"})
+    if counts["needs_team_plan"]:
+        alerts.append({"key": "needs_team_plan", "n": counts["needs_team_plan"],
+                       "title": "Move to a Team tier", "copy": "Multi-user companies still on Individual",
+                       "href": "/admin/companies"})
+    if not active_provider(cfg):
+        alerts.append({"key": "ai_not_configured", "n": 1,
+                       "title": "No AI provider configured", "copy": "Ada and the demo agent are both offline",
+                       "href": "/admin/settings"})
+    if fx() is None:
+        alerts.append({"key": "fx_missing", "n": 1,
+                       "title": "Bank of Ghana FX rates not loaded", "copy": "Multi-currency vouchers may be affected",
+                       "href": "/admin"})
+    if role in ("owner", "support") and counts["recent_errors"]:
+        alerts.append({"key": "recent_errors", "n": counts["recent_errors"],
+                       "title": "Application errors in the last hour", "copy": "Check the error log",
+                       "href": "/admin/errors"})
+    if role in ("owner", "billing") and counts["failed_payments"]:
+        alerts.append({"key": "failed_payments", "n": counts["failed_payments"],
+                       "title": "Failed payments in the last 24 hours", "copy": "Check Payments",
+                       "href": "/admin/payments"})
+    return {"alerts": alerts, "total": sum(a["n"] for a in alerts)}
+
+
 # Definitions stay in code while user choices/results stay in the database.
 # Adding a recipe is one registry entry plus a runner branch; existing rows and
 # clients continue to work because recipe_key is deliberately open-ended.
@@ -1206,6 +1248,24 @@ class RouteHandlerMixin:
 
     # ---------------------------------------------------------------- GET
 
+    def _route_safely(self, fn) -> None:
+        """Run a route handler, turning any exception that escapes it into a
+        JSON 500 instead of a dead connection. Without this, an unhandled
+        exception anywhere in a handler (e.g. a missed foreign-key cleanup)
+        propagates all the way out of do_GET/do_POST/application with no
+        response ever written - the browser sees that as the request simply
+        failing, indistinguishable from the server being unreachable."""
+        try:
+            fn()
+        except Exception as exc:
+            reference = report_application_error(
+                "server.unhandled", exc, context=f"{getattr(self, 'command', '')} {self.path}".strip())
+            print(f"  ! unhandled exception: {exc}")
+            try:
+                self._json({"error": f"Something went wrong on our end. Reference: {reference}."}, 500)
+            except Exception:
+                pass
+
     def _route_get(self):
         path = self.path.split("?")[0]
 
@@ -1507,6 +1567,12 @@ class RouteHandlerMixin:
                 },
             })
 
+        if path == "/api/admin/alerts":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json(admin_alerts(admin, load_env()))
+
         if path == "/api/admin/plans":
             admin = self._admin_role_request("owner", "billing")
             if not admin:
@@ -1653,6 +1719,7 @@ class RouteHandlerMixin:
             "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
             "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
             "/api/admin/company/delete": self._handle_admin_delete_company,
+            "/api/admin/payment/delete": self._handle_admin_delete_payment,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
@@ -2761,6 +2828,26 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
 
+    def _handle_admin_delete_payment(self):
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            payment_id = int(req.get("payment_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            db.delete_payment(payment_id)
+            db.record_admin_activity(admin, "deleted", "payment", payment_id,
+                                     details="Payment record permanently removed")
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True})
+
     def _handle_admin_mfa_setup(self):
         admin = current_admin(self)
         if not admin:
@@ -3160,11 +3247,11 @@ class Handler(RouteHandlerMixin, BaseHTTPRequestHandler):
         self.wfile.write(self._resp_body)
 
     def do_GET(self):
-        self._route_get()
+        self._route_safely(self._route_get)
         self._emit()
 
     def do_POST(self):
-        self._route_post()
+        self._route_safely(self._route_post)
         self._emit()
 
     def do_HEAD(self):
@@ -3240,15 +3327,15 @@ def application(environ, start_response):
     method = environ.get("REQUEST_METHOD", "GET").upper()
 
     if method == "GET":
-        req._route_get()
+        req._route_safely(req._route_get)
     elif method == "HEAD":
         req._head_only = True
         try:
-            req._route_get()
+            req._route_safely(req._route_get)
         finally:
             req._head_only = False
     elif method == "POST":
-        req._route_post()
+        req._route_safely(req._route_post)
     else:
         req._json({"error": "method not allowed"}, 405)
 

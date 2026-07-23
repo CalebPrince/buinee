@@ -1924,10 +1924,48 @@ def change_admin_password(admin_id: int, current_password: str, new_password: st
 def delete_company(company_id: int) -> None:
     """Permanently remove a company and everyone in it. Irreversible - no
     undo, no soft-delete. Command Center only; a company's own Supervisor
-    has no way to do this to their own company."""
+    has no way to do this to their own company.
+
+    Every table that references companies(id) or a user in this company has
+    to be cleared first - foreign keys are enforced on every connection (see
+    _connect), so leaving one out doesn't silently orphan rows, it raises
+    IntegrityError and aborts the whole delete. Children before parents:
+    admin_invoice_items before admin_invoices, team_message_files before
+    team_messages, voucher_events before vouchers."""
     if not get_company(company_id):
         raise AuthError("No such company.")
     with _cursor() as conn:
+        conn.execute(
+            "DELETE FROM admin_invoice_items WHERE invoice_id IN "
+            "(SELECT id FROM admin_invoices WHERE company_id = ?)", (company_id,))
+        conn.execute("DELETE FROM admin_invoices WHERE company_id = ?", (company_id,))
+        conn.execute(
+            "DELETE FROM team_message_files WHERE message_id IN "
+            "(SELECT id FROM team_messages WHERE company_id = ?)", (company_id,))
+        conn.execute("DELETE FROM team_messages WHERE company_id = ?", (company_id,))
+        conn.execute("DELETE FROM voucher_events WHERE company_id = ?", (company_id,))
+        conn.execute("DELETE FROM vouchers WHERE company_id = ?", (company_id,))
+        conn.execute("DELETE FROM automation_runs WHERE company_id = ?", (company_id,))
+        conn.execute(
+            "DELETE FROM automation_settings WHERE user_id IN "
+            "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute("DELETE FROM mailbox_connections WHERE company_id = ?", (company_id,))
+        conn.execute(
+            "DELETE FROM oauth_states WHERE user_id IN "
+            "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute(
+            "DELETE FROM user_instructions WHERE user_id IN "
+            "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute(
+            "DELETE FROM reference_documents WHERE user_id IN "
+            "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute(
+            "DELETE FROM team_conversation_clears WHERE user_id IN "
+            "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute(
+            "DELETE FROM user_notification_state WHERE user_id IN "
+            "(SELECT id FROM users WHERE company_id = ?)", (company_id,))
+        conn.execute("DELETE FROM chat_usage WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM payments WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_subscriptions WHERE company_id = ?", (company_id,))
         conn.execute("DELETE FROM crm_tasks WHERE company_id = ?", (company_id,))
@@ -3019,6 +3057,16 @@ def get_payment(reference: str) -> dict | None:
     return dict(row) if row else None
 
 
+def delete_payment(payment_id: int) -> None:
+    """Remove a single payment record - a test/bad row, not a real
+    transaction reversal. Command Center only; unlike delete_company this
+    doesn't cascade to anything, it's just the one row."""
+    with _cursor() as conn:
+        if not conn.execute("SELECT id FROM payments WHERE id = ?", (payment_id,)).fetchone():
+            raise AuthError("No such payment.")
+        conn.execute("DELETE FROM payments WHERE id = ?", (payment_id,))
+
+
 def list_user_crm_tasks(user: dict) -> list[dict]:
     with _cursor() as conn:
         if user["role"] == "finance_supervisor":
@@ -3338,6 +3386,43 @@ def platform_stats() -> dict:
         "companies": companies,
         "by_status": {r["status"]: r["n"] for r in by_status},
         "by_role": {r["role"]: r["n"] for r in by_role},
+    }
+
+
+def platform_alert_counts() -> dict:
+    """Cheap COUNT(*)-only signals for the Command Center's periodic alert
+    banner - deliberately no full row fetches (see list_companies_with_stats,
+    which the Overview page's one-time attention widget uses instead), since
+    this is meant to be polled every few minutes from every open admin tab."""
+    cutoff_errors = time.time() - 3600       # last hour
+    cutoff_payments = time.time() - 86400    # last 24 hours
+    with _cursor() as conn:
+        pending_access = conn.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE status = 'pending'"
+        ).fetchone()["n"]
+        missing_supervisor = conn.execute(
+            """SELECT COUNT(*) AS n FROM companies c WHERE NOT EXISTS (
+                   SELECT 1 FROM users u WHERE u.company_id = c.id
+                   AND u.role = 'finance_supervisor' AND u.status = 'approved')"""
+        ).fetchone()["n"]
+        needs_team_plan = conn.execute(
+            """SELECT COUNT(*) AS n FROM companies c JOIN plans p ON p.id = c.plan_id
+               WHERE p.audience = 'individual' AND (
+                   (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id AND u.status = 'approved') > 1
+                   OR EXISTS (SELECT 1 FROM users u WHERE u.company_id = c.id AND u.status = 'pending'))"""
+        ).fetchone()["n"]
+        recent_errors = conn.execute(
+            "SELECT COUNT(*) AS n FROM application_errors WHERE created_at > ?", (cutoff_errors,)
+        ).fetchone()["n"]
+        failed_payments = conn.execute(
+            "SELECT COUNT(*) AS n FROM payments WHERE status = 'failed' AND created_at > ?", (cutoff_payments,)
+        ).fetchone()["n"]
+    return {
+        "pending_access": pending_access,
+        "missing_supervisor": missing_supervisor,
+        "needs_team_plan": needs_team_plan,
+        "recent_errors": recent_errors,
+        "failed_payments": failed_payments,
     }
 
 
