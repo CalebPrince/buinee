@@ -294,6 +294,56 @@
     .cta-band { padding: 38px 22px; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* ---- Ask Ada (public demo widget) ---- */
+  .ada-launcher {
+    position: fixed; right: 22px; bottom: 22px; z-index: 60; width: 58px; height: 58px;
+    border-radius: 50%; border: 0; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--teal), var(--teal-deep)); color: #fff;
+    box-shadow: var(--shadow-lg); cursor: pointer; transition: transform .15s;
+  }
+  .ada-launcher:hover { transform: scale(1.05); }
+  .ada-launcher svg { width: 24px; height: 24px; }
+  .ada-panel {
+    position: fixed; right: 22px; bottom: 92px; z-index: 60; width: 360px; max-width: calc(100vw - 32px);
+    height: min(520px, calc(100vh - 140px)); background: var(--surface); border: 1px solid var(--line);
+    border-radius: 16px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;
+    opacity: 0; transform: translateY(12px) scale(.98); pointer-events: none; transition: opacity .16s, transform .16s;
+  }
+  .ada-panel.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .ada-panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .ada-panel-head .av {
+    width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--teal), var(--teal-deep)); color: #fff; font: 800 12px var(--sans);
+  }
+  .ada-panel-head b { display: block; font-size: 14px; }
+  .ada-panel-head span { display: block; font-size: 11px; color: var(--ink-3); }
+  .ada-panel-close { margin-left: auto; border: 0; background: transparent; color: var(--ink-3); cursor: pointer; padding: 4px; display: grid; place-items: center; }
+  .ada-panel-close svg { width: 18px; height: 18px; }
+  .ada-panel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+  .ada-panel-log { display: flex; flex-direction: column; gap: 12px; }
+  .ada-panel-msg { display: flex; gap: 8px; }
+  .ada-panel-msg .bub { max-width: 86%; padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+  .ada-panel-msg.ai .bub { background: var(--surface-2); border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .ada-panel-msg.me { flex-direction: row-reverse; }
+  .ada-panel-msg.me .bub { background: var(--teal); color: #fff; border-top-right-radius: 4px; }
+  .ada-starters-mini { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+  .ada-starter-mini { text-align: left; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-2); font-size: 12px; cursor: pointer; }
+  .ada-starter-mini:hover { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+  .ada-panel-foot { border-top: 1px solid var(--line); padding: 10px 12px; }
+  .ada-panel-box { display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 11px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); }
+  .ada-panel-box textarea { flex: 1; max-height: 90px; padding: 4px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: 13px/1.5 var(--sans); }
+  .ada-panel-send { width: 30px; height: 30px; border: 0; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--teal); color: #fff; cursor: pointer; }
+  .ada-panel-send svg { width: 15px; height: 15px; }
+  .ada-typing { display: flex; align-items: center; gap: 4px; padding: 3px 2px; }
+  .ada-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: adaBlink 1.3s ease-in-out infinite; }
+  .ada-typing i:nth-child(2) { animation-delay: .18s; }
+  .ada-typing i:nth-child(3) { animation-delay: .36s; }
+  @keyframes adaBlink { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+  @media (max-width: 480px) {
+    .ada-panel { right: 12px; left: 12px; width: auto; bottom: 84px; }
+    .ada-launcher { right: 16px; bottom: 16px; }
+  }
 </style>
 
 <header class="nav">
@@ -687,6 +737,34 @@
   </div>
 </footer>
 
+<button class="ada-launcher" id="adaLauncherBtn" type="button" aria-label="Chat with Ada" onclick="toggleAdaPanel()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+</button>
+
+<div class="ada-panel" id="adaPanel" role="dialog" aria-label="Chat with Ada">
+  <div class="ada-panel-head">
+    <span class="av">A</span>
+    <div><b>Ask Ada</b><span>Questions about Buinee, answered live</span></div>
+    <button class="ada-panel-close" type="button" aria-label="Close" onclick="toggleAdaPanel(false)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="ada-panel-scroll" id="adaPanelScroll">
+    <div class="ada-panel-log" id="adaPanelLog"></div>
+    <div class="ada-starters-mini" id="adaStartersMini">
+      <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;What is Buinee, in a nutshell?&quot;)">What is Buinee, in a nutshell?</button>
+      <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;How much does it cost?&quot;)">How much does it cost?</button>
+      <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;How do I get my team set up?&quot;)">How do I get my team set up?</button>
+    </div>
+  </div>
+  <form class="ada-panel-foot" onsubmit="return sendLandingAda(event)">
+    <div class="ada-panel-box">
+      <textarea id="adaPanelInput" rows="1" placeholder="Ask a question…" oninput="adaAutoGrow(this)" onkeydown="adaPanelKey(event)"></textarea>
+      <button class="ada-panel-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
+    </div>
+  </form>
+</div>
+
 <script>
   function toggleTheme() {
     const root = document.documentElement;
@@ -790,4 +868,110 @@
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
+
+  // ---- Ask Ada (public demo widget) ----
+  let adaLandingHistory = [];
+
+  function adaLandingKey() { return "buinee.landingAdaConversation"; }
+
+  function loadLandingAda() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(adaLandingKey()) || "[]");
+      adaLandingHistory = Array.isArray(saved)
+        ? saved.filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").slice(-30)
+        : [];
+    } catch { adaLandingHistory = []; }
+  }
+
+  function saveLandingAda() {
+    localStorage.setItem(adaLandingKey(), JSON.stringify(adaLandingHistory.slice(-30)));
+  }
+
+  function escapeHtmlAda(s) {
+    const d = document.createElement("div");
+    d.textContent = s ?? "";
+    return d.innerHTML;
+  }
+
+  function adaChatMarkdown(text) {
+    return escapeHtmlAda(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+  }
+
+  function renderLandingAdaLog() {
+    const box = document.getElementById("adaPanelLog");
+    const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee — what it does, pricing, or how to get your team started.</div></div>";
+    box.innerHTML = welcome + adaLandingHistory.map(m => {
+      const mine = m.role === "user";
+      return `<div class="ada-panel-msg ${mine ? "me" : "ai"}"><div class="bub">${mine ? escapeHtmlAda(m.content) : adaChatMarkdown(m.content)}</div></div>`;
+    }).join("");
+    const starters = document.getElementById("adaStartersMini");
+    if (starters) starters.style.display = adaLandingHistory.length ? "none" : "flex";
+    const scroll = document.getElementById("adaPanelScroll");
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
+  function adaAutoGrow(input) {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 90) + "px";
+  }
+
+  function adaPanelKey(ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      ev.target.closest("form").requestSubmit();
+    }
+  }
+
+  function primeLandingAda(prompt) {
+    const input = document.getElementById("adaPanelInput");
+    input.value = prompt;
+    adaAutoGrow(input);
+    input.focus();
+  }
+
+  let adaPanelOpen = false;
+  function toggleAdaPanel(force) {
+    adaPanelOpen = typeof force === "boolean" ? force : !adaPanelOpen;
+    document.getElementById("adaPanel").classList.toggle("open", adaPanelOpen);
+    if (adaPanelOpen) {
+      loadLandingAda();
+      renderLandingAdaLog();
+      document.getElementById("adaPanelInput").focus();
+    }
+  }
+
+  async function sendLandingAda(ev) {
+    ev.preventDefault();
+    const input = document.getElementById("adaPanelInput");
+    const text = input.value.trim();
+    if (!text) return false;
+
+    adaLandingHistory.push({ role: "user", content: text });
+    saveLandingAda();
+    input.value = "";
+    adaAutoGrow(input);
+    renderLandingAdaLog();
+    const box = document.getElementById("adaPanelLog");
+    box.insertAdjacentHTML("beforeend", '<div class="ada-panel-msg ai" id="adaPanelPending"><div class="bub"><span class="ada-typing"><i></i><i></i><i></i></span></div></div>');
+    document.getElementById("adaPanelScroll").scrollTop = 1e9;
+
+    try {
+      const res = await fetch("/api/demo", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          history: adaLandingHistory.slice(0, -1).map(({ role, content }) => ({ role, content })),
+        }),
+      });
+      const data = await res.json();
+      adaLandingHistory.push({ role: "assistant", content: res.ok ? data.reply : (data.error || "Could not reach the assistant.") });
+      saveLandingAda();
+    } catch {
+      adaLandingHistory.push({ role: "assistant", content: "Could not reach the server." });
+      saveLandingAda();
+    }
+    renderLandingAdaLog();
+    return false;
+  }
 </script>
