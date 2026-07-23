@@ -181,6 +181,13 @@
   .source-option-copy span { display: block; margin-top: 2px; color: var(--ink-3); font-size: 11.5px; }
   .source-option-state { color: var(--teal); font-size: 11px; font-weight: 800; }
   .source-modal-note { padding: 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 12px; }
+  .source-tools-link {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+    margin-top: 16px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 11px;
+    background: var(--surface-2); color: var(--ink-2); font-size: 12.5px; text-align: left; cursor: pointer;
+  }
+  .source-tools-link:hover { border-color: var(--teal); color: var(--teal); }
+  .source-tools-link span { flex: none; font-weight: 600; color: var(--teal-deep); }
   .onboard-back { position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center; padding:22px; background:rgba(10,25,22,.68); backdrop-filter:blur(5px); }
   .onboard-back.open { display:flex; }
   .onboard-card { width:min(720px,100%); min-height:430px; max-height:92vh; display:grid; grid-template-columns:170px minmax(0,1fr); overflow:hidden; border:1px solid rgba(255,255,255,.16); border-radius:20px; background:var(--surface); box-shadow:0 28px 80px rgba(0,0,0,.34); }
@@ -308,9 +315,15 @@
   .conn-top { display: flex; align-items: flex-start; gap: 10px; }
   .conn-ico {
     width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center;
+    background: #fff; border: 1px solid var(--line); overflow: hidden;
+  }
+  .conn-ico img { width: 20px; height: 20px; object-fit: contain; }
+  .conn-card.locked .conn-ico img { filter: grayscale(1); opacity: .55; }
+  .conn-ico-fallback {
+    width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center;
     background: var(--teal); color: #fff; font-weight: 800; font-size: 14px;
   }
-  .conn-card.locked .conn-ico { background: var(--ink-3); }
+  .conn-card.locked .conn-ico-fallback { background: var(--ink-3); }
   .conn-name { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
   .conn-blurb { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; margin-top: 2px; }
   .conn-tag {
@@ -1313,6 +1326,13 @@ Do not promise a payment date unless it has already been approved."></textarea>
       <button class="source-close" type="button" onclick="closeSourceModal()" aria-label="Close">×</button>
     </div>
     <div class="source-options" id="sourceModalOptions"></div>
+    <!-- This modal is email only, by design. Tools (Slack, Drive, Trello…)
+         live on the Connections page - "connect a source" reads like it
+         covers everything, so a pointer here saves the hunt. -->
+    <button class="source-tools-link" type="button" onclick="goToConnections()">
+      Looking for Slack, Drive, Trello and other tools?
+      <span>Open Connections →</span>
+    </button>
   </div>
 </div>
 
@@ -2499,6 +2519,41 @@ Do not promise a payment date unless it has already been approved."></textarea>
     }).join('');
   }
 
+  // Real vendor marks beat a generic letter tile - a person scanning this
+  // grid recognizes Slack's hashtag or Dropbox's box far faster than "S" or
+  // "D". Sourced from two free, keyless CDNs since no single one covers all
+  // 18: Simple Icons has an exact vector mark for most, Google's favicon
+  // service fills the handful it doesn't (Slack, Teams, OneDrive, Monday,
+  // Salesforce, Pipedrive, Outlook). Either can go offline or 404 a given
+  // vendor, so onerror always falls back to the old letter tile.
+  const TOOL_ICONS = {
+    slack: 'https://www.google.com/s2/favicons?domain=slack.com&sz=64',
+    teams: 'https://www.google.com/s2/favicons?domain=teams.microsoft.com&sz=64',
+    whatsapp: 'https://cdn.simpleicons.org/whatsapp',
+    google_drive: 'https://cdn.simpleicons.org/googledrive',
+    onedrive: 'https://www.google.com/s2/favicons?domain=onedrive.live.com&sz=64',
+    dropbox: 'https://cdn.simpleicons.org/dropbox',
+    notion: 'https://cdn.simpleicons.org/notion',
+    jira: 'https://cdn.simpleicons.org/jira',
+    asana: 'https://cdn.simpleicons.org/asana',
+    clickup: 'https://cdn.simpleicons.org/clickup',
+    monday: 'https://www.google.com/s2/favicons?domain=monday.com&sz=64',
+    trello: 'https://cdn.simpleicons.org/trello',
+    hubspot: 'https://cdn.simpleicons.org/hubspot',
+    salesforce: 'https://www.google.com/s2/favicons?domain=salesforce.com&sz=64',
+    pipedrive: 'https://www.google.com/s2/favicons?domain=pipedrive.com&sz=64',
+    google_calendar: 'https://cdn.simpleicons.org/googlecalendar',
+    outlook_calendar: 'https://www.google.com/s2/favicons?domain=outlook.com&sz=64',
+    calendly: 'https://cdn.simpleicons.org/calendly',
+  };
+
+  function toolIconHtml(t) {
+    const src = TOOL_ICONS[t.id];
+    const letter = escapeHtml(t.label[0]);
+    if (!src) return `<span class="conn-ico-fallback">${letter}</span>`;
+    return `<span class="conn-ico"><img src="${src}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'conn-ico-fallback',textContent:'${letter}'}))"></span>`;
+  }
+
   function toolCardHtml(t) {
     const accounts = t.connections.map(c => `
       <div class="conn-acct">
@@ -2542,7 +2597,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
     return `<div class="conn-card ${t.included ? '' : 'locked'}">
       <div class="conn-top">
-        <span class="conn-ico">${escapeHtml(t.label[0])}</span>
+        ${toolIconHtml(t)}
         <div style="min-width:0">
           <div class="conn-name">${escapeHtml(t.label)} ${tag}</div>
           <div class="conn-blurb">${escapeHtml(t.blurb)}</div>
@@ -2739,6 +2794,11 @@ Do not promise a payment date unless it has already been approved."></textarea>
   function closeSourceModal(ev) {
     if (ev && ev.target !== document.getElementById('sourceBack')) return;
     document.getElementById('sourceBack').classList.remove('open');
+  }
+
+  function goToConnections() {
+    document.getElementById('sourceBack').classList.remove('open');
+    go('connections');
   }
 
   document.addEventListener('keydown', ev => {
