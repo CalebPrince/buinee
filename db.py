@@ -792,6 +792,8 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN model_model TEXT")
     if "briefing" not in cols:
         conn.execute("ALTER TABLE companies ADD COLUMN briefing TEXT NOT NULL DEFAULT ''")
+    if "ada_notes" not in cols:
+        conn.execute("ALTER TABLE companies ADD COLUMN ada_notes TEXT NOT NULL DEFAULT ''")
 
 
 # Mon-Fri, 08:00-18:00 - a sensible starting point until an owner visits
@@ -820,6 +822,8 @@ def _migrate_platform_settings(conn: sqlite3.Connection) -> None:
             "UPDATE platform_settings SET livechat_schedule_json = ? WHERE livechat_schedule_json = '{}'",
             (json.dumps(DEFAULT_LIVECHAT_SCHEDULE),),
         )
+    if "ada_notes" not in cols:
+        conn.execute("ALTER TABLE platform_settings ADD COLUMN ada_notes TEXT NOT NULL DEFAULT ''")
     conn.execute(
         "INSERT OR IGNORE INTO platform_settings (id, ai_provider, ai_model, ai_briefing, "
         "livechat_mode, livechat_schedule_json) VALUES (1, NULL, '', '', 'schedule', ?)",
@@ -999,7 +1003,7 @@ def find_company_by_exact_name(name: str) -> dict | None:
 def get_company(company_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT id, name, plan_id, model_provider, model_model, briefing "
+            "SELECT id, name, plan_id, model_provider, model_model, briefing, ada_notes "
             "FROM companies WHERE id = ?", (company_id,)
         ).fetchone()
     return dict(row) if row else None
@@ -1033,6 +1037,56 @@ def set_company_briefing(company_id: int, briefing: str) -> dict:
         conn.execute(
             "UPDATE companies SET briefing = ? WHERE id = ?",
             (briefing.strip()[:4000], company_id),
+        )
+    return get_company(company_id)
+
+
+ADA_NOTES_MAX_CHARS = 4000
+
+
+def _append_ada_note(existing: str, note: str) -> str:
+    """Append a dated note to a running log, trimming from the oldest end
+    once it passes ADA_NOTES_MAX_CHARS - the same rolling-window idea used
+    for chat history everywhere else, just character-bounded instead of
+    message-count-bounded since these are freeform lines, not turns."""
+    note = " ".join(note.strip().split())[:600]
+    if not note:
+        return existing
+    line = f"- [{time.strftime('%Y-%m-%d', time.gmtime())}] {note}"
+    combined = (existing.strip() + "\n" + line) if existing.strip() else line
+    if len(combined) > ADA_NOTES_MAX_CHARS:
+        combined = combined[-ADA_NOTES_MAX_CHARS:]
+        nl = combined.find("\n")  # don't leave a truncated partial line at the top
+        if nl != -1:
+            combined = combined[nl + 1:]
+    return combined
+
+
+def append_company_ada_note(company_id: int, note: str) -> dict:
+    """Ada noting something worth remembering about how this company
+    operates - see extract_ada_note in server.py for how she signals it in
+    a reply. Sits alongside the human-authored briefing above, not merged
+    into it, so a Supervisor can tell the two apart on the Instructions
+    page and review, edit or clear what Ada's learned independently."""
+    company = get_company(company_id)
+    if not company:
+        raise AuthError("No such company.")
+    updated = _append_ada_note(company.get("ada_notes") or "", note)
+    with _cursor() as conn:
+        conn.execute("UPDATE companies SET ada_notes = ? WHERE id = ?", (updated, company_id))
+    return get_company(company_id)
+
+
+def set_company_ada_notes(company_id: int, notes: str) -> dict:
+    """Supervisor editing or clearing what Ada has noted - the same manual
+    override set_company_briefing already gives them over their own
+    instructions."""
+    if not get_company(company_id):
+        raise AuthError("No such company.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE companies SET ada_notes = ? WHERE id = ?",
+            (notes.strip()[:ADA_NOTES_MAX_CHARS], company_id),
         )
     return get_company(company_id)
 
@@ -3947,5 +4001,28 @@ def set_platform_ai_briefing(briefing: str) -> dict:
         conn.execute(
             "UPDATE platform_settings SET ai_briefing = ? WHERE id = 1",
             (briefing.strip()[:4000],),
+        )
+    return get_platform_settings()
+
+
+def append_platform_ada_note(note: str) -> dict:
+    """Ada noting something worth remembering from a Command Center
+    conversation - platform-wide, since staff share one back office rather
+    than each having their own. See append_company_ada_note for the
+    dashboard-side counterpart and why this stays separate from the
+    human-authored AI briefing above."""
+    settings = get_platform_settings()
+    updated = _append_ada_note(settings.get("ada_notes") or "", note)
+    with _cursor() as conn:
+        conn.execute("UPDATE platform_settings SET ada_notes = ? WHERE id = 1", (updated,))
+    return get_platform_settings()
+
+
+def set_platform_ada_notes(notes: str) -> dict:
+    """Owner editing or clearing what Ada has noted platform-wide."""
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE platform_settings SET ada_notes = ? WHERE id = 1",
+            (notes.strip()[:ADA_NOTES_MAX_CHARS],),
         )
     return get_platform_settings()

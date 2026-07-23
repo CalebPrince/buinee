@@ -262,6 +262,18 @@
               <button class="btn primary" type="submit">Save instructions</button>
             </form>
           </div>
+          <div class="panel">
+            <h3>Ada's notes</h3>
+            <div class="sub">What Ada has picked up on her own from past Command Center conversations — a correction, a recurring issue, a process detail. Review it, edit it, or clear anything wrong.</div>
+            <div id="adaNotesReadonly"></div>
+            <form id="adaNotesForm" style="display:none" onsubmit="return saveAdaNotes(event)">
+              <div class="msg error" id="adaNotesError"></div><div class="msg ok" id="adaNotesOk"></div>
+              <label>Notes
+                <textarea id="adaNotesInput" rows="6" placeholder="Nothing noted yet — Ada adds to this herself as she works." style="padding:10px 12px;border-radius:9px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);font:inherit;resize:vertical"></textarea>
+              </label>
+              <button class="btn primary" type="submit">Save notes</button>
+            </form>
+          </div>
         </div>
       </div>
     </main>
@@ -352,6 +364,18 @@
       briefingReadonly.style.display = 'block';
       briefingReadonly.textContent = settings.briefing || 'No custom instructions set yet. Only the owner can add them.';
     }
+
+    const notesReadonly = document.getElementById('adaNotesReadonly');
+    const notesForm = document.getElementById('adaNotesForm');
+    if (isOwner) {
+      notesReadonly.style.display = 'none';
+      notesForm.style.display = 'flex';
+      document.getElementById('adaNotesInput').value = settings.ada_notes || '';
+    } else {
+      notesForm.style.display = 'none';
+      notesReadonly.style.display = 'block';
+      notesReadonly.textContent = settings.ada_notes || 'Nothing noted yet. Only the owner can review or edit this.';
+    }
   }
 
   async function saveAiProvider(ev) {
@@ -389,6 +413,24 @@
       showMsg('aiBriefingOk', 'Saved.');
     } catch {
       showMsg('aiBriefingError', 'Could not reach the server.');
+    }
+    return false;
+  }
+
+  async function saveAdaNotes(ev) {
+    ev.preventDefault();
+    showMsg('adaNotesError', ''); showMsg('adaNotesOk', '');
+    try {
+      const res = await fetch('/api/admin/ai-settings/ada-notes', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: document.getElementById('adaNotesInput').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMsg('adaNotesError', data.error || 'Could not save.'); return false; }
+      showMsg('adaNotesOk', 'Saved.');
+    } catch {
+      showMsg('adaNotesError', 'Could not reach the server.');
     }
     return false;
   }

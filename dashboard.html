@@ -1192,6 +1192,17 @@ Do not promise a payment date unless it has already been approved."></textarea>
               <button class="btn primary sm" type="submit" style="margin-top:10px">Save instructions</button>
             </form>
           </div>
+          <div class="settings-sec">
+            <h3>Ada's notes</h3>
+            <p class="sub">What Ada has picked up on her own from past conversations—a correction, a recurring issue, a process detail. Review it, edit it, or clear anything wrong.</p>
+            <div id="adaNotesReadonly" class="readonly-note" hidden></div>
+            <form id="adaNotesForm" onsubmit="return saveAdaNotes(event)" hidden>
+              <textarea id="adaNotesInput" spellcheck="true" placeholder="Nothing noted yet—Ada adds to this herself as she works with your team."></textarea>
+              <div class="msg-error" id="adaNotesErr" style="display:none; margin-top:10px"></div>
+              <div class="msg-ok" id="adaNotesOk" style="display:none; margin-top:10px"></div>
+              <button class="btn primary sm" type="submit" style="margin-top:10px">Save notes</button>
+            </form>
+          </div>
         </div>
         <aside class="card instruction-tips">
           <h3>Useful things to include</h3>
@@ -3465,6 +3476,20 @@ Do not promise a payment date unless it has already been approved."></textarea>
         ? me.company.briefing
         : 'No custom instructions set yet. Only a Supervisor can add them.';
     }
+
+    const notesReadonly = document.getElementById('adaNotesReadonly');
+    const notesForm = document.getElementById('adaNotesForm');
+    if (isSupervisor) {
+      notesReadonly.hidden = true;
+      notesForm.hidden = false;
+      document.getElementById('adaNotesInput').value = me.company.ada_notes || '';
+    } else {
+      notesForm.hidden = true;
+      notesReadonly.hidden = false;
+      notesReadonly.textContent = me.company.ada_notes
+        ? me.company.ada_notes
+        : 'Nothing noted yet. Only a Supervisor can review or edit this.';
+    }
     loadPersonalContext();
   }
 
@@ -3509,6 +3534,33 @@ Do not promise a payment date unless it has already been approved."></textarea>
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ briefing: document.getElementById('briefingInput').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Could not save.';
+        errEl.style.display = 'block';
+        return false;
+      }
+      okEl.textContent = 'Saved.';
+      okEl.style.display = 'block';
+    } catch {
+      errEl.textContent = 'Could not reach the server.';
+      errEl.style.display = 'block';
+    }
+    return false;
+  }
+
+  async function saveAdaNotes(ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById('adaNotesErr');
+    const okEl = document.getElementById('adaNotesOk');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/company/ada-notes', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: document.getElementById('adaNotesInput').value }),
       });
       const data = await res.json();
       if (!res.ok) {

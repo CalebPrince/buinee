@@ -1442,9 +1442,12 @@ def build_admin_chat_system(admin: dict) -> str:
 def effective_briefing(user: dict, include_library_text: bool = True) -> str:
     parts = []
     company_text = (user.get("company") or {}).get("briefing", "").strip()
+    ada_notes = (user.get("company") or {}).get("ada_notes", "").strip()
     personal_text = db.get_user_instructions(user["id"]).strip()
     if company_text:
         parts.append("## Company instructions\n" + company_text)
+    if ada_notes:
+        parts.append("## What you've noted from past conversations at this company\n" + ada_notes)
     if personal_text:
         parts.append("## Personal instructions for this user\n" + personal_text)
     if include_library_text:
@@ -1519,6 +1522,23 @@ def extract_ada_register(reply: str) -> tuple[str, dict | None]:
         "plan_id": plan_id, "plan_name": plan["name"], "audience": plan["audience"],
         "price": plan["price"], "currency": plan["currency"],
     }
+
+
+_ADA_NOTE_RE = re.compile(r"\[\[ADA_NOTE\]\](.*?)\[\[/ADA_NOTE\]\]", re.S)
+
+
+def extract_ada_note(reply: str) -> tuple[str, str | None]:
+    """Split Ada's memory marker (if any) out of her reply. Same shape as
+    extract_ada_register: never shown to the person she's talking to,
+    present or malformed, always stripped before the reply leaves this
+    function - a bad marker degrades to "nothing was remembered" rather
+    than a broken-looking reply."""
+    m = _ADA_NOTE_RE.search(reply)
+    if not m:
+        return reply, None
+    cleaned = (reply[:m.start()] + reply[m.end():]).strip()
+    note = m.group(1).strip()
+    return cleaned, (note or None)
 
 
 def maybe_compute(message: str) -> dict | None:
@@ -2351,6 +2371,7 @@ class RouteHandlerMixin:
                 "current": {"provider": provider, "model": model},
                 "saved": {"provider": settings["ai_provider"], "model": settings["ai_model"] or ""},
                 "briefing": settings["ai_briefing"] or "",
+                "ada_notes": settings.get("ada_notes") or "",
             })
 
         if path == "/api/admin/site-settings":
@@ -2530,6 +2551,7 @@ class RouteHandlerMixin:
             "/api/company/approve": self._handle_approve,
             "/api/company/set-model": self._handle_set_company_model,
             "/api/company/briefing": self._handle_set_company_briefing,
+            "/api/company/ada-notes": self._handle_set_company_ada_notes,
             "/api/company/profile": self._handle_set_company_profile,
             "/api/user/instructions": self._handle_set_user_instructions,
             "/api/user/onboarding/complete": self._handle_complete_onboarding,
@@ -2553,6 +2575,7 @@ class RouteHandlerMixin:
             "/api/admin/chat": self._handle_admin_chat,
             "/api/admin/ai-settings/model": self._handle_admin_set_ai_model,
             "/api/admin/ai-settings/briefing": self._handle_admin_set_ai_briefing,
+            "/api/admin/ai-settings/ada-notes": self._handle_admin_set_ada_notes,
             "/api/admin/site-settings/livechat": self._handle_admin_set_livechat_settings,
             "/api/admin/mfa/setup": self._handle_admin_mfa_setup,
             "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
@@ -3370,6 +3393,24 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "company": company})
 
+    def _handle_set_company_ada_notes(self):
+        # Review/edit/clear only - Ada appends to this herself from _handle_chat
+        # (see append_company_ada_note); this is the Supervisor's manual override.
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a supervisor can change this."}, 403)
+        try:
+            req = self._body(max_len=8000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            company = db.set_company_ada_notes(user["company_id"], str(req.get("notes") or ""))
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "company": company})
+
     def _handle_set_company_profile(self):
         user = current_user(self)
         if not user or user["status"] != "approved":
@@ -3750,6 +3791,13 @@ class RouteHandlerMixin:
             reference = report_application_error("ada.chat.server", exc, user)
             return self._json({"error": ada_unavailable(reference)}, 500)
 
+        reply, note = extract_ada_note(reply)
+        if note:
+            try:
+                db.append_company_ada_note(user["company_id"], note)
+            except Exception as exc:
+                print(f"  ! could not save Ada note: {exc}")
+
         used = db.increment_chat_usage(user["company_id"])
         return self._json({"reply": reply, "usage": {"used": used, "limit": gate["limit"]}})
 
@@ -3857,12 +3905,20 @@ class RouteHandlerMixin:
                     "text": text,
                 })
 
+        settings = db.get_platform_settings()
+        briefing_parts = []
+        if settings.get("ai_briefing"):
+            briefing_parts.append("## Platform instructions\n" + settings["ai_briefing"])
+        if settings.get("ada_notes"):
+            briefing_parts.append(
+                "## What you've noted from past Command Center conversations\n" + settings["ada_notes"])
+
         try:
             reply = providers.chat(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, build_admin_digest(admin), history,
                 system=build_admin_chat_system(admin),
-                briefing=db.get_platform_settings().get("ai_briefing") or "",
+                briefing="\n\n".join(briefing_parts),
                 docs=docs or None,
             )
         except providers.ProviderError as exc:
@@ -3874,6 +3930,13 @@ class RouteHandlerMixin:
             reference = report_application_error(
                 "ada.admin_chat.server", exc, context=f"admin_id={admin['id']}")
             return self._json({"error": ada_unavailable(reference)}, 500)
+
+        reply, note = extract_ada_note(reply)
+        if note:
+            try:
+                db.append_platform_ada_note(note)
+            except Exception as exc:
+                print(f"  ! could not save Ada note: {exc}")
 
         return self._json({"reply": reply})
 
@@ -3907,6 +3970,21 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad request."}, 400)
         settings = db.set_platform_ai_briefing(str(req.get("briefing") or ""))
         db.record_admin_activity(admin, "ai_briefing_changed", "platform_settings", 1, "")
+        return self._json({"ok": True, "settings": settings})
+
+    def _handle_admin_set_ada_notes(self):
+        # Review/edit/clear only - Ada appends to this herself from
+        # _handle_admin_chat (see append_platform_ada_note); this is the
+        # owner's manual override.
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body(max_len=8000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        settings = db.set_platform_ada_notes(str(req.get("notes") or ""))
+        db.record_admin_activity(admin, "ada_notes_changed", "platform_settings", 1, "")
         return self._json({"ok": True, "settings": settings})
 
     def _handle_admin_set_livechat_settings(self):
