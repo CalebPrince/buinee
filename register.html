@@ -243,6 +243,9 @@
   .pending-screen h2 { font-family: var(--serif); font-size: 21px; margin-bottom: 10px; }
   .pending-screen p { font-size: 14.5px; color: var(--ink-2); }
 
+  /* ---------------- mobile drawer ---------------- */
+  .nav-toggle { display: none; }
+
   @media (max-width: 900px) {
     .split { grid-template-columns: 1fr; }
     .brandpanel { padding: 26px 24px; gap: 16px; }
@@ -250,8 +253,6 @@
     .nav-toggle { display: grid; }
   }
 
-  /* ---------------- mobile drawer ---------------- */
-  .nav-toggle { display: none; }
   .drawer-backdrop {
     position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45);
     opacity: 0; pointer-events: none; transition: opacity .3s;
