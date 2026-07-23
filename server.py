@@ -2504,6 +2504,7 @@ class RouteHandlerMixin:
         handlers = {
             "/api/demo": self._handle_demo,
             "/api/demo/register": self._handle_demo_register,
+            "/api/demo/contact": self._handle_demo_contact,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
             "/api/tools/connect-key": self._handle_tool_connect_key,
@@ -2731,6 +2732,57 @@ class RouteHandlerMixin:
             {"ok": True, "payment_required": True, "authorization_url": payment.get("authorization_url") or ""},
             extra_headers=[("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
         )
+
+    def _handle_demo_contact(self):
+        """A visitor leaving contact details while the live chat is offline.
+
+        No AI call happens here - the frontend already skips /api/demo while
+        offline, so this only ever records what someone typed plus who they
+        are, the same way _handle_demo's record() does, and flags it in the
+        Command Center inbox so a person follows up once back online."""
+        if rate_limited(f"demo:{client_ip(self)}"):
+            return self._json({"error": "Please wait a moment and try again."}, 429)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+
+        name = str(req.get("name") or "").strip()[:120]
+        email = str(req.get("email") or "").strip()[:200]
+        phone = str(req.get("phone") or "").strip()[:40]
+        if not name or not (email or phone):
+            return self._json(
+                {"error": "Add your name and an email or phone number so we can reach you."}, 400)
+
+        session_id = str(req.get("session_id") or "").strip()[:64]
+        if not session_id:
+            return self._json({"error": "Bad request."}, 400)
+
+        history = []
+        for t in (req.get("history") or [])[-MAX_HISTORY:]:
+            role = "assistant" if t.get("role") == "assistant" else "user"
+            text = str(t.get("content") or "").strip()[:1500]
+            if text:
+                history.append({"role": role, "content": text})
+        lines = [f"{'Ada' if t['role'] == 'assistant' else 'Visitor'}: {t['content']}" for t in history]
+        left = f"[Left contact details while offline: {name}"
+        if email:
+            left += f", {email}"
+        if phone:
+            left += f", {phone}"
+        lines.append(left + "]")
+
+        try:
+            db.save_landing_chat_session(
+                session_id, "\n".join(lines),
+                contact_name=name, contact_email=email, contact_phone=phone,
+                should_flag=True,
+            )
+        except Exception as exc:
+            print(f"  ! could not save offline contact: {exc}")
+            return self._json({"error": "Could not save your details. Please try again."}, 500)
+
+        return self._json({"ok": True})
 
     # ---------------------------------------------------------------- auth
 

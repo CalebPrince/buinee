@@ -448,7 +448,7 @@
   .ada-reg-card .t { font-weight: 700; color: var(--teal-deep); font-size: 13px; }
   .ada-reg-card .row { display: flex; justify-content: space-between; gap: 8px; color: var(--ink-2); }
   .ada-reg-card .row b { color: var(--ink); font-weight: 600; }
-  .ada-reg-card input[type=password] {
+  .ada-reg-card input:not([type=checkbox]) {
     padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
     background: var(--surface); color: var(--ink); font-size: 12.5px; width: 100%;
   }
@@ -956,6 +956,7 @@
          node on every message and on the 2-minute status poll - a half-typed
          password must not vanish underneath the visitor. -->
     <div id="adaRegSlot"></div>
+    <div id="adaOfflineSlot"></div>
     <div class="ada-starters-mini" id="adaStartersMini">
       <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;What is Buinee, in a nutshell?&quot;)">What is Buinee, in a nutshell?</button>
       <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;How much does it cost?&quot;)">How much does it cost?</button>
@@ -1160,7 +1161,7 @@
   function renderLandingAdaLog() {
     const box = document.getElementById("adaPanelLog");
     const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee — what it does, pricing, or how to get your team started.</div></div>";
-    const offlineNotice = adaOnline ? "" : "<div class=\"ada-offline-notice\">We're offline right now, but I can still help — ask away, and if you leave your name and a way to reach you, our team will follow up as soon as we're back.</div>";
+    const offlineNotice = adaOnline ? "" : "<div class=\"ada-offline-notice\">We're offline right now. Send a message and leave a way to reach you, and our team will follow up as soon as we're back.</div>";
     box.innerHTML = offlineNotice + welcome + adaLandingHistory.map(m => {
       const mine = m.role === "user";
       return `<div class="ada-panel-msg ${mine ? "me" : "ai"}"><div class="bub">${mine ? escapeHtmlAda(m.content) : adaChatMarkdown(m.content)}</div></div>`;
@@ -1214,6 +1215,38 @@
     } catch {}
   }
 
+  // Nobody wants to come back to a stale conversation days later, and an
+  // idle open panel serves no one - so a period of no activity while it's
+  // open closes it and wipes the thread back to the first-visit welcome
+  // screen, the same as if they'd never chatted. Only runs while the panel
+  // is actually open; sending a message or typing pushes it back out.
+  const ADA_INACTIVITY_MS = 5 * 60 * 1000;
+  let adaInactivityTimer = null;
+
+  function resetAdaInactivityTimer() {
+    clearTimeout(adaInactivityTimer);
+    if (!adaPanelOpen) return;
+    adaInactivityTimer = setTimeout(adaHandleInactivity, ADA_INACTIVITY_MS);
+  }
+
+  function adaHandleInactivity() {
+    if (!adaPanelOpen) return;
+    resetLandingAdaConversation();
+    toggleAdaPanel(false);
+  }
+
+  function resetLandingAdaConversation() {
+    adaLandingHistory = [];
+    localStorage.removeItem(adaLandingKey());
+    localStorage.removeItem("buinee.landingAdaSessionId");
+    adaRegisterDone = false;
+    adaOfflineFormShown = false;
+    const regSlot = document.getElementById("adaRegSlot");
+    if (regSlot) regSlot.innerHTML = "";
+    const offlineSlot = document.getElementById("adaOfflineSlot");
+    if (offlineSlot) offlineSlot.innerHTML = "";
+  }
+
   let adaPanelOpen = false;
   function toggleAdaPanel(force) {
     adaPanelOpen = typeof force === "boolean" ? force : !adaPanelOpen;
@@ -1226,8 +1259,18 @@
       loadLandingAda();
       renderLandingAdaLog();
       document.getElementById("adaPanelInput").focus();
+      resetAdaInactivityTimer();
+    } else {
+      clearTimeout(adaInactivityTimer);
     }
   }
+
+  // Any interaction inside the open panel counts as activity, not just
+  // sending a message - otherwise someone reading a long reply or picking
+  // a starter prompt could get timed out mid-thought.
+  document.getElementById("adaPanel").addEventListener("click", () => resetAdaInactivityTimer());
+  document.getElementById("adaPanel").addEventListener("keydown", () => resetAdaInactivityTimer());
+  document.getElementById("adaPanel").addEventListener("input", () => resetAdaInactivityTimer());
 
   async function sendLandingAda(ev) {
     ev.preventDefault();
@@ -1240,6 +1283,15 @@
     input.value = "";
     adaAutoGrow(input);
     renderLandingAdaLog();
+
+    // Offline means no one's watching to correct a bad answer, so Ada
+    // doesn't reply at all - the visitor leaves contact details instead
+    // and a person follows up once the team's back.
+    if (!adaOnline) {
+      renderAdaOfflineCard();
+      return false;
+    }
+
     const box = document.getElementById("adaPanelLog");
     box.insertAdjacentHTML("beforeend", '<div class="ada-panel-msg ai" id="adaPanelPending"><div class="bub"><span class="ada-typing"><i></i><i></i><i></i></span></div></div>');
     document.getElementById("adaPanelScroll").scrollTop = 1e9;
@@ -1263,6 +1315,72 @@
       adaLandingHistory.push({ role: "assistant", content: "Could not reach the server." });
       saveLandingAda();
       renderLandingAdaLog();
+    }
+    return false;
+  }
+
+  // ---- Leaving contact details while the live chat is offline ----
+  let adaOfflineFormShown = false;
+
+  function renderAdaOfflineCard() {
+    // One prompt per conversation - repeating it after every offline
+    // message would just be noise once they've already left their details.
+    if (adaOfflineFormShown) return;
+    adaOfflineFormShown = true;
+    const box = document.getElementById("adaOfflineSlot");
+    box.innerHTML = `
+      <div class="ada-reg-card" id="adaOfflineCard">
+        <div class="t">We're offline right now</div>
+        <div style="color:var(--ink-2)">Leave a way to reach you and our team will follow up as soon as we're back.</div>
+        <form onsubmit="return submitAdaOfflineContact(event)">
+          <input type="text" id="adaOfflineName" placeholder="Your name" required style="margin-bottom:9px">
+          <input type="email" id="adaOfflineEmail" placeholder="Email address" style="margin-bottom:9px">
+          <input type="tel" id="adaOfflinePhone" placeholder="Phone number" style="margin-bottom:9px">
+          <div class="err" id="adaOfflineErr"></div>
+          <button type="submit" id="adaOfflineSubmit" style="margin-top:9px;width:100%">Send my details</button>
+        </form>
+      </div>`;
+    document.getElementById("adaPanelScroll").scrollTop = 1e9;
+  }
+
+  async function submitAdaOfflineContact(ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById("adaOfflineErr");
+    errEl.classList.remove("show");
+    const name = document.getElementById("adaOfflineName").value.trim();
+    const email = document.getElementById("adaOfflineEmail").value.trim();
+    const phone = document.getElementById("adaOfflinePhone").value.trim();
+    if (!name || (!email && !phone)) {
+      errEl.textContent = "Add your name and an email or phone number so we can reach you.";
+      errEl.classList.add("show");
+      return false;
+    }
+    const btn = document.getElementById("adaOfflineSubmit");
+    btn.disabled = true; btn.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/demo/contact", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name, email, phone,
+          history: adaLandingHistory.map(({ role, content }) => ({ role, content })),
+          session_id: getLandingAdaSessionId(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || "Something went wrong.";
+        errEl.classList.add("show");
+        btn.disabled = false; btn.textContent = "Send my details";
+        return false;
+      }
+      document.getElementById("adaOfflineCard").innerHTML =
+        `<div class="ok"><div class="t">Thanks, ${escapeHtmlAda(name)}</div>` +
+        `<div>We've got your message and will get back to you as soon as we're online.</div></div>`;
+    } catch {
+      errEl.textContent = "Could not reach the server.";
+      errEl.classList.add("show");
+      btn.disabled = false; btn.textContent = "Send my details";
     }
     return false;
   }
