@@ -1839,7 +1839,7 @@ class RouteHandlerMixin:
                 print(f"  ! could not save landing chat session: {exc}")
 
         cfg = load_env()
-        provider = active_provider(cfg)
+        provider, model = resolve_admin_provider_model(cfg)
         if not provider:
             reference = report_application_error(
                 "ada.demo.configuration", "No AI provider is configured for the public demo")
@@ -1848,7 +1848,6 @@ class RouteHandlerMixin:
                 {"error": ada_unavailable(reference)}, 503)
 
         computed = maybe_compute(message)
-        model = cfg.get("CLERK_MODEL", "").strip() or providers.DEFAULT_MODELS[provider]
 
         try:
             reply = providers.chat(
