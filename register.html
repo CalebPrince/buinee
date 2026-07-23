@@ -299,8 +299,8 @@
     </a>
 
     <div class="bp-copy">
-      <h2>Bring your whole team into one place.</h2>
-      <p>Register your company once. Everyone else joins by name and gets the role — and the visibility — that fits them.</p>
+      <h2>{{cms:brand_headline}}</h2>
+      <p>{{cms:brand_subtext}}</p>
     </div>
 
     <div class="bp-mock">
@@ -329,7 +329,7 @@
       </div>
     </div>
 
-    <p class="bp-foot">Every join request needs a supervisor's approval — a company name alone never grants access.</p>
+    <p class="bp-foot">{{cms:brand_foot}}</p>
   </div>
 
   <div class="formside">
@@ -376,9 +376,9 @@
 
     <div id="gateScreen" class="gate">
       <div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
-      <h2>Choose a plan first</h2>
-      <p>Registering a company starts with picking the tier it runs on — how many people it covers, and whether the AI assistant is included.</p>
-      <a class="btn primary" href="/#pricing">See the plans</a>
+      <h2>{{cms:gate_title}}</h2>
+      <p>{{cms:gate_text}}</p>
+      <a class="btn primary" href="/#pricing">{{cms:gate_cta}}</a>
       <p class="alt">Joining a company that's already here?
         <button type="button" onclick="showMode('join')">Join instead</button> — no plan needed, you inherit theirs.</p>
     </div>
@@ -386,13 +386,13 @@
     <div id="formArea">
       <div class="card-head">
         <span class="eyebrow">Get started</span>
-        <h1>Set up Buinee</h1>
-        <p>Register your company, or join one that's already here.</p>
+        <h1>{{cms:team_h1}}</h1>
+        <p>{{cms:team_subtitle}}</p>
       </div>
 
       <div class="tabs">
-        <button class="tab" id="tabRegister" onclick="showMode('register')">Register your company</button>
-        <button class="tab" id="tabJoin" onclick="showMode('join')">Join a company</button>
+        <button class="tab" id="tabRegister" onclick="showMode('register')">{{cms:tab_register_team}}</button>
+        <button class="tab" id="tabJoin" onclick="showMode('join')">{{cms:tab_join}}</button>
       </div>
 
       <!-- ---------------- register ---------------- -->
@@ -416,7 +416,7 @@
           </div>
           <a href="/#pricing">Change</a>
         </div>
-        <label id="regCompanyLabel"><span id="regCompanyCaption">Company name</span>
+        <label id="regCompanyLabel"><span id="regCompanyCaption">{{cms:company_caption_team}}</span>
           <input type="text" id="regCompany" required autocomplete="organization" placeholder="e.g. Coastal Logistics Ltd">
         </label>
         <label>Your name
@@ -436,8 +436,8 @@
           <input type="password" id="regPassword" required autocomplete="new-password" minlength="12" placeholder="At least 12 characters">
         </label>
         <label class="terms-check"><input type="checkbox" id="regTerms" required><span>I agree to Buinee’s <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
-        <button class="btn primary" type="submit" id="regSubmit">Register company</button>
-        <p class="note" id="regNote">Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.</p>
+        <button class="btn primary" type="submit" id="regSubmit">{{cms:reg_submit_team}}</button>
+        <p class="note" id="regNote">{{cms:reg_note_team}}</p>
       </form>
 
       <!-- ---------------- join ---------------- -->
@@ -471,8 +471,8 @@
           </select>
         </label>
         <label class="terms-check"><input type="checkbox" id="joinTerms" required><span>I agree to Buinee’s <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
-        <button class="btn primary" type="submit" id="joinSubmit">Request to join</button>
-        <p class="note">A supervisor at that company approves every join request before it's active — company name alone doesn't grant access. The one exception: claiming Supervisor when the company doesn't have one yet gets you in immediately, since there'd be no one to approve it.</p>
+        <button class="btn primary" type="submit" id="joinSubmit">{{cms:join_submit}}</button>
+        <p class="note">{{cms:join_note}}</p>
       </form>
 
       <div class="foot-link">Already registered? <a href="/login">Sign in</a></div>
@@ -483,6 +483,7 @@
 </div>
 
 <footer class="auth-legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/cookies">Cookies</a><a href="/refunds">Refunds</a><a href="/security">Security</a></footer><style>.auth-legal{padding:20px;text-align:center;font-size:12px}.auth-legal a{margin:0 7px;color:var(--ink-3)}</style>
+<script>window.REG_COPY = {{cms_json:register}};</script>
 <script>
   function toggleTheme() {
     const root = document.documentElement;
@@ -526,22 +527,18 @@
   // when you're the one preparing and approving your own work.
   function applySoloShape() {
     const solo = chosenPlan && chosenPlan.audience === 'individual';
-    document.querySelector('.card-head h1').textContent = solo ? 'Set up your workspace' : 'Set up Buinee';
-    document.querySelector('.card-head p').textContent = solo
-      ? "Yours alone — nobody else can see it or join it."
-      : "Register your company, or join one that's already here.";
-    document.getElementById('tabRegister').textContent = solo ? 'Work on your own' : 'Register your company';
-    document.getElementById('regCompanyCaption').textContent = solo ? 'Workspace name (optional)' : 'Company name';
+    document.querySelector('.card-head h1').textContent = solo ? REG_COPY.solo_h1 : REG_COPY.team_h1;
+    document.querySelector('.card-head p').textContent = solo ? REG_COPY.solo_subtitle : REG_COPY.team_subtitle;
+    document.getElementById('tabRegister').textContent = solo ? REG_COPY.tab_register_solo : REG_COPY.tab_register_team;
+    document.getElementById('regCompanyCaption').textContent = solo ? REG_COPY.company_caption_solo : REG_COPY.company_caption_team;
     document.getElementById('regCompany').required = !solo;
     document.getElementById('regCompany').placeholder = solo
       ? 'Defaults to your own name' : 'e.g. Coastal Logistics Ltd';
     document.getElementById('regCompany').autocomplete = solo ? 'off' : 'organization';
     document.getElementById('regRoleLabel').style.display = solo ? 'none' : '';
     document.getElementById('regEmail').placeholder = solo ? 'you@example.com' : 'you@company.com';
-    document.getElementById('regSubmit').textContent = solo ? 'Create my workspace' : 'Register company';
-    document.getElementById('regNote').textContent = solo
-      ? 'You prepare and approve your own vouchers. If you later need colleagues in here, ask us to move you onto a team plan — nothing gets set up twice.'
-      : 'Not the boss? Pick your real role — you get full access to it right away. Whoever should hold Supervisor can join afterward and claim it themselves, as long as nobody holds it yet.';
+    document.getElementById('regSubmit').textContent = solo ? REG_COPY.reg_submit_solo : REG_COPY.reg_submit_team;
+    document.getElementById('regNote').textContent = solo ? REG_COPY.reg_note_solo : REG_COPY.reg_note_team;
   }
 
   async function boot() {
@@ -713,6 +710,7 @@
     if (!pickedCompany) { showMsg('joinError', 'Pick your company from the list first.'); return false; }
     if (!document.getElementById('joinTerms').checked) { showMsg('joinError', 'Agree to the Terms of Use and Privacy Policy to continue.'); return false; }
     const btn = document.getElementById('joinSubmit');
+    const idleLabel = btn.textContent;
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
       const res = await fetch('/api/join', {
@@ -740,7 +738,7 @@
     } catch {
       showMsg('joinError', 'Could not reach the server.');
     } finally {
-      btn.disabled = false; btn.textContent = 'Request to join';
+      btn.disabled = false; btn.textContent = idleLabel;
     }
     return false;
   }

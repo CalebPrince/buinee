@@ -234,6 +234,7 @@ STATIC_PAGES = {
     "/admin/settings": "admin-settings.html",
     "/admin/ada": "admin-ada.html",
     "/admin/site-settings": "admin-site-settings.html",
+    "/admin/site-contents": "admin-site-contents.html",
 }
 
 LEGACY_PAGE_REDIRECTS = {
@@ -261,7 +262,313 @@ LEGACY_PAGE_REDIRECTS = {
     "/admin-settings.html": "/admin/settings",
     "/admin-ada.html": "/admin/ada",
     "/admin-site-settings.html": "/admin/site-settings",
+    "/admin-site-contents.html": "/admin/site-contents",
 }
+
+# --- site contents CMS ------------------------------------------------------
+# Every visible string on the public pages that a business owner would
+# reasonably want to reword, grouped by page. `type` controls how a saved
+# value is turned back into HTML by render_site_content():
+#   text      - single line, HTML-escaped only
+#   paragraph - HTML-escaped, blank lines become paragraph breaks
+#   bullets   - one item per line, each wrapped as its own <li> with the
+#               same checkmark icon the page already uses
+CMS_CHECK_SVG = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+                  'stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>')
+
+SITE_CONTENT_SCHEMA = {
+    "index": [
+        {"key": "hero_eyebrow", "label": "Hero eyebrow", "type": "text",
+         "default": "One workspace for the work behind your business"},
+        {"key": "hero_headline", "label": "Hero headline", "type": "paragraph",
+         "default": "Your team already has a way of working.\nIt just lives in too many places."},
+        {"key": "hero_lede", "label": "Hero subtext", "type": "paragraph",
+         "default": "Buinee brings messages, documents, tasks, customer follow-ups, approvals and "
+                     "everyday decisions into one place. Give each person the right view, keep a clear "
+                     "history of what happened, and let AI help with the work without taking control away."},
+        {"key": "hero_cta_primary", "label": "Hero primary button", "type": "text", "default": "Create your workspace"},
+        {"key": "hero_cta_secondary", "label": "Hero secondary button", "type": "text", "default": "Meet the agents"},
+        {"key": "hero_note", "label": "Hero note", "type": "text",
+         "default": "Your team joins by name — no per-seat setup, no IT project."},
+
+        {"key": "how_eyebrow", "label": "\"How it works\" eyebrow", "type": "text", "default": "How work moves"},
+        {"key": "how_headline", "label": "\"How it works\" headline", "type": "text",
+         "default": "One request. The right people. A clear outcome."},
+        {"key": "how_subtext", "label": "\"How it works\" subtext", "type": "paragraph",
+         "default": "Whether it starts as an email, file, customer question or internal task, the work "
+                     "stays connected from arrival to completion."},
+        {"key": "how_step1_title", "label": "Step 1 title", "type": "text", "default": "Work comes in"},
+        {"key": "how_step1_text", "label": "Step 1 text", "type": "paragraph",
+         "default": "Bring in an email, document, request or customer conversation. Buinee keeps the "
+                     "source and context together."},
+        {"key": "how_step2_title", "label": "Step 2 title", "type": "text", "default": "Someone takes ownership"},
+        {"key": "how_step2_text", "label": "Step 2 text", "type": "paragraph",
+         "default": "Assign it, discuss it, add instructions and complete the next step without losing "
+                     "decisions across separate tools."},
+        {"key": "how_step3_title", "label": "Step 3 title", "type": "text", "default": "The outcome is recorded"},
+        {"key": "how_step3_text", "label": "Step 3 text", "type": "paragraph",
+         "default": "Send the reply, approve the document, close the task or issue the final file with a "
+                     "history everyone can trust."},
+
+        {"key": "roles_eyebrow", "label": "Roles eyebrow", "type": "text", "default": "Roles & visibility"},
+        {"key": "roles_headline", "label": "Roles headline", "type": "text",
+         "default": "Give everyone the access their work requires."},
+        {"key": "roles_subtext", "label": "Roles subtext", "type": "paragraph",
+         "default": "Buinee supports different responsibilities without forcing every business into the "
+                     "same job titles. People see their own work, shared team work, or the full workspace "
+                     "according to their role."},
+        {"key": "role1_tier", "label": "Role 1 tier label", "type": "text", "default": "Tier 3"},
+        {"key": "role1_title", "label": "Role 1 title", "type": "text", "default": "Team member"},
+        {"key": "role1_tagline", "label": "Role 1 tagline", "type": "text", "default": "Handles day-to-day work."},
+        {"key": "role1_bullets", "label": "Role 1 bullets (one per line)", "type": "bullets",
+         "default": "Manages assigned work\nWorks with messages and files\nRequests review when needed"},
+        {"key": "role1_sees", "label": "Role 1 \"sees\" line", "type": "text", "default": "Sees their own work only."},
+        {"key": "role2_tier", "label": "Role 2 tier label", "type": "text", "default": "Tier 2"},
+        {"key": "role2_title", "label": "Role 2 title", "type": "text", "default": "Team lead"},
+        {"key": "role2_tagline", "label": "Role 2 tagline", "type": "text", "default": "Coordinates people and decisions."},
+        {"key": "role2_bullets", "label": "Role 2 bullets (one per line)", "type": "bullets",
+         "default": "Reviews team work\nApproves or returns requests\nKeeps work moving"},
+        {"key": "role2_sees", "label": "Role 2 \"sees\" line", "type": "text",
+         "default": "Sees their own work and their team's."},
+        {"key": "role3_tier", "label": "Role 3 tier label", "type": "text", "default": "Tier 1"},
+        {"key": "role3_title", "label": "Role 3 title", "type": "text", "default": "Supervisor"},
+        {"key": "role3_tagline", "label": "Role 3 tagline", "type": "text", "default": "Runs the workspace."},
+        {"key": "role3_bullets", "label": "Role 3 bullets (one per line)", "type": "bullets",
+         "default": "Oversees teams and workflows\nSets access and business rules\nAdds and removes people"},
+        {"key": "role3_sees", "label": "Role 3 \"sees\" line", "type": "text", "default": "Sees the whole workspace."},
+
+        {"key": "workspace_eyebrow", "label": "Workspace eyebrow", "type": "text", "default": "The workspace"},
+        {"key": "workspace_headline", "label": "Workspace headline", "type": "text",
+         "default": "Where your team already talks — with the work in the room."},
+        {"key": "workspace_feat1_title", "label": "Workspace feature 1 title", "type": "text",
+         "default": "Send a file to a colleague. Or to an agent."},
+        {"key": "workspace_feat1_text", "label": "Workspace feature 1 text", "type": "paragraph",
+         "default": "The chat is where the team already works things out. Buinee puts the documents in "
+                     "the same place — so a file goes to a person or straight to an assistant that reads "
+                     "it, without leaving the conversation."},
+        {"key": "workspace_feat1_bullets", "label": "Workspace feature 1 bullets (one per line)", "type": "bullets",
+         "default": "Team and one-to-one chat\nShare PDFs, Word, Excel, images and more\n"
+                     "Hand any file to an assistant in one tap"},
+        {"key": "workspace_feat2_title", "label": "Workspace feature 2 title", "type": "text",
+         "default": "A signature that means something."},
+        {"key": "workspace_feat2_text", "label": "Workspace feature 2 text", "type": "paragraph",
+         "default": "Sign inside the system and the PDF prints ready. But the signature on the page is "
+                     "only the visible part — underneath it sits a record of who approved what, when, and "
+                     "what changed between drafts. That record is the thing an auditor actually asks for."},
+        {"key": "workspace_feat2_bullets", "label": "Workspace feature 2 bullets (one per line)", "type": "bullets",
+         "default": "No printing to sign, then scanning back\nEvery approval and return time-stamped\n"
+                     "Nothing editable after it is approved"},
+
+        {"key": "agents_eyebrow", "label": "Agents eyebrow", "type": "text", "default": "Inside your dashboard"},
+        {"key": "agents_headline", "label": "Agents headline", "type": "text",
+         "default": "Every person gets an assistant that understands their work."},
+        {"key": "agents_subtext", "label": "Agents subtext", "type": "paragraph",
+         "default": "Once your company is in, each person's dashboard comes with an AI assistant — one "
+                     "that works with the actual context: mailbox conversations, documents, customer "
+                     "records, team instructions and outstanding tasks. Not a generic chatbot bolted to "
+                     "the corner of the screen."},
+        {"key": "agents_card1_tag", "label": "Agents card 1 tag", "type": "text", "default": "Your inbox"},
+        {"key": "agents_card1_title", "label": "Agents card 1 title", "type": "text",
+         "default": "It reads the mail before you do"},
+        {"key": "agents_card1_text", "label": "Agents card 1 text", "type": "paragraph",
+         "default": "Connect your work mailbox and it goes through overnight — sorting what came in, "
+                     "drafting the replies that are obvious, and putting the things that genuinely need "
+                     "you at the top."},
+        {"key": "agents_card1_bullets", "label": "Agents card 1 bullets (one per line)", "type": "bullets",
+         "default": "Sorts requests, updates, questions and noise\nDrafts replies in your own tone\n"
+                     "Flags risks, changes and unanswered messages"},
+        {"key": "agents_card1_sees", "label": "Agents card 1 \"sees\" line", "type": "text",
+         "default": "Nothing is ever sent without you pressing send."},
+        {"key": "agents_card2_tag", "label": "Agents card 2 tag", "type": "text", "default": "Your documents"},
+        {"key": "agents_card2_title", "label": "Agents card 2 title", "type": "text", "default": "Hand it a file and ask"},
+        {"key": "agents_card2_text", "label": "Agents card 2 text", "type": "paragraph",
+         "default": "Give it a report, spreadsheet, contract, proposal, invoice or internal guide. It "
+                     "reads the document itself, finds the useful details, and helps you act on what is "
+                     "missing or important."},
+        {"key": "agents_card2_bullets", "label": "Agents card 2 bullets (one per line)", "type": "bullets",
+         "default": "PDFs, scans, Word and Excel\nSummarises, compares and extracts details\n"
+                     "Explains what needs attention and why"},
+        {"key": "agents_card2_sees", "label": "Agents card 2 \"sees\" line", "type": "text",
+         "default": "Works from your rules — your thresholds, your terms, your templates."},
+        {"key": "agents_card3_title", "label": "Agents card 3 title", "type": "text",
+         "default": "You tell it how your business works. Once."},
+        {"key": "agents_card3_text", "label": "Agents card 3 text", "type": "paragraph",
+         "default": "Every business has rules a new hire spends months learning — how customers are "
+                     "handled, what needs approval, when work is escalated, and which templates to use. "
+                     "Write them down once and the assistant works to them instead of generic practice."},
+        {"key": "agents_card3_bullets", "label": "Agents card 3 bullets (one per line)", "type": "bullets",
+         "default": "Your approval, service and escalation rules\nYour documents and response templates\n"
+                     "Your vocabulary, customers, teams and processes"},
+
+        {"key": "trust_eyebrow", "label": "Trust eyebrow", "type": "text", "default": "Built for dependable work"},
+        {"key": "trust_headline", "label": "Trust headline", "type": "text",
+         "default": "AI can assist. Your rules and records remain in control."},
+        {"key": "trust_subtext", "label": "Trust subtext", "type": "paragraph",
+         "default": "Business software earns its place by being predictable. Buinee separates suggestions "
+                     "from facts, keeps actions reviewable, and records important changes."},
+        {"key": "trust_card1_title", "label": "Trust card 1 title", "type": "text", "default": "Facts stay verifiable"},
+        {"key": "trust_card1_text", "label": "Trust card 1 text", "type": "paragraph",
+         "default": "Stored records, calculated figures and completed actions remain distinct from AI "
+                     "suggestions, so people can see what is known and what is proposed."},
+        {"key": "trust_card2_title", "label": "Trust card 2 title", "type": "text",
+         "default": "People approve important actions"},
+        {"key": "trust_card2_text", "label": "Trust card 2 text", "type": "paragraph",
+         "default": "Drafts, summaries and recommendations stay ready for review. Sending, approving and "
+                     "changing records remains a deliberate human action."},
+        {"key": "trust_card3_title", "label": "Trust card 3 title", "type": "text",
+         "default": "Your company's data is yours"},
+        {"key": "trust_card3_text", "label": "Trust card 3 text", "type": "paragraph",
+         "default": "Every record belongs to one company and is scoped to it. No document, figure or "
+                     "conversation is visible outside the organisation that created it."},
+
+        {"key": "pricing_eyebrow", "label": "Pricing eyebrow", "type": "text", "default": "Pricing"},
+        {"key": "pricing_headline", "label": "Pricing headline", "type": "text",
+         "default": "Working alone, or setting this up for a team?"},
+        {"key": "pricing_subtext", "label": "Pricing subtext", "type": "paragraph",
+         "default": "Both get the same connected workspace for messages, documents, tasks and business "
+                     "records. What changes is how many people it covers and which advanced features are "
+                     "included."},
+        {"key": "pricing_aud_individual", "label": "Pricing toggle: individual", "type": "text", "default": "Just me"},
+        {"key": "pricing_aud_team", "label": "Pricing toggle: team", "type": "text", "default": "My team"},
+
+        {"key": "cta_headline", "label": "Closing CTA headline", "type": "text",
+         "default": "Start with the work your team handles every day."},
+        {"key": "cta_subtext", "label": "Closing CTA subtext", "type": "paragraph",
+         "default": "Create a workspace, invite the right people, and bring your next request, "
+                     "conversation or document into one clear process."},
+        {"key": "cta_primary", "label": "Closing CTA primary button", "type": "text", "default": "Choose a plan"},
+        {"key": "cta_secondary", "label": "Closing CTA secondary button", "type": "text",
+         "default": "Join a company already here"},
+        {"key": "cta_fine", "label": "Closing CTA fine print", "type": "text",
+         "default": "If your company is already registered, you'll be placed in it automatically."},
+
+        {"key": "footer_tagline", "label": "Footer tagline", "type": "text",
+         "default": "Buinee — one workspace for the work behind your business."},
+    ],
+    "register": [
+        {"key": "brand_headline", "label": "Brand panel headline", "type": "text",
+         "default": "Bring your whole team into one place."},
+        {"key": "brand_subtext", "label": "Brand panel subtext", "type": "paragraph",
+         "default": "Register your company once. Everyone else joins by name and gets the role — and "
+                     "the visibility — that fits them."},
+        {"key": "brand_foot", "label": "Brand panel footnote", "type": "paragraph",
+         "default": "Every join request needs a supervisor's approval — a company name alone never "
+                     "grants access."},
+        {"key": "gate_title", "label": "\"Choose a plan\" gate title", "type": "text", "default": "Choose a plan first"},
+        {"key": "gate_text", "label": "\"Choose a plan\" gate text", "type": "paragraph",
+         "default": "Registering a company starts with picking the tier it runs on — how many people it "
+                     "covers, and whether the AI assistant is included."},
+        {"key": "gate_cta", "label": "\"Choose a plan\" gate button", "type": "text", "default": "See the plans"},
+        {"key": "team_h1", "label": "Form heading (team plan)", "type": "text", "default": "Set up Buinee"},
+        {"key": "team_subtitle", "label": "Form subtitle (team plan)", "type": "paragraph",
+         "default": "Register your company, or join one that's already here."},
+        {"key": "solo_h1", "label": "Form heading (solo plan)", "type": "text", "default": "Set up your workspace"},
+        {"key": "solo_subtitle", "label": "Form subtitle (solo plan)", "type": "paragraph",
+         "default": "Yours alone — nobody else can see it or join it."},
+        {"key": "tab_register_team", "label": "Register tab label (team)", "type": "text",
+         "default": "Register your company"},
+        {"key": "tab_register_solo", "label": "Register tab label (solo)", "type": "text", "default": "Work on your own"},
+        {"key": "tab_join", "label": "Join tab label", "type": "text", "default": "Join a company"},
+        {"key": "company_caption_team", "label": "Company field label (team)", "type": "text", "default": "Company name"},
+        {"key": "company_caption_solo", "label": "Company field label (solo)", "type": "text",
+         "default": "Workspace name (optional)"},
+        {"key": "reg_note_team", "label": "Register form note (team)", "type": "paragraph",
+         "default": "Not the boss? Pick your real role — you get full access to it right away. Whoever "
+                     "should hold Supervisor can join afterward and claim it themselves, as long as nobody "
+                     "holds it yet."},
+        {"key": "reg_note_solo", "label": "Register form note (solo)", "type": "paragraph",
+         "default": "You prepare and approve your own vouchers. If you later need colleagues in here, "
+                     "ask us to move you onto a team plan — nothing gets set up twice."},
+        {"key": "reg_submit_team", "label": "Register submit button (team)", "type": "text", "default": "Register company"},
+        {"key": "reg_submit_solo", "label": "Register submit button (solo)", "type": "text",
+         "default": "Create my workspace"},
+        {"key": "join_note", "label": "Join form note", "type": "paragraph",
+         "default": "A supervisor at that company approves every join request before it's active — "
+                     "company name alone doesn't grant access. The one exception: claiming Supervisor when "
+                     "the company doesn't have one yet gets you in immediately, since there'd be no one to "
+                     "approve it."},
+        {"key": "join_submit", "label": "Join submit button", "type": "text", "default": "Request to join"},
+    ],
+    "login": [
+        {"key": "brand_headline", "label": "Brand panel headline", "type": "text",
+         "default": "Everyone who touches a payment, in one place."},
+        {"key": "brand_subtext", "label": "Brand panel subtext", "type": "paragraph",
+         "default": "The people who prepare, approve and sign — with the roles and the trail to prove "
+                     "who did what, and when."},
+        {"key": "brand_foot", "label": "Brand panel footnote", "type": "paragraph",
+         "default": "Visibility runs downward only — a supervisor sees everything, an assistant sees "
+                     "their own work."},
+        {"key": "card_eyebrow", "label": "Card eyebrow", "type": "text", "default": "Welcome back"},
+        {"key": "card_h1", "label": "Card heading", "type": "text", "default": "Sign in"},
+    ],
+    "legal": [
+        {"key": "privacy_title", "label": "Privacy Policy — title", "type": "text", "default": "Privacy Policy"},
+        {"key": "privacy_intro", "label": "Privacy Policy — intro", "type": "paragraph", "default": ""},
+        {"key": "privacy_body", "label": "Privacy Policy — full text (HTML)", "type": "html", "default": ""},
+        {"key": "terms_title", "label": "Terms of Use — title", "type": "text", "default": "Terms of Use"},
+        {"key": "terms_intro", "label": "Terms of Use — intro", "type": "paragraph", "default": ""},
+        {"key": "terms_body", "label": "Terms of Use — full text (HTML)", "type": "html", "default": ""},
+        {"key": "cookies_title", "label": "Cookie Policy — title", "type": "text", "default": "Cookie Policy"},
+        {"key": "cookies_intro", "label": "Cookie Policy — intro", "type": "paragraph", "default": ""},
+        {"key": "cookies_body", "label": "Cookie Policy — full text (HTML)", "type": "html", "default": ""},
+        {"key": "refunds_title", "label": "Refund Policy — title", "type": "text", "default": "Refund Policy"},
+        {"key": "refunds_intro", "label": "Refund Policy — intro", "type": "paragraph", "default": ""},
+        {"key": "refunds_body", "label": "Refund Policy — full text (HTML)", "type": "html", "default": ""},
+        {"key": "security_title", "label": "Security — title", "type": "text", "default": "Security"},
+        {"key": "security_intro", "label": "Security — intro", "type": "paragraph", "default": ""},
+        {"key": "security_body", "label": "Security — full text (HTML)", "type": "html", "default": ""},
+    ],
+}
+
+CMS_PAGE_ROUTES = {"/": "index", "/register": "register", "/login": "login"}
+
+_CMS_TOKEN_RE = re.compile(r"\{\{cms:([a-z0-9_]+)\}\}")
+_CMS_JSON_TOKEN_RE = re.compile(r"\{\{cms_json:([a-z0-9_]+)\}\}")
+
+
+def site_content_effective(page: str) -> dict:
+    """Default copy for `page`, overridden by whatever an admin has saved."""
+    fields = SITE_CONTENT_SCHEMA.get(page, [])
+    overrides = db.get_site_content_overrides(page)
+    return {f["key"]: overrides.get(f["key"], f["default"]) for f in fields}
+
+
+def _cms_field_type(page: str, key: str) -> str:
+    for f in SITE_CONTENT_SCHEMA.get(page, []):
+        if f["key"] == key:
+            return f["type"]
+    return "text"
+
+
+def _render_cms_value(field_type: str, value: str) -> str:
+    if field_type == "bullets":
+        lines = [ln.strip() for ln in value.split("\n") if ln.strip()]
+        return "".join(f"<li>{CMS_CHECK_SVG}{html.escape(ln)}</li>" for ln in lines)
+    if field_type == "paragraph":
+        return html.escape(value).replace("\n", "<br>")
+    return html.escape(value)
+
+
+def render_site_content(page: str, raw_html: bytes) -> bytes:
+    """Replace {{cms:key}} / {{cms_json:page}} tokens in a static page's HTML
+    with admin-edited copy (falling back to the schema default), escaping
+    every value so saved content can never inject markup into the public site."""
+    if page not in SITE_CONTENT_SCHEMA:
+        return raw_html
+    values = site_content_effective(page)
+    text = raw_html.decode("utf-8")
+
+    def repl_token(m: re.Match) -> str:
+        key = m.group(1)
+        return _render_cms_value(_cms_field_type(page, key), values.get(key, ""))
+
+    def repl_json(m: re.Match) -> str:
+        return json.dumps(values) if m.group(1) == page else m.group(0)
+
+    text = _CMS_TOKEN_RE.sub(repl_token, text)
+    text = _CMS_JSON_TOKEN_RE.sub(repl_json, text)
+    return text.encode("utf-8")
+
 
 # --- public-endpoint limits ------------------------------------------------
 MAX_MESSAGE = 600
@@ -1630,11 +1937,34 @@ class RouteHandlerMixin:
             # show an online/offline badge before anyone signs in.
             return self._json({"online": is_livechat_online(db.get_platform_settings())})
 
+        if path == "/api/site-content":
+            # Public and unauthenticated - legal.html fetches this to merge
+            # admin-edited copy into its client-rendered legal documents.
+            page = parse_qs(urlparse(self.path).query).get("page", [""])[0]
+            if page not in SITE_CONTENT_SCHEMA:
+                return self._json({"error": "Unknown page."}, 404)
+            return self._json({"values": site_content_effective(page)})
+
         if path == "/api/admin/me":
             admin = current_admin(self)
             if not admin:
                 return self._json({"error": "Not signed in."}, 401)
             return self._json({"admin": public_admin(admin)})
+
+        if path == "/api/admin/site-content":
+            admin = current_admin(self)
+            if not admin:
+                return self._json({"error": "Not signed in."}, 401)
+            page = parse_qs(urlparse(self.path).query).get("page", [""])[0]
+            if page not in SITE_CONTENT_SCHEMA:
+                return self._json({"error": "Unknown page."}, 404)
+            values = site_content_effective(page)
+            fields = [{**f, "value": values[f["key"]]} for f in SITE_CONTENT_SCHEMA[page]]
+            return self._json({
+                "pages": list(SITE_CONTENT_SCHEMA.keys()),
+                "page": page,
+                "fields": fields,
+            })
 
         if path == "/api/admin/ai-settings":
             admin = current_admin(self)
@@ -1776,7 +2106,11 @@ class RouteHandlerMixin:
             f = ROOT / STATIC_PAGES[path]
             if not f.exists():
                 return self._json({"error": f"{STATIC_PAGES[path]} missing"}, 404)
-            return self._send(200, f.read_bytes(), "text/html; charset=utf-8")
+            raw = f.read_bytes()
+            cms_page = CMS_PAGE_ROUTES.get(path)
+            if cms_page:
+                raw = render_site_content(cms_page, raw)
+            return self._send(200, raw, "text/html; charset=utf-8")
 
         return self._json({"error": "not found"}, 404)
 
@@ -1849,6 +2183,7 @@ class RouteHandlerMixin:
             "/api/admin/errors/clear": self._handle_admin_errors_clear,
             "/api/admin/inbox/state": self._handle_admin_inbox_state,
             "/api/admin/inbox/delete": self._handle_admin_inbox_delete,
+            "/api/admin/site-content/save": self._handle_admin_site_content_save,
             "/api/admin/invoices/create": self._handle_admin_invoice_create,
             "/api/admin/invoices/status": self._handle_admin_invoice_status,
         }
@@ -2973,6 +3308,31 @@ class RouteHandlerMixin:
             "livechat_schedule": json.loads(settings["livechat_schedule_json"] or "{}"),
             "livechat_online": is_livechat_online(settings),
         })
+
+    def _handle_admin_site_content_save(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body(max_len=200000)
+            page = str(req.get("page") or "")
+            values = req.get("values") or {}
+            if page not in SITE_CONTENT_SCHEMA or not isinstance(values, dict):
+                raise ValueError
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        allowed_keys = {f["key"] for f in SITE_CONTENT_SCHEMA[page]}
+        unknown = set(values.keys()) - allowed_keys
+        if unknown:
+            return self._json({"error": f"Unknown field(s): {', '.join(sorted(unknown))}"}, 400)
+        try:
+            db.set_site_content(page, values)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        db.record_admin_activity(admin, "edited", "site_content", details=f"page={page}, {len(values)} field(s)")
+        updated = site_content_effective(page)
+        fields = [{**f, "value": updated[f["key"]]} for f in SITE_CONTENT_SCHEMA[page]]
+        return self._json({"ok": True, "fields": fields})
 
     def _handle_admin_delete_company(self):
         admin = self._admin_role_request("owner")

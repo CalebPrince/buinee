@@ -460,21 +460,19 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <span class="eyebrow">One workspace for the work behind your business</span>
-        <h1>Your team already has a way of working.<br>It just <em>lives in too many places</em>.</h1>
+        <span class="eyebrow">{{cms:hero_eyebrow}}</span>
+        <h1>{{cms:hero_headline}}</h1>
         <p class="lede">
-          Buinee brings messages, documents, tasks, customer follow-ups, approvals and
-          everyday decisions into one place. Give each person the right view, keep a clear
-          history of what happened, and let AI help with the work without taking control away.
+          {{cms:hero_lede}}
         </p>
         <div class="cta">
           <a class="btn primary" href="#pricing">
-            Create your workspace
+            {{cms:hero_cta_primary}}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </a>
-          <a class="btn ghost" href="#agents">Meet the agents</a>
+          <a class="btn ghost" href="#agents">{{cms:hero_cta_secondary}}</a>
         </div>
-        <p class="note">Your team joins by name — no per-seat setup, no IT project.</p>
+        <p class="note">{{cms:hero_note}}</p>
       </div>
 
       <!-- One concrete workflow; the workspace supports many others. -->
@@ -513,25 +511,25 @@
   <section id="how" class="band">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">How work moves</span>
-        <h2>One request. The right people. A clear outcome.</h2>
-        <p>Whether it starts as an email, file, customer question or internal task, the work stays connected from arrival to completion.</p>
+        <span class="eyebrow">{{cms:how_eyebrow}}</span>
+        <h2>{{cms:how_headline}}</h2>
+        <p>{{cms:how_subtext}}</p>
       </div>
       <div class="chain">
         <div class="step">
           <span class="n">01</span>
-          <h3>Work comes in</h3>
-          <p>Bring in an email, document, request or customer conversation. Buinee keeps the source and context together.</p>
+          <h3>{{cms:how_step1_title}}</h3>
+          <p>{{cms:how_step1_text}}</p>
         </div>
         <div class="step">
           <span class="n">02</span>
-          <h3>Someone takes ownership</h3>
-          <p>Assign it, discuss it, add instructions and complete the next step without losing decisions across separate tools.</p>
+          <h3>{{cms:how_step2_title}}</h3>
+          <p>{{cms:how_step2_text}}</p>
         </div>
         <div class="step">
           <span class="n">03</span>
-          <h3>The outcome is recorded</h3>
-          <p>Send the reply, approve the document, close the task or issue the final file with a history everyone can trust.</p>
+          <h3>{{cms:how_step3_title}}</h3>
+          <p>{{cms:how_step3_text}}</p>
         </div>
       </div>
     </div>
@@ -541,43 +539,31 @@
   <section id="roles">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Roles &amp; visibility</span>
-        <h2>Give everyone the access their work requires.</h2>
-        <p>Buinee supports different responsibilities without forcing every business into the same job titles. People see their own work, shared team work, or the full workspace according to their role.</p>
+        <span class="eyebrow">{{cms:roles_eyebrow}}</span>
+        <h2>{{cms:roles_headline}}</h2>
+        <p>{{cms:roles_subtext}}</p>
       </div>
       <div class="roles">
         <div class="role">
-          <span class="tier">Tier 3</span>
-          <h3>Team member</h3>
-          <p>Handles day-to-day work.</p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Manages assigned work</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Works with messages and files</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Requests review when needed</li>
-          </ul>
-          <p class="sees">Sees <b>their own work only</b>.</p>
+          <span class="tier">{{cms:role1_tier}}</span>
+          <h3>{{cms:role1_title}}</h3>
+          <p>{{cms:role1_tagline}}</p>
+          <ul>{{cms:role1_bullets}}</ul>
+          <p class="sees">{{cms:role1_sees}}</p>
         </div>
         <div class="role">
-          <span class="tier">Tier 2</span>
-          <h3>Team lead</h3>
-          <p>Coordinates people and decisions.</p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Reviews team work</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Approves or returns requests</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Keeps work moving</li>
-          </ul>
-          <p class="sees">Sees <b>their own work and their team's</b>.</p>
+          <span class="tier">{{cms:role2_tier}}</span>
+          <h3>{{cms:role2_title}}</h3>
+          <p>{{cms:role2_tagline}}</p>
+          <ul>{{cms:role2_bullets}}</ul>
+          <p class="sees">{{cms:role2_sees}}</p>
         </div>
         <div class="role">
-          <span class="tier">Tier 1</span>
-          <h3>Supervisor</h3>
-          <p>Runs the workspace.</p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Oversees teams and workflows</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Sets access and business rules</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Adds and removes people</li>
-          </ul>
-          <p class="sees">Sees <b>the whole workspace</b>.</p>
+          <span class="tier">{{cms:role3_tier}}</span>
+          <h3>{{cms:role3_title}}</h3>
+          <p>{{cms:role3_tagline}}</p>
+          <ul>{{cms:role3_bullets}}</ul>
+          <p class="sees">{{cms:role3_sees}}</p>
         </div>
       </div>
     </div>
@@ -587,23 +573,17 @@
   <section id="workspace" class="band">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">The workspace</span>
-        <h2>Where your team already talks — with the work in the room.</h2>
+        <span class="eyebrow">{{cms:workspace_eyebrow}}</span>
+        <h2>{{cms:workspace_headline}}</h2>
       </div>
 
       <div class="feat">
         <div>
-          <h3>Send a file to a colleague. Or to an agent.</h3>
+          <h3>{{cms:workspace_feat1_title}}</h3>
           <p>
-            The chat is where the team already works things out. Buinee puts the
-            documents in the same place — so a file goes to a person or straight to an
-            assistant that reads it, without leaving the conversation.
+            {{cms:workspace_feat1_text}}
           </p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Team and one-to-one chat</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Share PDFs, Word, Excel, images and more</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Hand any file to an assistant in one tap</li>
-          </ul>
+          <ul>{{cms:workspace_feat1_bullets}}</ul>
         </div>
         <div class="chat">
           <div class="chat-head">
@@ -642,18 +622,11 @@
           </div>
         </div>
         <div>
-          <h3>A signature that means something.</h3>
+          <h3>{{cms:workspace_feat2_title}}</h3>
           <p>
-            Sign inside the system and the PDF prints ready. But the signature on the page
-            is only the visible part — underneath it sits a record of who approved what,
-            when, and what changed between drafts. That record is the thing an auditor
-            actually asks for.
+            {{cms:workspace_feat2_text}}
           </p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>No printing to sign, then scanning back</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Every approval and return time-stamped</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Nothing editable after it is approved</li>
-          </ul>
+          <ul>{{cms:workspace_feat2_bullets}}</ul>
         </div>
       </div>
     </div>
@@ -663,63 +636,42 @@
   <section id="agents">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Inside your dashboard</span>
-        <h2>Every person gets an assistant that understands their work.</h2>
+        <span class="eyebrow">{{cms:agents_eyebrow}}</span>
+        <h2>{{cms:agents_headline}}</h2>
         <p>
-          Once your company is in, each person's dashboard comes with an AI assistant —
-          one that works with the actual context: mailbox conversations, documents,
-          customer records, team instructions and outstanding tasks. Not a generic chatbot
-          bolted to the corner of the screen.
+          {{cms:agents_subtext}}
         </p>
       </div>
 
       <div class="roles" style="grid-template-columns:repeat(2,1fr)">
         <div class="role">
-          <span class="tier">Your inbox</span>
-          <h3>It reads the mail before you do</h3>
+          <span class="tier">{{cms:agents_card1_tag}}</span>
+          <h3>{{cms:agents_card1_title}}</h3>
           <p>
-            Connect your work mailbox and it goes through overnight — sorting what came in,
-            drafting the replies that are obvious, and putting the things that genuinely
-            need you at the top.
+            {{cms:agents_card1_text}}
           </p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Sorts requests, updates, questions and noise</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Drafts replies in your own tone</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Flags risks, changes and unanswered messages</li>
-          </ul>
-          <p class="sees">Nothing is ever sent without you pressing send.</p>
+          <ul>{{cms:agents_card1_bullets}}</ul>
+          <p class="sees">{{cms:agents_card1_sees}}</p>
         </div>
 
         <div class="role">
-          <span class="tier">Your documents</span>
-          <h3>Hand it a file and ask</h3>
+          <span class="tier">{{cms:agents_card2_tag}}</span>
+          <h3>{{cms:agents_card2_title}}</h3>
           <p>
-            Give it a report, spreadsheet, contract, proposal, invoice or internal guide.
-            It reads the document itself, finds the useful details, and helps you act on
-            what is missing or important.
+            {{cms:agents_card2_text}}
           </p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>PDFs, scans, Word and Excel</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Summarises, compares and extracts details</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Explains what needs attention and why</li>
-          </ul>
-          <p class="sees">Works from <b>your</b> rules — your thresholds, your terms, your templates.</p>
+          <ul>{{cms:agents_card2_bullets}}</ul>
+          <p class="sees">{{cms:agents_card2_sees}}</p>
         </div>
       </div>
 
       <div class="feat" style="margin-top:52px">
         <div>
-          <h3>You tell it how your business works. Once.</h3>
+          <h3>{{cms:agents_card3_title}}</h3>
           <p>
-            Every business has rules a new hire spends months learning — how customers are
-            handled, what needs approval, when work is escalated, and which templates to use.
-            Write them down once and the assistant works to them instead of generic practice.
+            {{cms:agents_card3_text}}
           </p>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Your approval, service and escalation rules</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Your documents and response templates</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Your vocabulary, customers, teams and processes</li>
-          </ul>
+          <ul>{{cms:agents_card3_bullets}}</ul>
         </div>
         <div class="chat">
           <div class="chat-head">
@@ -747,25 +699,25 @@
   <section id="trust">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Built for dependable work</span>
-        <h2>AI can assist. Your rules and records remain in control.</h2>
-        <p>Business software earns its place by being predictable. Buinee separates suggestions from facts, keeps actions reviewable, and records important changes.</p>
+        <span class="eyebrow">{{cms:trust_eyebrow}}</span>
+        <h2>{{cms:trust_headline}}</h2>
+        <p>{{cms:trust_subtext}}</p>
       </div>
       <div class="trust">
         <div class="tcard">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
-          <h4>Facts stay verifiable</h4>
-          <p>Stored records, calculated figures and completed actions remain distinct from AI suggestions, so people can see what is known and what is proposed.</p>
+          <h4>{{cms:trust_card1_title}}</h4>
+          <p>{{cms:trust_card1_text}}</p>
         </div>
         <div class="tcard">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
-          <h4>People approve important actions</h4>
-          <p>Drafts, summaries and recommendations stay ready for review. Sending, approving and changing records remains a deliberate human action.</p>
+          <h4>{{cms:trust_card2_title}}</h4>
+          <p>{{cms:trust_card2_text}}</p>
         </div>
         <div class="tcard">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-          <h4>Your company's data is yours</h4>
-          <p>Every record belongs to one company and is scoped to it. No document, figure or conversation is visible outside the organisation that created it.</p>
+          <h4>{{cms:trust_card3_title}}</h4>
+          <p>{{cms:trust_card3_text}}</p>
         </div>
       </div>
     </div>
@@ -775,17 +727,17 @@
   <section id="pricing" class="band">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Pricing</span>
-        <h2>Working alone, or setting this up for a team?</h2>
-        <p>Both get the same connected workspace for messages, documents, tasks and business records. What changes is how many people it covers and which advanced features are included.</p>
+        <span class="eyebrow">{{cms:pricing_eyebrow}}</span>
+        <h2>{{cms:pricing_headline}}</h2>
+        <p>{{cms:pricing_subtext}}</p>
       </div>
 
       <div class="aud-toggle" role="tablist" aria-label="Who the plan is for">
         <button class="aud" id="audIndividual" role="tab" onclick="showAudience('individual')">
-          Just me
+          {{cms:pricing_aud_individual}}
         </button>
         <button class="aud" id="audTeam" role="tab" onclick="showAudience('team')">
-          My team
+          {{cms:pricing_aud_team}}
         </button>
       </div>
 
@@ -800,13 +752,13 @@
   <section style="padding-top:0">
     <div class="wrap">
       <div class="cta-band">
-        <h2>Start with the work your team handles every day.</h2>
-        <p>Create a workspace, invite the right people, and bring your next request, conversation or document into one clear process.</p>
+        <h2>{{cms:cta_headline}}</h2>
+        <p>{{cms:cta_subtext}}</p>
         <div class="cta-row">
-          <a class="btn primary" href="#pricing">Choose a plan</a>
-          <a class="btn ghost" href="/register?join=1">Join a company already here</a>
+          <a class="btn primary" href="#pricing">{{cms:cta_primary}}</a>
+          <a class="btn ghost" href="/register?join=1">{{cms:cta_secondary}}</a>
         </div>
-        <p class="fine">If your company is already registered, you'll be placed in it automatically.</p>
+        <p class="fine">{{cms:cta_fine}}</p>
       </div>
     </div>
   </section>
@@ -814,7 +766,7 @@
 
 <footer>
   <div class="wrap foot">
-    <p>Buinee — one workspace for the work behind your business.</p>
+    <p>{{cms:footer_tagline}}</p>
     <nav class="foot-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/cookies">Cookies</a><a href="/refunds">Refunds</a><a href="/security">Security</a></nav>
     <p>Built by <a href="https://princecaleb.dev" target="_blank" rel="noopener">princecaleb.dev</a> · <a href="/admin/login" style="color:var(--ink-4);font-weight:400">Owner sign in</a></p>
   </div>

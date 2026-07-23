@@ -176,6 +176,13 @@ def init_db() -> None:
                 livechat_mode          TEXT NOT NULL DEFAULT 'schedule',
                 livechat_schedule_json TEXT NOT NULL DEFAULT '{}'
             );
+            CREATE TABLE IF NOT EXISTS site_content (
+                page       TEXT NOT NULL,
+                key        TEXT NOT NULL,
+                value      TEXT NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (page, key)
+            );
             CREATE TABLE IF NOT EXISTS application_errors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL DEFAULT 'application',
                 severity TEXT NOT NULL DEFAULT 'error', message TEXT NOT NULL,
@@ -3595,6 +3602,31 @@ def set_livechat_settings(mode: str, schedule: dict) -> dict:
             (mode, json.dumps(cleaned)),
         )
     return get_platform_settings()
+
+
+def get_site_content_overrides(page: str) -> dict:
+    with _cursor() as conn:
+        rows = conn.execute("SELECT key, value FROM site_content WHERE page = ?", (page,)).fetchall()
+    return {r["key"]: r["value"] for r in rows}
+
+
+def set_site_content(page: str, values: dict) -> dict:
+    """Upsert admin-edited copy for one CMS page. Caller (server.py) is
+    responsible for checking each key against that page's known field
+    schema before calling this - this just stores whatever it's given."""
+    now = time.time()
+    with _cursor() as conn:
+        for key, value in values.items():
+            key = str(key).strip()
+            if not key or not all(c.islower() or c.isdigit() or c == "_" for c in key):
+                raise AuthError(f"Not a valid content key: {key!r}")
+            value = str(value)[:20000]
+            conn.execute(
+                """INSERT INTO site_content(page,key,value,updated_at) VALUES(?,?,?,?)
+                   ON CONFLICT(page,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
+                (page, key, value, now),
+            )
+    return get_site_content_overrides(page)
 
 
 def set_platform_ai_model(provider: str | None, model: str) -> dict:

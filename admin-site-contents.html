@@ -1,6 +1,6 @@
 <meta charset="utf-8">
-<title>Command Center — Buinee</title>
-<meta name="description" content="Cross-company overview for Buinee's platform owner.">
+<title>Site Contents — Command Center — Buinee</title>
+<meta name="description" content="Edit the text shown on the public landing, register, login and legal pages.">
 <style>
   :root {
     --paper: #f6f4ef; --surface: #ffffff; --surface-2: #efece5;
@@ -51,36 +51,24 @@
   }
 
   * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--paper); color: var(--ink);
-    font-family: var(--sans); font-size: 16px; line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
   a { color: inherit; }
   h1,h2,h3 { margin: 0; font-weight: 600; letter-spacing: -.02em; }
   p { margin: 0; }
-  button { font-family: inherit; font-size: inherit; }
+  button, input, textarea { font-family: inherit; font-size: inherit; }
   :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 
-  .shell { display: flex; min-height: 100vh; }
-
+  .shell { display: flex; height: 100vh; height: 100dvh; }
   .sidebar {
     width: 232px; flex: none; background: var(--surface); border-right: 1px solid var(--line);
     display: flex; flex-direction: column; padding: 20px 14px;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
   }
   .sidebar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; padding: 0 8px; }
-  .sidebar-brand .mark {
-    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
-    background: linear-gradient(140deg, var(--violet), #0a4340); color: #fff;
-  }
+  .sidebar-brand .mark { width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; background: linear-gradient(140deg, var(--violet), #0a4340); color: #fff; }
   .sidebar-brand .mark svg { width: 16px; height: 16px; }
   .sidebar-brand .name { font-family: var(--serif); font-size: 18px; font-weight: 600; }
-  .sidebar-tag {
-    font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-    color: var(--violet); padding: 3px 8px; margin: 6px 0 18px;
-  }
+  .sidebar-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--violet); padding: 3px 8px; margin: 6px 0 18px; }
   .sidebar-nav { display: flex; flex-direction: column; gap: 3px; flex: 1; }
   .sidebar-link {
     display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 9px;
@@ -90,32 +78,15 @@
   .sidebar-link svg { width: 17px; height: 17px; flex: none; }
   .sidebar-link:hover { background: var(--surface-2); color: var(--ink); }
   .sidebar-link.active { background: var(--violet-soft); color: var(--violet); }
-  .sidebar-foot {
-    border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px;
-    display: flex; flex-direction: column; gap: 3px;
-  }
+  .sidebar-foot { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 3px; }
 
   .content { flex: 1; min-width: 0; }
-  main { padding: 36px 0 70px; }
-  .hero-line { margin-bottom: 28px; }
-  .hero-line .eyebrow { font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; font-weight: 700; color: #0e5d57; }
-  .hero-line h1 { font-family: var(--serif); font-size: 28px; margin: 8px 0 6px; }
-  .hero-line p { font-size: 15px; color: var(--ink-2); max-width: 60ch; }
-
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-  .tile {
-    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: var(--shadow); padding: 18px 20px;
-  }
-  .tile .n { font-family: var(--mono); font-size: 30px; font-weight: 700; line-height: 1; }
-  .tile .l { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
-
-  .panel {
-    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: var(--shadow); padding: 20px; margin-bottom: 20px;
-  }
-  .panel h3 { font-size: 15.5px; margin-bottom: 4px; }
-  .panel .sub { font-size: 12.5px; color: var(--ink-3); margin-bottom: 16px; }
+  main { padding: 40px 0 70px; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 28px; }
+  .hero-line { margin-bottom: 20px; }
+  .hero-line .eyebrow { font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; font-weight: 700; color: var(--violet); }
+  .hero-line h1 { font-family: var(--serif); font-size: 26px; margin: 8px 0 6px; }
+  .hero-line p { font-size: 14.5px; color: var(--ink-2); }
 
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -124,49 +95,43 @@
     background: var(--surface); color: var(--ink); white-space: nowrap;
   }
   .btn:hover { border-color: var(--violet); color: var(--violet); }
-  .btn.sm { padding: 6px 11px; font-size: 12.5px; }
+  .btn.primary { background: var(--violet); color: #fff; border-color: transparent; }
+  .btn.primary:hover { background: var(--teal-deep); }
+  .btn.primary:disabled { opacity: .6; cursor: default; }
 
-  #recentCompanies {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
+  .page-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .page-tab {
+    padding: 8px 14px; border-radius: 20px; border: 1px solid var(--line-strong); background: var(--surface);
+    color: var(--ink-2); font-size: 13.5px; font-weight: 600; cursor: pointer;
   }
-  .mini-company-card {
-    display: flex; flex-direction: column; gap: 8px; min-width: 0;
-    padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
-  }
-  .mini-company-card .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .mini-company-card .info .name {
-    font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .mini-company-card .info .meta { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; }
-  .mini-company-card .counts { display: flex; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }
-  .count-badge {
-    display: inline-flex; align-items: center; justify-content: center; min-width: 22px; padding: 2px 7px;
-    border-radius: 20px; font-size: 12px; font-weight: 700; font-family: var(--mono);
-    background: var(--surface-2); color: var(--ink-2);
-  }
-  .count-badge.warn { background: var(--warn-soft); color: var(--warn); }
-  .attention-panel { margin-bottom: 18px; padding: 15px; border: 1px solid var(--warn); border-radius: 12px; background: var(--warn-soft); }
-  .attention-panel .head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; }
-  .attention-panel .head h2 { font-size: 16px; }
-  .attention-panel .head span { color: var(--ink-3); font-size: 11.5px; }
-  .admin-alerts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
-  .admin-alert { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); text-decoration: none; }
-  .admin-alert:hover { border-color: var(--warn); }
-  .admin-alert .n { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--warn); color: #fff; font: 700 12px var(--mono); }
-  .admin-alert b, .admin-alert small { display: block; }
-  .admin-alert b { font-size: 12.5px; }
-  .admin-alert small { margin-top: 2px; color: var(--ink-3); font-size: 10.5px; }
-  .no-super { font-style: italic; }
-  .empty-mini { font-size: 12.5px; color: var(--ink-3); padding: 6px 0; }
+  .page-tab.active { background: var(--violet); border-color: transparent; color: #fff; }
 
-  .sys-row { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .sys-row:last-child { border-bottom: none; }
-  .sys-row .val { font-family: var(--mono); font-size: 12.5px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
-  .dot.good { background: var(--good); }
-  .dot.warn { background: var(--warn); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; }
+  .panel + .panel { margin-top: 14px; }
+  .panel summary { font-size: 14.5px; font-weight: 600; cursor: pointer; list-style: none; }
+  .panel summary::-webkit-details-marker { display: none; }
+  .panel summary:before { content: '▸'; display: inline-block; margin-right: 8px; color: var(--ink-4); transition: transform .12s; }
+  .panel[open] summary:before { transform: rotate(90deg); }
+  .panel .fields { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+
+  label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); display: flex; flex-direction: column; gap: 6px; }
+  input[type=text], textarea {
+    padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line-strong);
+    background: var(--paper); color: var(--ink); font-weight: 400; font-size: 13.5px; resize: vertical;
+  }
+  textarea.mono { font-family: var(--mono); font-size: 12px; }
+  input:focus, textarea:focus { border-color: var(--violet); }
+  .hint { font-size: 11px; color: var(--ink-3); font-weight: 400; }
+  .readonly-value { padding: 9px 11px; border-radius: 9px; background: var(--surface-2); color: var(--ink-2); font-size: 13.5px; white-space: pre-wrap; }
+
+  .save-bar { position: sticky; bottom: 0; margin-top: 18px; padding: 14px 0; background: var(--paper); display: flex; align-items: center; gap: 12px; }
+  .msg { font-size: 13.5px; padding: 9px 13px; border-radius: 9px; display: none; }
+  .msg.show { display: block; }
+  .msg.error { background: var(--bad-soft); color: var(--bad); }
+  .msg.ok { background: var(--good-soft); color: var(--good); }
 
   #loading { padding: 80px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
+  .readonly-banner { padding: 12px 14px; border-radius: 10px; background: var(--surface-2); color: var(--ink-2); font-size: 12.5px; margin-bottom: 18px; }
 
   @media (max-width: 640px) {
     .sidebar { width: 64px; padding: 16px 8px; }
@@ -179,36 +144,11 @@
 <div class="shell">
   <aside class="sidebar">
     <a class="sidebar-brand" href="/admin">
-      <span class="mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg>
-      </span>
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg></span>
       <span class="name">Buinee</span>
     </a>
     <div class="sidebar-tag">Command Center</div>
-    <nav class="sidebar-nav">
-      <a class="sidebar-link active" href="/admin">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        <span class="label">Overview</span>
-      </a>
-      <a class="sidebar-link" href="/admin/companies">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M6 21V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v14"/><path d="M14 21V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v17"/></svg>
-        <span class="label">Companies</span>
-      </a>
-      <a class="sidebar-link" href="/admin/pipeline">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
-        <span class="label">Pipeline</span>
-      </a>
-      <a class="sidebar-link" href="/admin/payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="label">Payments</span></a>
-      <a class="sidebar-link" href="/admin/plans">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        <span class="label">Plans</span>
-      </a>
-      <a class="sidebar-link" href="/admin/team"><span class="label">Back-office team</span></a>
-      <a class="sidebar-link" href="/admin/reports"><span class="label">Reports</span></a><a class="sidebar-link" href="/admin/inbox"><span class="label">Inbox</span></a><a class="sidebar-link" href="/admin/invoices"><span class="label">Invoices</span></a><a class="sidebar-link" href="/admin/errors"><span class="label">Error logs</span></a><a class="sidebar-link" href="/admin/activity"><span class="label">Activity log</span></a><a class="sidebar-link" href="/" target="_blank"><span class="label">View site</span></a><a class="sidebar-link" href="/admin/settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-        <span class="label">Settings</span>
-      </a>
-    </nav>
+    <nav class="sidebar-nav"></nav>
     <div class="sidebar-foot">
       <button class="sidebar-link" onclick="toggleTheme()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -224,34 +164,22 @@
   <div class="content">
     <main>
       <div class="wrap">
-        <div id="loading">Loading the command center…</div>
-
+        <div id="loading">Loading…</div>
         <div id="content" style="display:none">
           <div class="hero-line">
-            <span class="eyebrow">Platform overview</span>
-            <h1>Overview</h1>
-            <p>The numbers that matter at a glance, the newest signups, and whether the platform itself is configured. For every company's full team, see Companies.</p>
+            <span class="eyebrow">Site contents</span>
+            <h1>Edit your public pages</h1>
+            <p>Every headline, paragraph and button label on the landing, register, login and legal pages — changes go live immediately.</p>
           </div>
 
-          <section class="attention-panel" id="adminAttention" aria-live="polite"></section>
+          <div class="page-tabs" id="pageTabs"></div>
+          <div id="readonlyBanner" class="readonly-banner" style="display:none">Only the owner can edit site contents. You can view the current text below.</div>
+          <div id="fieldPanels"></div>
 
-          <div class="tiles" id="tiles"></div>
-
-          <div class="panel">
-            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap">
-              <div>
-                <h3>Recently signed up</h3>
-                <div class="sub">The newest companies on the platform</div>
-              </div>
-              <a class="btn sm" href="/admin/companies">View all companies</a>
-            </div>
-            <div id="recentCompanies"></div>
-          </div>
-
-          <div class="panel">
-            <h3>System</h3>
-            <div class="sub">Platform-level configuration, not any one company's</div>
-            <div id="systemRows"></div>
+          <div class="save-bar" id="saveBar" style="display:none">
+            <button class="btn primary" type="button" id="saveBtn" onclick="saveContent()">Save changes</button>
+            <div class="msg error" id="contentError"></div>
+            <div class="msg ok" id="contentOk"></div>
           </div>
         </div>
       </div>
@@ -260,11 +188,47 @@
 </div>
 
 <script>
+  let currentAdmin = null;
+  let currentPage = 'index';
+  let currentFields = [];
+
+  const PAGES = [
+    { key: 'index', label: 'Landing page' },
+    { key: 'register', label: 'Register page' },
+    { key: 'login', label: 'Login page' },
+    { key: 'legal', label: 'Legal pages' },
+  ];
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s ?? '';
+    return d.innerHTML;
+  }
+
+  function sectionOf(key) {
+    const map = [
+      ['hero_', 'Hero'], ['how_', 'How it works'],
+      ['roles_', 'Roles'], ['role1_', 'Roles'], ['role2_', 'Roles'], ['role3_', 'Roles'],
+      ['workspace_', 'Workspace'], ['agents_', 'AI agents'], ['trust_', 'Trust'],
+      ['pricing_', 'Pricing'], ['cta_', 'Closing CTA'], ['footer_', 'Footer'],
+      ['brand_', 'Brand panel'], ['gate_', 'Plan gate'], ['join_', 'Join form'],
+      ['card_', 'Sign-in card'],
+      ['privacy_', 'Privacy Policy'], ['terms_', 'Terms of Use'], ['cookies_', 'Cookie Policy'],
+      ['refunds_', 'Refund Policy'], ['security_', 'Security'],
+      ['team_', 'Register form'], ['solo_', 'Register form'], ['tab_', 'Register form'],
+      ['company_caption', 'Register form'], ['reg_', 'Register form'],
+    ];
+    for (const [prefix, label] of map) if (key.startsWith(prefix)) return label;
+    return 'Other';
+  }
+
   function toggleTheme() {
     const root = document.documentElement;
     const cur = root.getAttribute('data-theme') ||
-      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+      ((matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('buinee-admin-theme', next);
   }
 
   async function logout() {
@@ -272,114 +236,108 @@
     location.href = '/admin/login';
   }
 
-  function escapeHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = s == null ? '' : String(s);
-    return d.innerHTML;
+  function showMsg(id, text) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.classList.toggle('show', !!text);
   }
 
-  function fmtDate(epochSeconds) {
-    return new Date(epochSeconds * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  }
-
-  async function main() {
-    try {
-      const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
-      if (!res.ok) { location.href = '/admin/login'; return; }
-    } catch { location.href = '/admin/login'; return; }
-
-    let overview;
-    try {
-      const res = await fetch('/api/admin/overview', { credentials: 'same-origin' });
-      if (!res.ok) { throw new Error(); }
-      overview = await res.json();
-    } catch {
-      document.getElementById('loading').textContent = 'Could not load the command center.';
-      return;
+  function fieldControl(f, isOwner) {
+    const id = 'f_' + f.key;
+    if (!isOwner) {
+      const display = f.type === 'bullets'
+        ? f.value.split('\n').filter(Boolean).map(l => '• ' + l).join('\n')
+        : f.value;
+      return `<label>${esc(f.label)}<div class="readonly-value">${esc(display) || '<em>(empty)</em>'}</div></label>`;
     }
-
-    renderTiles(overview.platform);
-    renderAdminAttention(overview);
-    renderRecentCompanies(overview.companies);
-    renderSystem(overview.system);
-
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('content').style.display = 'block';
-  }
-
-  function renderAdminAttention(overview) {
-    const companies = overview.companies || [];
-    const system = overview.system || {};
-    const alerts = [];
-    const pending = companies.reduce((sum, company) => sum + (company.pending_count || 0), 0);
-    const missingSupervisors = companies.filter(company => !company.supervisor).length;
-    const planBlocks = companies.filter(company => company.needs_team_plan).length;
-    const systemWarnings = [!system.demo_agent_configured, !system.fx_rates_loaded].filter(Boolean).length;
-    if (pending) alerts.push({ n: pending, title: 'Pending access requests', copy: 'Across all companies', href: '/admin/companies' });
-    if (planBlocks) alerts.push({ n: planBlocks, title: 'Move to a Team tier', copy: 'Multi-user companies still on Individual', href: '/admin/companies' });
-    if (missingSupervisors) alerts.push({ n: missingSupervisors, title: 'No supervisor assigned', copy: 'Companies without an approver', href: '/admin/companies' });
-    if (systemWarnings) alerts.push({ n: systemWarnings, title: 'System setup warnings', copy: 'Configuration needs attention', href: '#systemRows' });
-    const total = alerts.reduce((sum, alert) => sum + alert.n, 0);
-    document.getElementById('adminAttention').innerHTML = `<div class="head"><h2>${total ? 'Command center attention' : 'Command center clear'}</h2><span>${total ? `${total} open ${total === 1 ? 'item' : 'items'}` : 'No platform exceptions detected'}</span></div>
-      ${alerts.length ? `<div class="admin-alerts">${alerts.map(alert => `<a class="admin-alert" href="${alert.href}"><span class="n">${alert.n}</span><span><b>${alert.title}</b><small>${alert.copy}</small></span><span>›</span></a>`).join('')}</div>` : '<div class="empty-mini">New company, access, plan, and system exceptions will appear here first.</div>'}`;
-  }
-
-  function renderTiles(platform) {
-    const approved = platform.by_status.approved || 0;
-    const pending = platform.by_status.pending || 0;
-    const supervisors = platform.by_role.finance_supervisor || 0;
-    const tiles = document.getElementById('tiles');
-    tiles.innerHTML = [
-      { n: platform.companies, l: 'Companies registered' },
-      { n: approved, l: 'Approved employees, platform-wide' },
-      { n: pending, l: 'Pending approvals, platform-wide' },
-      { n: supervisors, l: 'Supervisors' },
-    ].map(t => `<div class="tile"><div class="n">${t.n}</div><div class="l">${t.l}</div></div>`).join('');
-  }
-
-  const RECENT_LIMIT = 5;
-
-  function renderRecentCompanies(companies) {
-    const box = document.getElementById('recentCompanies');
-    if (!companies.length) {
-      box.innerHTML = '<div class="empty-mini">No companies registered yet.</div>';
-      return;
+    if (f.type === 'bullets') {
+      return `<label>${esc(f.label)}<textarea id="${id}" rows="4">${esc(f.value)}</textarea><span class="hint">One item per line.</span></label>`;
     }
-    // companies comes ordered oldest-first; show the newest ones here.
-    const recent = companies.slice(-RECENT_LIMIT).reverse();
-    box.innerHTML = recent.map(c => `
-      <div class="mini-company-card">
-        <div class="info">
-          <span class="name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</span>
-          <span class="meta">Registered ${fmtDate(c.created_at)}</span>
-          <span class="meta">${c.supervisor
-              ? `Supervisor: ${escapeHtml(c.supervisor.name)}`
-              : '<span class="no-super">no Supervisor yet</span>'}</span>
-        </div>
-        <div class="counts">
-          <span class="count-badge" title="${c.plan.name} plan — ${c.approved_count} of ${c.plan.user_limit} users">${c.approved_count}/${c.plan.user_limit}</span>
-          <span class="count-badge ${c.pending_count ? 'warn' : ''}" title="Pending requests">${c.pending_count}</span>
-        </div>
-      </div>
+    if (f.type === 'paragraph') {
+      return `<label>${esc(f.label)}<textarea id="${id}" rows="3">${esc(f.value)}</textarea></label>`;
+    }
+    if (f.type === 'html') {
+      return `<label>${esc(f.label)}<textarea id="${id}" rows="16" class="mono">${esc(f.value)}</textarea><span class="hint">Raw HTML, used as-is on the legal page.</span></label>`;
+    }
+    return `<label>${esc(f.label)}<input type="text" id="${id}" value="${esc(f.value)}"></label>`;
+  }
+
+  function renderFields(fields, isOwner) {
+    const groups = {};
+    const order = [];
+    for (const f of fields) {
+      const s = sectionOf(f.key);
+      if (!groups[s]) { groups[s] = []; order.push(s); }
+      groups[s].push(f);
+    }
+    document.getElementById('fieldPanels').innerHTML = order.map(s => `
+      <details class="panel" open>
+        <summary>${esc(s)}</summary>
+        <div class="fields">${groups[s].map(f => fieldControl(f, isOwner)).join('')}</div>
+      </details>
     `).join('');
   }
 
-  function renderSystem(system) {
-    const box = document.getElementById('systemRows');
-    box.innerHTML = `
-      <div class="sys-row">
-        <span><span class="dot ${system.demo_agent_configured ? 'good' : 'warn'}"></span>Landing page demo agent</span>
-        <span class="val">${system.demo_agent_configured ? 'configured' : 'not configured'}</span>
-      </div>
-      <div class="sys-row">
-        <span><span class="dot ${system.fx_rates_loaded ? 'good' : 'warn'}"></span>Bank of Ghana FX rates</span>
-        <span class="val">${system.fx_rates_loaded ? 'loaded' : 'not found'}</span>
-      </div>
-      <div class="sys-row">
-        <span>Database</span>
-        <span class="val">${system.database_ready ? 'Available' : 'Unavailable'}</span>
-      </div>
-    `;
+  async function loadPage(pageKey) {
+    currentPage = pageKey;
+    document.querySelectorAll('.page-tab').forEach(b => b.classList.toggle('active', b.dataset.page === pageKey));
+    showMsg('contentError', ''); showMsg('contentOk', '');
+    document.getElementById('fieldPanels').innerHTML = '<div class="panel">Loading…</div>';
+    let data;
+    try {
+      data = await (await fetch('/api/admin/site-content?page=' + encodeURIComponent(pageKey), { credentials: 'same-origin' })).json();
+    } catch {
+      document.getElementById('fieldPanels').innerHTML = '<div class="panel">Could not load this page\'s content.</div>';
+      return;
+    }
+    currentFields = data.fields || [];
+    const isOwner = currentAdmin.role === 'owner';
+    renderFields(currentFields, isOwner);
+    document.getElementById('saveBar').style.display = isOwner ? 'flex' : 'none';
+    document.getElementById('readonlyBanner').style.display = isOwner ? 'none' : 'block';
+  }
+
+  async function saveContent() {
+    showMsg('contentError', ''); showMsg('contentOk', '');
+    const values = {};
+    for (const f of currentFields) {
+      const el = document.getElementById('f_' + f.key);
+      if (el) values[f.key] = el.value;
+    }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/admin/site-content/save', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: currentPage, values }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMsg('contentError', data.error || 'Could not save.'); return; }
+      currentFields = data.fields || currentFields;
+      showMsg('contentOk', 'Saved — live on the public site now.');
+    } catch {
+      showMsg('contentError', 'Could not reach the server.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save changes';
+    }
+  }
+
+  async function main() {
+    let admin;
+    try {
+      const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
+      if (!res.ok) { location.href = '/admin/login'; return; }
+      admin = (await res.json()).admin;
+    } catch { location.href = '/admin/login'; return; }
+
+    currentAdmin = admin;
+    document.getElementById('pageTabs').innerHTML = PAGES.map(p =>
+      `<button class="page-tab" type="button" data-page="${p.key}" onclick="loadPage('${p.key}')">${esc(p.label)}</button>`
+    ).join('');
+    await loadPage('index');
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
   }
 
   main();
