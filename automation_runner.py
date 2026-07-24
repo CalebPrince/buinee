@@ -13,9 +13,12 @@ import server
 def main() -> None:
     server.db.init_db()
     mailbox_result = server.poll_connected_mailboxes()
-    print("mailboxes " + " ".join(f"{key}={value}" for key, value in mailbox_result.items()))
+    print("mailboxes " + " ".join(f"{key}={value}" for key, value in mailbox_result.items() if key != "by_user"))
     connector_result = server.poll_connected_tools()
-    print("connectors " + " ".join(f"{key}={value}" for key, value in connector_result.items()))
+    print("connectors " + " ".join(f"{key}={value}" for key, value in connector_result.items() if key != "by_user"))
+    notify_result = server.notify_new_message_arrivals(
+        mailbox_result.get("by_user", {}), connector_result.get("by_user", {}))
+    print("new-message emails " + " ".join(f"{key}={value}" for key, value in notify_result.items()))
     due = server.db.due_automations()
     for job in due:
         key = job["recipe_key"]

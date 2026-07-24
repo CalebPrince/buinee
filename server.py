@@ -1797,20 +1797,27 @@ def paystack_config(cfg: dict) -> dict:
 
 
 def poll_connected_mailboxes() -> dict:
-    """Header-only polling used by the scheduled runner for arrival alerts."""
+    """Header-only polling used by the scheduled runner for arrival alerts.
+
+    by_user tracks newly-arrived counts per person this cycle, so the caller
+    can email each of them once rather than re-scanning arrival rows."""
     cfg = load_env()
     checked = arrivals = failed = 0
+    by_user: dict[int, int] = {}
     for saved in db.list_all_mailbox_connections():
         try:
             connection, creds = live_mailbox(saved["user_id"], cfg, saved["id"])
             messages = mailbox.list_recent(cfg, connection, creds, limit=25)
-            arrivals += db.record_mailbox_poll(connection, messages)
+            added = db.record_mailbox_poll(connection, messages)
+            arrivals += added
+            if added:
+                by_user[saved["user_id"]] = by_user.get(saved["user_id"], 0) + added
             checked += 1
         except Exception as exc:
             failed += 1
             db.record_mailbox_poll_error(saved["id"], saved["user_id"], str(exc))
             print(f"mailbox poll failed connection={saved['id']}: {exc}")
-    return {"checked": checked, "arrivals": arrivals, "failed": failed}
+    return {"checked": checked, "arrivals": arrivals, "failed": failed, "by_user": by_user}
 
 
 def poll_connected_tools() -> dict:
@@ -1818,19 +1825,56 @@ def poll_connected_tools() -> dict:
     alerts, the connector counterpart of poll_connected_mailboxes above."""
     cfg = load_env()
     checked = arrivals = failed = 0
+    by_user: dict[int, int] = {}
     chat_ids = tools.chat_tool_ids()
     for saved in db.list_all_tool_connections(chat_ids):
         try:
             user = {"id": saved["user_id"], "company_id": saved["company_id"]}
             creds = tool_credentials(user, saved, cfg)
             items = tools.list_recent(cfg, saved["tool"], creds, limit=25)
-            arrivals += db.record_connector_poll(saved, items)
+            added = db.record_connector_poll(saved, items)
+            arrivals += added
+            if added:
+                by_user[saved["user_id"]] = by_user.get(saved["user_id"], 0) + added
             checked += 1
         except Exception as exc:
             failed += 1
             db.record_connector_poll_error(saved["id"], saved["user_id"], str(exc))
             print(f"connector poll failed connection={saved['id']}: {exc}")
-    return {"checked": checked, "arrivals": arrivals, "failed": failed}
+    return {"checked": checked, "arrivals": arrivals, "failed": failed, "by_user": by_user}
+
+
+def notify_new_message_arrivals(mail_by_user: dict, connector_by_user: dict) -> dict:
+    """Email each affected person once per poll cycle when Ada finds new
+    messages - the out-of-band counterpart to the dashboard banner, which
+    only fires while a tab is open to poll for it. Fails open: nothing here
+    is fatal to the cron cycle if SMTP isn't configured or a send fails."""
+    cfg = load_env()
+    sent = failed = 0
+    if not outbound_mail.is_configured(cfg):
+        return {"sent": 0, "failed": 0}
+    for user_id in set(mail_by_user) | set(connector_by_user):
+        user = db.get_user(user_id)
+        if not user or not user.get("email"):
+            continue
+        mail_n = mail_by_user.get(user_id, 0)
+        connector_n = connector_by_user.get(user_id, 0)
+        total = mail_n + connector_n
+        parts = []
+        if mail_n:
+            parts.append(f"{mail_n} in your inbox")
+        if connector_n:
+            parts.append(f"{connector_n} from connected tools")
+        subject = f"Ada noticed {total} new message{'s' if total != 1 else ''}"
+        body = (f"{subject} ({', '.join(parts)}).\n\n"
+                "Open Buinee to review: https://buinee.app/dashboard#triage")
+        try:
+            outbound_mail.send(cfg, user["email"], subject, body)
+            sent += 1
+        except outbound_mail.MailSendError as exc:
+            failed += 1
+            print(f"new-message email failed user={user_id}: {exc}")
+    return {"sent": sent, "failed": failed}
 
 
 def _mail_received_timestamp(value: str) -> float:
