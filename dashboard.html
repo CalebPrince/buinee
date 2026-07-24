@@ -503,6 +503,7 @@
     background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical;
   }
   .readonly-note { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
+  .qtier-checkbox { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
   .qtier-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
   .qtier-card .vgrid { margin-bottom: 10px; }
   .qtier-card input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-size: 13px; }
@@ -1264,15 +1265,26 @@ Do not promise a payment date unless it has already been approved."></textarea>
             </form>
           </div>
           <div class="settings-sec">
-            <h3>Solar quote pricing tiers</h3>
-            <p class="sub">Package tiers Ada matches a customer's computed system size against when quoting a solar job. Only shown to companies using the solar quote tool — leave empty if that doesn't apply to you.</p>
-            <div id="quoteTiersReadonly" class="readonly-note" hidden></div>
-            <div id="quoteTiersEditor" hidden>
-              <div id="quoteTiersRows"></div>
-              <button class="btn sm" type="button" onclick="addQuoteTierRow()">+ Add tier</button>
-              <div class="msg-error" id="quoteTiersErr" style="display:none; margin-top:10px"></div>
-              <div class="msg-ok" id="quoteTiersOk" style="display:none; margin-top:10px"></div>
-              <button class="btn primary sm" type="button" onclick="saveQuoteTiers()" style="margin-top:10px">Save tiers</button>
+            <h3>Solar quoting</h3>
+            <p class="sub">Turn this on only if your company installs solar systems and wants Ada to size and quote them for customers. Off by default for every new company.</p>
+            <div id="solarVerticalReadonly" class="readonly-note" hidden></div>
+            <label class="qtier-checkbox" id="solarVerticalToggle" hidden>
+              <input type="checkbox" id="solarVerticalCheckbox" onchange="saveSolarVertical(this.checked)">
+              Enable solar quoting for this company
+            </label>
+            <div class="msg-error" id="solarVerticalErr" style="display:none; margin-top:10px"></div>
+
+            <div id="quoteTiersBlock" hidden style="margin-top:16px; padding-top:16px; border-top:1px solid var(--line)">
+              <h4 style="margin-bottom:4px">Solar quote pricing tiers</h4>
+              <p class="sub">Package tiers Ada matches a customer's computed system size against when quoting a solar job.</p>
+              <div id="quoteTiersReadonly" class="readonly-note" hidden></div>
+              <div id="quoteTiersEditor" hidden>
+                <div id="quoteTiersRows"></div>
+                <button class="btn sm" type="button" onclick="addQuoteTierRow()">+ Add tier</button>
+                <div class="msg-error" id="quoteTiersErr" style="display:none; margin-top:10px"></div>
+                <div class="msg-ok" id="quoteTiersOk" style="display:none; margin-top:10px"></div>
+                <button class="btn primary sm" type="button" onclick="saveQuoteTiers()" style="margin-top:10px">Save tiers</button>
+              </div>
             </div>
           </div>
         </div>
@@ -3694,6 +3706,53 @@ Do not promise a payment date unless it has already been approved."></textarea>
         : 'Nothing noted yet. Only a Supervisor can review or edit this.';
     }
 
+    const solarEnabled = (me.company.verticals || []).includes('solar');
+    const solarReadonly = document.getElementById('solarVerticalReadonly');
+    const solarToggle = document.getElementById('solarVerticalToggle');
+    if (isSupervisor) {
+      solarReadonly.hidden = true;
+      solarToggle.hidden = false;
+      document.getElementById('solarVerticalCheckbox').checked = solarEnabled;
+    } else {
+      solarToggle.hidden = true;
+      solarReadonly.hidden = false;
+      solarReadonly.textContent = solarEnabled
+        ? 'Solar quoting is enabled for this company. Only a Supervisor can change this.'
+        : 'Solar quoting is not enabled for this company. Only a Supervisor can turn it on.';
+    }
+
+    document.getElementById('quoteTiersBlock').hidden = !solarEnabled;
+    if (solarEnabled) await loadQuoteTiersBlock(isSupervisor);
+
+    loadPersonalContext();
+  }
+
+  async function saveSolarVertical(checked) {
+    const errEl = document.getElementById('solarVerticalErr');
+    errEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/company/verticals', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verticals: checked ? ['solar'] : [] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Could not save.';
+        errEl.style.display = 'block';
+        document.getElementById('solarVerticalCheckbox').checked = !checked;
+        return;
+      }
+      document.getElementById('quoteTiersBlock').hidden = !checked;
+      if (checked) await loadQuoteTiersBlock(true);
+    } catch {
+      errEl.textContent = 'Could not reach the server.';
+      errEl.style.display = 'block';
+      document.getElementById('solarVerticalCheckbox').checked = !checked;
+    }
+  }
+
+  async function loadQuoteTiersBlock(isSupervisor) {
     const quoteTiersReadonly = document.getElementById('quoteTiersReadonly');
     const quoteTiersEditor = document.getElementById('quoteTiersEditor');
     try {
@@ -3713,8 +3772,6 @@ Do not promise a payment date unless it has already been approved."></textarea>
         ? `${quoteTiers.length} solar pricing tier(s) configured. Only a Supervisor can review or edit them.`
         : 'No solar pricing tiers configured yet. Only a Supervisor can add them.';
     }
-
-    loadPersonalContext();
   }
 
   let quoteTiers = [];

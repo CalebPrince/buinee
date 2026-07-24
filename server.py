@@ -2715,6 +2715,7 @@ class RouteHandlerMixin:
             "/api/company/briefing": self._handle_set_company_briefing,
             "/api/company/ada-notes": self._handle_set_company_ada_notes,
             "/api/company/quote-tiers": self._handle_set_quote_tiers,
+            "/api/company/verticals": self._handle_set_company_verticals,
             "/api/company/profile": self._handle_set_company_profile,
             "/api/user/instructions": self._handle_set_user_instructions,
             "/api/user/onboarding/complete": self._handle_complete_onboarding,
@@ -3579,6 +3580,29 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad request."}, 400)
         try:
             company = db.set_company_ada_notes(user["company_id"], str(req.get("notes") or ""))
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "company": company})
+
+    def _handle_set_company_verticals(self):
+        """Which vertical-specific settings sections (currently just
+        "solar") a company's Supervisor has turned on - self-service, not
+        admin-set, since they're the ones who know what business they run.
+        See db.set_company_verticals / KNOWN_VERTICALS."""
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        if user["role"] != "finance_supervisor":
+            return self._json({"error": "Only a supervisor can change this."}, 403)
+        try:
+            req = self._body(max_len=2000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        verticals = req.get("verticals")
+        if not isinstance(verticals, list) or not all(isinstance(v, str) for v in verticals):
+            return self._json({"error": "verticals must be a list of strings."}, 400)
+        try:
+            company = db.set_company_verticals(user["company_id"], verticals)
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "company": company})

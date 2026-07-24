@@ -592,6 +592,7 @@ def init_db() -> None:
         _migrate_generated_documents(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
+        _migrate_company_verticals(conn)
         _migrate_team_message_recipient(conn)
         _migrate_crm_profile_fields(conn)
         _migrate_crm_task_assignee(conn)
@@ -901,6 +902,22 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN ada_notes TEXT NOT NULL DEFAULT ''")
 
 
+# Which vertical-specific Ada tools/settings sections a company has opted
+# into - comma-separated tags, e.g. "solar". Deliberately not tied to plan
+# (a plan is what you pay for; a vertical is what business you're in), and
+# off by default so a brand-new accounting or airline signup never sees a
+# settings section meant for solar installers. Self-service (the company's
+# own Supervisor turns it on), not admin-set, since they're the ones who
+# know what kind of business they run.
+KNOWN_VERTICALS = ("solar",)
+
+
+def _migrate_company_verticals(conn: sqlite3.Connection) -> None:
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
+    if "verticals" not in cols:
+        conn.execute("ALTER TABLE companies ADD COLUMN verticals TEXT NOT NULL DEFAULT ''")
+
+
 # Mon-Fri, 08:00-18:00 - a sensible starting point until an owner visits
 # Site Settings and changes it. Times are plain HH:MM with no timezone
 # conversion - Ghana runs UTC+0 year-round (no DST), so treating these as
@@ -1108,10 +1125,26 @@ def find_company_by_exact_name(name: str) -> dict | None:
 def get_company(company_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT id, name, plan_id, model_provider, model_model, briefing, ada_notes "
+            "SELECT id, name, plan_id, model_provider, model_model, briefing, ada_notes, verticals "
             "FROM companies WHERE id = ?", (company_id,)
         ).fetchone()
-    return dict(row) if row else None
+    if not row:
+        return None
+    company = dict(row)
+    company["verticals"] = [v for v in company["verticals"].split(",") if v]
+    return company
+
+
+def set_company_verticals(company_id: int, verticals: list[str]) -> dict:
+    """Which vertical-specific tool sections (see KNOWN_VERTICALS) this
+    company's Supervisor has turned on for themselves."""
+    unknown = [v for v in verticals if v not in KNOWN_VERTICALS]
+    if unknown:
+        raise AuthError(f"Not a recognized vertical: {', '.join(unknown)}")
+    with _cursor() as conn:
+        conn.execute("UPDATE companies SET verticals=? WHERE id=?",
+                    (",".join(sorted(set(verticals))), company_id))
+    return get_company(company_id)
 
 
 def set_company_model(company_id: int, provider: str | None, model: str) -> dict:
