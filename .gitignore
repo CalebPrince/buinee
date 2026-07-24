@@ -9,6 +9,10 @@ storage/*
 *.sqlite
 *.db
 
+# Real client business data dropped in for reference/analysis - not code.
+BDC ACTIVITY LOGS.xlsx
+SABBDCLIFTINGS(OCTOBER),2023.xlsx
+
 # Python
 __pycache__/
 .venv/
