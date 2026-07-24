@@ -71,6 +71,7 @@ import providers  # noqa: E402
 import secretstore  # noqa: E402
 import solar_tools  # noqa: E402
 import tools  # noqa: E402
+import verticals  # noqa: E402
 import voucher  # noqa: E402
 
 # Only the local dev transport reads these - production runs under Passenger,
@@ -2254,6 +2255,12 @@ class RouteHandlerMixin:
                 return self._json({"error": "Not signed in."}, 401)
             vertical = parse_qs(urlparse(self.path).query).get("vertical", ["solar"])[0]
             return self._json({"vertical": vertical, "tiers": db.list_quote_tiers(user["company_id"], vertical)})
+
+        if path == "/api/verticals":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({"verticals": verticals.VERTICALS})
 
         if path == "/api/user/instructions":
             user = current_user(self)

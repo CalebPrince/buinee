@@ -39,6 +39,8 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+import verticals
+
 ROOT = Path(__file__).parent
 DB_FILE = ROOT / "storage" / "ledgerline.db"
 
@@ -908,8 +910,10 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
 # off by default so a brand-new accounting or airline signup never sees a
 # settings section meant for solar installers. Self-service (the company's
 # own Supervisor turns it on), not admin-set, since they're the ones who
-# know what kind of business they run.
-KNOWN_VERTICALS = ("solar",)
+# know what kind of business they run. The known set lives in verticals.py,
+# the registry that also drives the settings UI - a new vertical only needs
+# adding there, not here too.
+KNOWN_VERTICALS = verticals.known_ids()
 
 
 def _migrate_company_verticals(conn: sqlite3.Connection) -> None:
