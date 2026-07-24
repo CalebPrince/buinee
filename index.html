@@ -11,6 +11,13 @@
       var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       document.documentElement.setAttribute("data-theme", theme);
     } catch (e) {}
+    // Arm scroll-reveal animations before first paint (so sections start
+    // hidden with no flash), unless the visitor prefers reduced motion.
+    try {
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.documentElement.classList.add("anim");
+      }
+    } catch (e) {}
   })();
 </script>
 <style>
@@ -501,6 +508,35 @@
   @media (max-width: 480px) {
     .ada-panel { right: 12px; left: 12px; width: auto; bottom: 84px; }
     .ada-launcher { right: 16px; bottom: 16px; }
+  }
+
+  /* ---- Scroll-reveal: sections ease in as they enter the viewport ---- */
+  /* The hidden state is pure CSS keyed on html.anim, which the head script
+     sets before first paint (so there's no flash) and only when motion is
+     allowed. With JS disabled, .anim is never added and everything shows. */
+  html.anim .sec-head,
+  html.anim .hero-grid > div,
+  html.anim .chain > .step,
+  html.anim .roles > .role,
+  html.anim .feat > div,
+  html.anim .trust > .tcard,
+  html.anim .faq-list > *,
+  html.anim .cta-band {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity .7s cubic-bezier(.16, .8, .3, 1), transform .7s cubic-bezier(.16, .8, .3, 1);
+    will-change: opacity, transform;
+  }
+  html.anim .reveal-in { opacity: 1 !important; transform: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    html.anim .sec-head,
+    html.anim .hero-grid > div,
+    html.anim .chain > .step,
+    html.anim .roles > .role,
+    html.anim .feat > div,
+    html.anim .trust > .tcard,
+    html.anim .faq-list > *,
+    html.anim .cta-band { opacity: 1 !important; transform: none !important; transition: none !important; }
   }
 </style>
 
@@ -1332,6 +1368,37 @@
     syncAdaAutoReadBtn(document.getElementById("adaAutoReadBtn"));
     const mic = document.getElementById("adaMicBtn");
     if (mic && !AdaMic.supported()) mic.style.display = "none";
+  })();
+
+  // ---- Scroll-reveal: ease sections in as they scroll into view ----
+  (function initReveal() {
+    const root = document.documentElement;
+    if (!root.classList.contains("anim")) return; // reduced motion / JS-off
+    const SELECTOR = ".sec-head, .hero-grid > div, .chain > .step, .roles > .role, .feat > div, .trust > .tcard, .faq-list > *, .cta-band";
+    const targets = Array.prototype.slice.call(document.querySelectorAll(SELECTOR));
+    if (!targets.length) return;
+
+    // Stagger siblings that share a parent so a row of cards cascades in.
+    const seen = new Map();
+    targets.forEach(el => {
+      const p = el.parentNode;
+      const i = seen.get(p) || 0;
+      seen.set(p, i + 1);
+      el.style.transitionDelay = Math.min(i * 90, 360) + "ms";
+    });
+
+    const reveal = el => el.classList.add("reveal-in");
+    if (!("IntersectionObserver" in window)) { targets.forEach(reveal); return; }
+
+    const io = new IntersectionObserver((entries, obs) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { reveal(e.target); obs.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+    targets.forEach(el => io.observe(el));
+
+    // Failsafe: never leave content hidden if the observer misfires.
+    setTimeout(() => targets.forEach(reveal), 4000);
   })();
 
   function renderLandingAdaLog() {
