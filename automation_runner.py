@@ -29,6 +29,13 @@ def main() -> None:
             server.db.finish_automation_run(run_id, error=str(exc))
             print(f"failed user={job['user_id']} recipe={key}: {exc}")
 
+    for job in server.db.due_reminders():
+        try:
+            result = server.send_due_reminder(job)
+            print(f"reminder id={job['id']} user={job['created_by']}: {result}")
+        except Exception as exc:
+            print(f"reminder id={job['id']} failed unexpectedly: {exc}")
+
 
 if __name__ == "__main__":
     main()

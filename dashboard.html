@@ -1139,6 +1139,24 @@
           <span class="auto-status">Coming soon</span>
         </article>
       </div>
+
+      <div class="card full" style="margin-top:18px">
+        <div class="card-h">
+          <h3>Reminders</h3>
+          <div class="sub" id="reminderListSub"></div>
+        </div>
+        <div class="card-b">
+          <form id="reminderForm" onsubmit="return createReminder(event)" style="margin-bottom:16px">
+            <div class="vgrid">
+              <label>Message<input id="reminderMessage" maxlength="2000" required placeholder="Call the auditor about Q3 vouchers"></label>
+              <label>Due<input id="reminderDue" type="datetime-local" required></label>
+            </div>
+            <div class="msg-error" id="reminderErr" style="display:none"></div>
+            <button class="btn primary sm" type="submit">Set reminder</button>
+          </form>
+          <div id="reminderRows"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ===== ACTIVITY ===== -->
@@ -1737,6 +1755,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     renderActivity();
     loadInstructions();
     loadAutomations();
+    loadReminders();
 
     document.getElementById('loading').style.display = 'none';
     go(location.hash.slice(1) || 'overview', { replace: true });
@@ -1946,6 +1965,77 @@ Do not promise a payment date unless it has already been approved."></textarea>
   document.querySelectorAll('[data-auto-run]').forEach(button => button.addEventListener('click', () => {
     runAutomationNow(button.dataset.autoRun, button);
   }));
+
+  // --------------------------------------------------------------- reminders
+
+  let allReminders = [];
+
+  async function loadReminders() {
+    const box = document.getElementById('reminderRows');
+    try {
+      const res = await fetch('/api/reminders', { credentials: 'same-origin' });
+      const data = await res.json();
+      allReminders = data.reminders || [];
+    } catch {
+      box.innerHTML = '<div class="empty"><h4>Could not load reminders.</h4></div>';
+      return;
+    }
+    const pending = allReminders.filter(r => r.status === 'pending');
+    document.getElementById('reminderListSub').textContent =
+      pending.length ? `${pending.length} pending` : '';
+    box.innerHTML = allReminders.length
+      ? allReminders.map(renderReminderRow).join('')
+      : '<div class="empty"><h4>No reminders yet</h4></div>';
+  }
+
+  function renderReminderRow(r) {
+    const due = new Date(r.due_at * 1000).toLocaleString();
+    const cancelBtn = r.status === 'pending'
+      ? `<button class="btn sm" type="button" onclick="cancelReminder(${r.id})">Cancel</button>` : '';
+    return `<div class="auto" style="grid-template-columns:1fr auto">
+      <div class="auto-copy"><div class="t">${escapeHtml(r.message)}</div>
+      <div class="m">${r.status === 'pending' ? 'Due ' + escapeHtml(due) : escapeHtml(r.status)}</div></div>
+      <div class="auto-actions">${cancelBtn}</div>
+    </div>`;
+  }
+
+  async function createReminder(ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById('reminderErr');
+    errEl.style.display = 'none';
+    const message = document.getElementById('reminderMessage').value.trim();
+    const dueLocal = document.getElementById('reminderDue').value; // "YYYY-MM-DDTHH:MM"
+    if (!message || !dueLocal) return false;
+    // Ghana is UTC+0 year-round (no DST) - treated as literal Ghana wall-clock
+    // time, same convention as is_livechat_online's schedule, not the
+    // visitor's own browser timezone.
+    const dueAt = Date.parse(dueLocal + 'Z') / 1000;
+    try {
+      const res = await fetch('/api/reminders/create', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, due_at: dueAt }),
+      });
+      const data = await res.json();
+      if (!res.ok) { errEl.textContent = data.error || 'Could not set that reminder.'; errEl.style.display = 'block'; return false; }
+      document.getElementById('reminderForm').reset();
+      loadReminders();
+    } catch { errEl.textContent = 'Could not reach the server.'; errEl.style.display = 'block'; }
+    return false;
+  }
+
+  async function cancelReminder(id) {
+    try {
+      const res = await fetch('/api/reminders/cancel', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminder_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not cancel that reminder.'); return; }
+      loadReminders();
+    } catch { alert('Could not reach the server.'); }
+  }
 
   // -------------------------------------------------------------- team chat
 

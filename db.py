@@ -470,6 +470,26 @@ def init_db() -> None:
                 finished_at REAL
             );
 
+            -- A user's own one-time reminder: free text plus a due timestamp.
+            -- Unlike automation_settings there is no "next" run to advance to -
+            -- once it fires it is done, so status moves pending -> sent/canceled
+            -- and stays put. Scoped to company_id like every other row here, but
+            -- visibility is per-user (see list_reminders): a reminder is a
+            -- personal note-to-self, not a company record.
+            CREATE TABLE IF NOT EXISTS reminders (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id  INTEGER NOT NULL REFERENCES companies(id),
+                created_by  INTEGER NOT NULL REFERENCES users(id),
+                message     TEXT NOT NULL,
+                due_at      REAL NOT NULL,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                email_sent  INTEGER NOT NULL DEFAULT 0,
+                error       TEXT NOT NULL DEFAULT '',
+                created_at  REAL NOT NULL,
+                sent_at     REAL,
+                canceled_at REAL
+            );
+
             CREATE TABLE IF NOT EXISTS user_instructions (
                 user_id     INTEGER PRIMARY KEY REFERENCES users(id),
                 briefing    TEXT NOT NULL DEFAULT '',
@@ -542,6 +562,8 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_voucher_events_company ON voucher_events(company_id);
             CREATE INDEX IF NOT EXISTS idx_automation_due ON automation_settings(enabled, next_run_at);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_user ON automation_runs(user_id, started_at);
+            CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(status, due_at);
+            CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(company_id, created_by, status, due_at);
             CREATE INDEX IF NOT EXISTS idx_reference_documents_user ON reference_documents(user_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_team_messages_company ON team_messages(company_id, id);
             CREATE INDEX IF NOT EXISTS idx_team_message_files_message ON team_message_files(message_id);
@@ -3849,6 +3871,106 @@ def finish_automation_run(run_id: int, result: dict | None = None, error: str = 
                WHERE id = ?""",
             ("failed" if error else "complete", json.dumps(result or {}), error[:1000], time.time(), run_id),
         )
+
+
+# --- reminders ---------------------------------------------------------
+
+def create_reminder(company_id: int, created_by: int, *, message: str, due_at: float) -> dict:
+    """A one-time reminder. due_at must be a Unix epoch float already
+    resolved to a concrete instant by the caller - db.py never parses dates,
+    matching every other table here."""
+    message = message.strip()
+    if not message:
+        raise AuthError("Reminder text is required.")
+    if len(message) > 2000:
+        raise AuthError("Reminder text is too long.")
+    now = time.time()
+    if due_at <= now:
+        raise AuthError("Pick a due date and time in the future.")
+    with _cursor() as conn:
+        cur = conn.execute(
+            """INSERT INTO reminders (company_id, created_by, message, due_at, status, created_at)
+               VALUES (?, ?, ?, ?, 'pending', ?)""",
+            (company_id, created_by, message, due_at, now),
+        )
+        reminder_id = cur.lastrowid
+    return get_reminder(reminder_id)
+
+
+def get_reminder(reminder_id: int) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def list_reminders(company_id: int, viewer_id: int, viewer_role: str) -> list[dict]:
+    """Personal, not role-scoped: unlike vouchers, a reminder is a note to
+    yourself, so every role - supervisor included - sees only their own.
+    viewer_role is unused but kept so call sites match list_vouchers's shape."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT * FROM reminders WHERE company_id = ? AND created_by = ?
+               ORDER BY (status = 'pending') DESC, due_at ASC""",
+            (company_id, viewer_id),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def cancel_reminder(company_id: int, user_id: int, reminder_id: int) -> dict:
+    r = get_reminder(reminder_id)
+    if not r or r["company_id"] != company_id:
+        raise AuthError("No such reminder.")
+    if r["created_by"] != user_id:
+        raise AuthError("You can only cancel your own reminder.")
+    if r["status"] != "pending":
+        raise AuthError("Only a pending reminder can be canceled.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE reminders SET status = 'canceled', canceled_at = ? WHERE id = ? AND status = 'pending'",
+            (time.time(), reminder_id),
+        )
+    return get_reminder(reminder_id)
+
+
+def due_reminders(now: float | None = None, limit: int = 50) -> list[dict]:
+    now = now or time.time()
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT r.*, u.email AS user_email, u.name AS user_name
+               FROM reminders r JOIN users u ON u.id = r.created_by
+               WHERE r.status = 'pending' AND r.due_at <= ? AND u.status = 'approved'
+               ORDER BY r.due_at LIMIT ?""",
+            (now, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def claim_reminder(reminder_id: int) -> bool:
+    """Atomically moves a pending reminder to 'sending' so a second cron
+    tick (or a concurrent cancel) can't also pick it up. Mirrors
+    start_automation_run's ordering guarantee - the claim happens before any
+    network work - but expressed as a conditional UPDATE with a rowcount
+    check instead of 'advance next_run_at', because a one-time reminder has
+    no next run to advance to. Returns True if this call won the race."""
+    with _cursor() as conn:
+        cur = conn.execute(
+            "UPDATE reminders SET status = 'sending' WHERE id = ? AND status = 'pending'",
+            (reminder_id,),
+        )
+        return cur.rowcount == 1
+
+
+def finish_reminder(reminder_id: int, *, email_sent: bool, error: str = "") -> dict:
+    """Records the outcome after a claimed reminder's email attempt. Always
+    ends in 'sent' once claimed - email failing or being unconfigured is
+    recorded via email_sent/error but never blocks the in-app fired state."""
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE reminders SET status = 'sent', email_sent = ?, error = ?, sent_at = ?
+               WHERE id = ?""",
+            (int(email_sent), error[:1000], time.time(), reminder_id),
+        )
+    return get_reminder(reminder_id)
 
 
 def platform_stats() -> dict:

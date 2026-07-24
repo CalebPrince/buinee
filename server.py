@@ -62,8 +62,10 @@ from urllib.parse import parse_qs, quote, urlparse
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
+import ada_tools  # noqa: E402
 import db  # noqa: E402
 import mailbox  # noqa: E402
+import outbound_mail  # noqa: E402
 import providers  # noqa: E402
 import secretstore  # noqa: E402
 import tools  # noqa: E402
@@ -689,6 +691,7 @@ def load_env() -> dict:
         "BUINEE_SECRET_KEY",
         "BUINEE_COOKIE_SECURE", "BUINEE_TRUST_PROXY",
         "PAYSTACK_PUBLIC_KEY", "PAYSTACK_SECRET_KEY", "PAYSTACK_CALLBACK_URL", "PAYSTACK_WEBHOOK_URL",
+        *outbound_mail.SMTP_KEYS,
         # Two per connectable tool plus the shared callback. Generated rather
         # than listed: this deployment configures itself through Passenger
         # environment variables, so a key missing from here is a credential
@@ -1402,6 +1405,31 @@ def run_automation(user_id: int, recipe_key: str) -> dict:
     )
     db.increment_chat_usage(user["company_id"])
     return {"headline": f"{len(invoices)} invoice(s) checked", "summary": comparison, "items": invoices}
+
+
+def send_due_reminder(job: dict) -> dict:
+    """Claim, then attempt email, then record the outcome. In-app delivery
+    (the reminder simply flipping to 'sent' and disappearing from Pending on
+    the dashboard) always happens once claimed - email is best-effort on top
+    of that, never a precondition for it."""
+    if not db.claim_reminder(job["id"]):
+        return {"claimed": False}  # another tick or a cancel got there first
+    cfg = load_env()
+    email_sent, error = False, ""
+    if outbound_mail.is_configured(cfg):
+        try:
+            when = datetime.fromtimestamp(job["due_at"], timezone.utc).strftime("%Y-%m-%d %H:%M")
+            outbound_mail.send(
+                cfg, job["user_email"], "Reminder: " + job["message"][:80],
+                f"{job['message']}\n\nDue {when} (Ghana time).\n\nOpen Buinee: https://buinee.app/dashboard",
+            )
+            email_sent = True
+        except outbound_mail.MailSendError as exc:
+            error = str(exc)
+    else:
+        error = outbound_mail.why_unavailable(cfg)
+    db.finish_reminder(job["id"], email_sent=email_sent, error=error)
+    return {"claimed": True, "email_sent": email_sent, "error": error}
 
 
 def build_chat_system(user: dict) -> str:
@@ -2163,6 +2191,14 @@ class RouteHandlerMixin:
                 enrich_voucher(v)
             return self._json({"vouchers": vouchers})
 
+        if path == "/api/reminders":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            return self._json({
+                "reminders": db.list_reminders(user["company_id"], user["id"], user["role"]),
+            })
+
         if path == "/api/activity":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -2568,6 +2604,8 @@ class RouteHandlerMixin:
             "/api/vouchers/create": self._handle_voucher_create,
             "/api/vouchers/submit": self._handle_voucher_submit,
             "/api/vouchers/review": self._handle_voucher_review,
+            "/api/reminders/create": self._handle_reminder_create,
+            "/api/reminders/cancel": self._handle_reminder_cancel,
             "/api/chat": self._handle_chat,
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
@@ -3696,6 +3734,42 @@ class RouteHandlerMixin:
         enrich_voucher(v)
         return self._json({"ok": True, "voucher": v})
 
+    # ----------------------------------------------------------- reminders
+
+    def _handle_reminder_create(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            due_at = float(req.get("due_at"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            r = db.create_reminder(
+                user["company_id"], user["id"],
+                message=str(req.get("message") or ""),
+                due_at=due_at,
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        return self._json({"ok": True, "reminder": r})
+
+    def _handle_reminder_cancel(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            reminder_id = int(req.get("reminder_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            r = db.cancel_reminder(user["company_id"], user["id"], reminder_id)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "reminder": r})
+
     def _handle_chat(self):
         """The signed-in equivalent of the landing page's demo agent. Grounded
         in this person's real, role-scoped vouchers instead of a hypothetical
@@ -3760,7 +3834,12 @@ class RouteHandlerMixin:
         vouchers = db.list_vouchers(user["company_id"], user["id"], user["role"])
         for v in vouchers:
             enrich_voucher(v)
-        digest = build_voucher_digest(vouchers)
+        # Ghana is UTC+0 year-round (no DST) - see is_livechat_online's identical
+        # reasoning. Reminder tool calls resolve relative times ("in 20 minutes")
+        # against this, so it has to be in the digest, not just known server-side.
+        now_line = ("Current time: " + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+                    + " (Ghana time, UTC+0)\n\n")
+        digest = now_line + build_voucher_digest(vouchers)
         if re.search(r"\b(email|emails|mailbox|inbox|sender|thread|reply|replies)\b", message, re.I):
             mail_context = recent_mail_context(user["id"], cfg)
             digest += ("\n\n## Recent connected mailbox messages\n"
@@ -3782,6 +3861,9 @@ class RouteHandlerMixin:
                 message, digest, history, system=build_chat_system(pub),
                 briefing=effective_briefing(pub, include_library_text=False),
                 docs=(user_reference_docs(user["id"]) + docs) or None,
+                tools=ada_tools.REMINDER_TOOLS,
+                tool_runner=lambda name, inp: ada_tools.run_reminder_tool(
+                    name, inp, company_id=user["company_id"], user_id=user["id"]),
             )
         except providers.ProviderError as exc:
             reference = report_application_error("ada.chat.provider", exc, user)

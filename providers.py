@@ -20,6 +20,12 @@ DEFAULT_MODELS = {
     "openrouter": "anthropic/claude-opus-4.8",
 }
 
+# How many function-call round-trips chat() will make with a provider before
+# giving up. Only Google/Gemini honours this today (see _chat_google) - a
+# bound exists so a model that keeps calling tools instead of answering can't
+# loop forever against the API.
+MAX_TOOL_ROUNDS = 4
+
 # Said once, used everywhere content from outside the product reaches a model:
 # email bodies, attachments, and items read from connected tools. All of it is
 # written by people who are not the user and who may well know their text ends
@@ -526,7 +532,9 @@ def split_docs(docs: list[dict]) -> tuple[str, list[dict]]:
     return blob, native
 
 
-def _chat_anthropic(model, key, system, turns, native=None):
+def _chat_anthropic(model, key, system, turns, native=None, tools=None, tool_runner=None):
+    if tools:
+        raise ProviderError("Tool-calling isn't supported on this provider yet.")
     try:
         import anthropic
     except ImportError as exc:
@@ -558,7 +566,7 @@ def _chat_anthropic(model, key, system, turns, native=None):
     return "".join(b.text for b in resp.content if b.type == "text").strip()
 
 
-def _chat_google(model, key, system, turns, native=None):
+def _chat_google(model, key, system, turns, native=None, tools=None, tool_runner=None):
     contents = [
         {"role": "model" if t["role"] == "assistant" else "user",
          "parts": [{"text": t["content"]}]}
@@ -569,20 +577,48 @@ def _chat_google(model, key, system, turns, native=None):
             {"inline_data": {"mime_type": d["media_type"], "data": d["data"]}}
             for d in native
         ] + contents[-1]["parts"]
-    data = _post(
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model}:generateContent?key={key}",
-        {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents},
-        {},
-    )
-    try:
-        parts = data["candidates"][0]["content"]["parts"]
-        return "".join(p.get("text", "") for p in parts).strip()
-    except (KeyError, IndexError) as exc:
-        raise ProviderError(f"Unexpected Google response: {str(data)[:300]}") from exc
+
+    body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents}
+    if tools:
+        # Gemini rejects additionalProperties in function parameter schemas -
+        # same fix TRIAGE_SCHEMA already needs, see _strip_unsupported above.
+        body["tools"] = [{"functionDeclarations": [_strip_unsupported(t) for t in tools]}]
+
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent?key={key}")
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        data = _post(url, body, {})
+        try:
+            parts = data["candidates"][0]["content"]["parts"]
+        except (KeyError, IndexError) as exc:
+            raise ProviderError(f"Unexpected Google response: {str(data)[:300]}") from exc
+
+        calls = [p["functionCall"] for p in parts if "functionCall" in p]
+        if not calls or not tool_runner:
+            return "".join(p.get("text", "") for p in parts).strip()
+
+        # The model's own turn (its function-call request) has to be replayed
+        # back verbatim before the function results, or the next call loses
+        # track of what it asked for.
+        body["contents"].append({"role": "model", "parts": parts})
+        response_parts = []
+        for fc in calls:
+            try:
+                output = tool_runner(fc["name"], fc.get("args", {}))
+            except Exception as exc:
+                output = {"error": str(exc)}
+            response_parts.append({"functionResponse": {"name": fc["name"], "response": output}})
+        # Gemini's REST API has no separate "tool" role - function results
+        # go back as a user-role turn made of functionResponse parts.
+        body["contents"].append({"role": "user", "parts": response_parts})
+
+    raise ProviderError("Ada made too many tool calls without finishing. Try again.")
 
 
-def _chat_openrouter(model, key, system, turns, native=None):
+def _chat_openrouter(model, key, system, turns, native=None, tools=None, tool_runner=None):
+    if tools:
+        raise ProviderError("Tool-calling isn't supported on this provider yet.")
     turns = [dict(t) for t in turns]
     imgs = [d for d in (native or []) if d["kind"] == "image"]
     if imgs and turns:
@@ -612,7 +648,8 @@ _CHAT = {
 
 def chat(provider: str, model: str, key: str,
          message: str, digest: str, history: list[dict],
-         system: str, briefing: str = "", docs: list[dict] | None = None) -> str:
+         system: str, briefing: str = "", docs: list[dict] | None = None,
+         tools: list[dict] | None = None, tool_runner=None) -> str:
     """Answer a question grounded in the supplied digest.
 
     `system` is the caller's full base persona/context - there is no hardcoded
@@ -621,6 +658,14 @@ def chat(provider: str, model: str, key: str,
     into their own company's workspace). `briefing` is for short, optional,
     user-authored instructions folded on top of that via with_briefing - most
     callers can leave it blank.
+
+    `tools`/`tool_runner` are optional and currently only honoured by the
+    Google/Gemini backend (see _chat_google) - pass them to any other
+    provider and you get a clear ProviderError instead of silence.
+    `tool_runner(name, args) -> dict` is called once per function call the
+    model makes and must not raise anything the caller wants surfaced to the
+    model verbatim - any exception is caught and turned into an
+    `{"error": ...}` result the model sees, not a crash.
     """
     fn = _CHAT.get(provider)
     if not fn:
@@ -640,7 +685,8 @@ def chat(provider: str, model: str, key: str,
             turns.append({"role": role, "content": text[:4000]})
     turns.append({"role": "user", "content": message[:4000]})
 
-    reply = fn(model or DEFAULT_MODELS[provider], key, system, turns, native)
+    reply = fn(model or DEFAULT_MODELS[provider], key, system, turns, native,
+               tools=tools, tool_runner=tool_runner)
     if not reply:
         raise ProviderError("The model returned an empty reply.")
     return reply
