@@ -66,7 +66,7 @@ def run_solar_tool(name: str, tool_input: dict, *, company_id: int) -> dict:
     load = solar_calc.compute_load(appliances)
     sizing = solar_calc.size_system(load["daily_kwh"], load["peak_watts"], backup_days=backup_days)
 
-    tiers = db.list_solar_pricing_tiers(company_id)
+    tiers = db.list_quote_tiers(company_id, vertical="solar")
     if not tiers:
         return {"load": load, "sizing": sizing, "tier": None,
                 "note": "This company hasn't configured solar pricing tiers yet."}

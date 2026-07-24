@@ -503,6 +503,9 @@
     background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical;
   }
   .readonly-note { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
+  .qtier-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .qtier-card .vgrid { margin-bottom: 10px; }
+  .qtier-card input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-size: 13px; }
   .instructions-intro { max-width: 720px; }
   .instructions-note { display: flex; gap: 11px; align-items: flex-start; margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--teal); border-radius: 12px; background: var(--teal-soft); color: var(--ink-2); font-size: 12.5px; line-height: 1.6; }
   .instructions-note-mark { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 800; }
@@ -1259,6 +1262,18 @@ Do not promise a payment date unless it has already been approved."></textarea>
               <div class="msg-ok" id="adaNotesOk" style="display:none; margin-top:10px"></div>
               <button class="btn primary sm" type="submit" style="margin-top:10px">Save notes</button>
             </form>
+          </div>
+          <div class="settings-sec">
+            <h3>Solar quote pricing tiers</h3>
+            <p class="sub">Package tiers Ada matches a customer's computed system size against when quoting a solar job. Only shown to companies using the solar quote tool — leave empty if that doesn't apply to you.</p>
+            <div id="quoteTiersReadonly" class="readonly-note" hidden></div>
+            <div id="quoteTiersEditor" hidden>
+              <div id="quoteTiersRows"></div>
+              <button class="btn sm" type="button" onclick="addQuoteTierRow()">+ Add tier</button>
+              <div class="msg-error" id="quoteTiersErr" style="display:none; margin-top:10px"></div>
+              <div class="msg-ok" id="quoteTiersOk" style="display:none; margin-top:10px"></div>
+              <button class="btn primary sm" type="button" onclick="saveQuoteTiers()" style="margin-top:10px">Save tiers</button>
+            </div>
           </div>
         </div>
         <aside class="card instruction-tips">
@@ -3678,7 +3693,86 @@ Do not promise a payment date unless it has already been approved."></textarea>
         ? me.company.ada_notes
         : 'Nothing noted yet. Only a Supervisor can review or edit this.';
     }
+
+    const quoteTiersReadonly = document.getElementById('quoteTiersReadonly');
+    const quoteTiersEditor = document.getElementById('quoteTiersEditor');
+    try {
+      const qt = await (await fetch('/api/company/quote-tiers?vertical=solar', { credentials: 'same-origin' })).json();
+      quoteTiers = (qt.tiers || []).map(t => ({ ...t, thresholds: t.thresholds || {} }));
+    } catch {
+      quoteTiers = [];
+    }
+    if (isSupervisor) {
+      quoteTiersReadonly.hidden = true;
+      quoteTiersEditor.hidden = false;
+      renderQuoteTierRows();
+    } else {
+      quoteTiersEditor.hidden = true;
+      quoteTiersReadonly.hidden = false;
+      quoteTiersReadonly.textContent = quoteTiers.length
+        ? `${quoteTiers.length} solar pricing tier(s) configured. Only a Supervisor can review or edit them.`
+        : 'No solar pricing tiers configured yet. Only a Supervisor can add them.';
+    }
+
     loadPersonalContext();
+  }
+
+  let quoteTiers = [];
+
+  function renderQuoteTierRows() {
+    const box = document.getElementById('quoteTiersRows');
+    if (!box) return;
+    box.innerHTML = quoteTiers.length ? quoteTiers.map((t, i) => `
+      <div class="qtier-card" data-i="${i}">
+        <div class="vgrid">
+          <label>Tier name<input value="${escapeHtml(t.name || '')}" oninput="quoteTiers[${i}].name=this.value"></label>
+          <label>Panel size (kWp)<input type="number" step="0.1" value="${t.thresholds.kwp ?? ''}" oninput="quoteTiers[${i}].thresholds.kwp=Number(this.value)"></label>
+          <label>Inverter (kVA)<input type="number" step="0.1" value="${t.thresholds.kva ?? ''}" oninput="quoteTiers[${i}].thresholds.kva=Number(this.value)"></label>
+          <label>Battery (kWh)<input type="number" step="0.1" value="${t.thresholds.battery_kwh ?? ''}" oninput="quoteTiers[${i}].thresholds.battery_kwh=Number(this.value)"></label>
+          <label>Price low<input type="number" step="1" value="${t.price_low ?? ''}" oninput="quoteTiers[${i}].price_low=Number(this.value)"></label>
+          <label>Price high<input type="number" step="1" value="${t.price_high ?? ''}" oninput="quoteTiers[${i}].price_high=Number(this.value)"></label>
+          <label>Currency<input value="${escapeHtml(t.currency || 'GHS')}" oninput="quoteTiers[${i}].currency=this.value"></label>
+          <label>What it supports<input value="${escapeHtml(t.supports || '')}" oninput="quoteTiers[${i}].supports=this.value"></label>
+        </div>
+        <button class="btn sm" type="button" onclick="removeQuoteTierRow(${i})">Remove tier</button>
+      </div>`).join('') : '<p class="sub">No tiers yet — add one below.</p>';
+  }
+
+  function addQuoteTierRow() {
+    quoteTiers.push({ name: '', thresholds: { kwp: 0, kva: 0, battery_kwh: 0 }, price_low: 0, price_high: 0, currency: 'GHS', supports: '' });
+    renderQuoteTierRows();
+  }
+
+  function removeQuoteTierRow(i) {
+    quoteTiers.splice(i, 1);
+    renderQuoteTierRows();
+  }
+
+  async function saveQuoteTiers() {
+    const errEl = document.getElementById('quoteTiersErr');
+    const okEl = document.getElementById('quoteTiersOk');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/company/quote-tiers', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vertical: 'solar', tiers: quoteTiers }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Could not save.';
+        errEl.style.display = 'block';
+        return;
+      }
+      quoteTiers = (data.tiers || []).map(t => ({ ...t, thresholds: t.thresholds || {} }));
+      renderQuoteTierRows();
+      okEl.textContent = 'Saved.';
+      okEl.style.display = 'block';
+    } catch {
+      errEl.textContent = 'Could not reach the server.';
+      errEl.style.display = 'block';
+    }
   }
 
   async function saveProvider(ev) {

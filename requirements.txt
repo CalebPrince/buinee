@@ -4,3 +4,9 @@ openpyxl
 # a mailbox is refused rather than storing a password or token in the clear —
 # everything else in the app runs fine.
 cryptography
+
+# Ada's document-generation tools (doc_gen.py): PDF invoices/reports and
+# PPTX presentations. Both fail open the same way outbound_mail does - a
+# missing dependency just means those tools aren't offered, not a crash.
+reportlab
+python-pptx

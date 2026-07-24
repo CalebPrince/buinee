@@ -28,6 +28,7 @@ Auth model:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -587,7 +588,8 @@ def init_db() -> None:
         _migrate_plan_mailbox_limits(conn)
         _migrate_tool_connections(conn)
         _migrate_connector_polling(conn)
-        _migrate_solar_pricing_tiers(conn)
+        _migrate_quote_tiers(conn)
+        _migrate_generated_documents(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
@@ -825,25 +827,51 @@ def _migrate_connector_polling(conn: sqlite3.Connection) -> None:
     """)
 
 
-def _migrate_solar_pricing_tiers(conn: sqlite3.Connection) -> None:
-    """A company's own solar package price list - see solar_calc.match_tier.
-    Empty for every company except one that has actually set it up, so the
-    calculate_solar_quote tool is only offered where it means something."""
+def _migrate_quote_tiers(conn: sqlite3.Connection) -> None:
+    """A company's own quote-package price list, generic across verticals -
+    see solar_calc.match_tier for the first (and so far only) consumer.
+    thresholds_json is opaque here: this table only knows a tier has a name,
+    a price range, and some numeric thresholds - what those threshold keys
+    mean ("kwp", "kva", "battery_kwh" for solar) is entirely up to whichever
+    vertical's calculator reads them. Empty for every company except one
+    that has actually set it up, so a vertical's quote tool is only offered
+    where it means something."""
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS solar_pricing_tiers (
+        CREATE TABLE IF NOT EXISTS quote_tiers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            vertical TEXT NOT NULL DEFAULT '',
             name TEXT NOT NULL,
-            min_kwp REAL NOT NULL,
-            inverter_kva REAL NOT NULL,
-            battery_kwh REAL NOT NULL,
-            price_ghs_low REAL NOT NULL,
-            price_ghs_high REAL NOT NULL,
+            thresholds_json TEXT NOT NULL DEFAULT '{}',
+            price_low REAL NOT NULL DEFAULT 0,
+            price_high REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'GHS',
             supports TEXT NOT NULL DEFAULT '',
             sort_order INTEGER NOT NULL DEFAULT 0
         );
-        CREATE INDEX IF NOT EXISTS idx_solar_pricing_tiers_company
-            ON solar_pricing_tiers(company_id, sort_order);
+        CREATE INDEX IF NOT EXISTS idx_quote_tiers_company
+            ON quote_tiers(company_id, vertical, sort_order);
+    """)
+
+
+def _migrate_generated_documents(conn: sqlite3.Connection) -> None:
+    """Files Ada generated (invoices, reports, presentations - see
+    doc_tools.py), stored the same way team_chat/reference_documents store
+    an upload: base64 in a text column rather than a filesystem path, so
+    there's nothing on disk to clean up or lose track of."""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS generated_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            kind TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            media_type TEXT NOT NULL,
+            data_base64 TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_generated_documents_company
+            ON generated_documents(company_id, created_at);
     """)
 
 
@@ -1583,30 +1611,65 @@ def mark_connector_arrivals_seen(user_id: int) -> None:
         )
 
 
-def list_solar_pricing_tiers(company_id: int) -> list[dict]:
+def list_quote_tiers(company_id: int, vertical: str) -> list[dict]:
+    """A company's own quote tiers for one vertical (e.g. "solar"). Each
+    tier's opaque thresholds_json is parsed into a plain dict for the
+    caller - see solar_calc.match_tier for how solar reads it."""
     with _cursor() as conn:
         rows = conn.execute(
-            "SELECT * FROM solar_pricing_tiers WHERE company_id=? ORDER BY sort_order, min_kwp",
-            (company_id,),
+            "SELECT * FROM quote_tiers WHERE company_id=? AND vertical=? ORDER BY sort_order, id",
+            (company_id, vertical),
         ).fetchall()
-    return [dict(row) for row in rows]
+    out = []
+    for row in rows:
+        tier = dict(row)
+        tier["thresholds"] = json.loads(tier.pop("thresholds_json") or "{}")
+        out.append(tier)
+    return out
 
 
-def set_solar_pricing_tiers(company_id: int, tiers: list[dict]) -> None:
-    """Replace this company's whole price list in one go - there is no
-    partial-update UI for this yet, so callers always send the full set."""
+def set_quote_tiers(company_id: int, vertical: str, tiers: list[dict]) -> None:
+    """Replace this company's whole tier list for one vertical in one go -
+    there is no partial-update UI for this yet, so callers always send the
+    full set. Each tier's "thresholds" dict is whatever shape that
+    vertical's calculator expects; this table stores it opaquely."""
     with _cursor() as conn:
-        conn.execute("DELETE FROM solar_pricing_tiers WHERE company_id=?", (company_id,))
+        conn.execute("DELETE FROM quote_tiers WHERE company_id=? AND vertical=?", (company_id, vertical))
         conn.executemany(
-            """INSERT INTO solar_pricing_tiers
-               (company_id,name,min_kwp,inverter_kva,battery_kwh,price_ghs_low,price_ghs_high,supports,sort_order)
+            """INSERT INTO quote_tiers
+               (company_id,vertical,name,thresholds_json,price_low,price_high,currency,supports,sort_order)
                VALUES (?,?,?,?,?,?,?,?,?)""",
-            [(company_id, str(t.get("name") or ""), float(t.get("min_kwp") or 0),
-              float(t.get("inverter_kva") or 0), float(t.get("battery_kwh") or 0),
-              float(t.get("price_ghs_low") or 0), float(t.get("price_ghs_high") or 0),
-              str(t.get("supports") or ""), int(t.get("sort_order") or index))
+            [(company_id, vertical, str(t.get("name") or ""),
+              json.dumps(t.get("thresholds") or {}),
+              float(t.get("price_low") or 0), float(t.get("price_high") or 0),
+              str(t.get("currency") or "GHS"), str(t.get("supports") or ""),
+              int(t.get("sort_order") if t.get("sort_order") is not None else index))
              for index, t in enumerate(tiers)],
         )
+
+
+def save_generated_document(company_id: int, user_id: int, kind: str, filename: str,
+                            media_type: str, data: bytes) -> int:
+    with _cursor() as conn:
+        cur = conn.execute(
+            """INSERT INTO generated_documents
+               (company_id,user_id,kind,filename,media_type,data_base64,created_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (company_id, user_id, kind, filename[:200], media_type,
+             base64.b64encode(data).decode("ascii"), time.time()),
+        )
+        return cur.lastrowid
+
+
+def get_generated_document(company_id: int, doc_id: int) -> dict | None:
+    """Scoped to company_id so one company's Ada-generated documents can
+    never be fetched by another's download link."""
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT * FROM generated_documents WHERE id=? AND company_id=?",
+            (doc_id, company_id),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def recent_connector_arrivals(user_id: int, limit: int = 25) -> list[dict]:

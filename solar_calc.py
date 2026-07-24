@@ -58,13 +58,22 @@ def size_system(daily_kwh: float, peak_watts: float, backup_days: float = 1,
 
 def match_tier(sizing: dict, tiers: list[dict]) -> dict | None:
     """The cheapest configured tier whose panels/inverter/battery all cover
-    the computed need, or None if nothing on the price list is big enough."""
+    the computed need, or None if nothing on the price list is big enough.
+
+    Each tier is a generic quote_tiers row (see db.list_quote_tiers) with an
+    opaque "thresholds" dict - this function is what gives solar's specific
+    meaning ("kwp"/"kva"/"battery_kwh") to those keys. A tier missing one of
+    these keys is treated as having no capacity on that dimension, so it
+    simply won't match anything with a nonzero need there."""
+    def threshold(t: dict, key: str) -> float:
+        return float((t.get("thresholds") or {}).get(key) or 0)
+
     candidates = [
         t for t in tiers
-        if t["min_kwp"] >= sizing["kwp"]
-        and t["inverter_kva"] >= sizing["kva"]
-        and t["battery_kwh"] >= sizing["battery_kwh"]
+        if threshold(t, "kwp") >= sizing["kwp"]
+        and threshold(t, "kva") >= sizing["kva"]
+        and threshold(t, "battery_kwh") >= sizing["battery_kwh"]
     ]
     if not candidates:
         return None
-    return min(candidates, key=lambda t: t["min_kwp"])
+    return min(candidates, key=lambda t: threshold(t, "kwp"))
