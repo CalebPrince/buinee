@@ -4047,14 +4047,21 @@ class RouteHandlerMixin:
             return ada_tools.run_reminder_tool(
                 name, tool_input, company_id=user["company_id"], user_id=user["id"])
 
+        # Anthropic/OpenRouter raise ProviderError the moment tools is
+        # non-empty (see providers._chat_anthropic/_chat_openrouter) - only
+        # Gemini actually implements tool-calling (providers._chat_google).
+        # chat_tools is never empty, so passing it unconditionally would hard
+        # -fail every chat message for a company on either of those providers.
+        supports_tools = provider == "google"
+
         try:
             reply = providers.chat(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, digest, history, system=build_chat_system(pub),
                 briefing=effective_briefing(pub, include_library_text=False),
                 docs=(user_reference_docs(user["id"]) + docs) or None,
-                tools=chat_tools,
-                tool_runner=run_chat_tool,
+                tools=chat_tools if supports_tools else None,
+                tool_runner=run_chat_tool if supports_tools else None,
             )
         except providers.ProviderError as exc:
             reference = report_application_error("ada.chat.provider", exc, user)
