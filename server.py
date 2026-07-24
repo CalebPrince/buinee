@@ -4050,8 +4050,8 @@ class RouteHandlerMixin:
         # Anthropic/OpenRouter raise ProviderError the moment tools is
         # non-empty (see providers._chat_anthropic/_chat_openrouter) - only
         # Gemini actually implements tool-calling (providers._chat_google).
-        # chat_tools is never empty, so passing it unconditionally would hard
-        # -fail every chat message for a company on either of those providers.
+        # chat_tools is never empty, so passing it unconditionally would
+        # hard-fail every chat message for a company on either provider.
         supports_tools = provider == "google"
 
         try:
