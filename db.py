@@ -587,6 +587,7 @@ def init_db() -> None:
         _migrate_plan_mailbox_limits(conn)
         _migrate_tool_connections(conn)
         _migrate_connector_polling(conn)
+        _migrate_solar_pricing_tiers(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
@@ -821,6 +822,28 @@ def _migrate_connector_polling(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_connector_arrivals_user
             ON connector_arrivals(user_id, seen_at, created_at);
+    """)
+
+
+def _migrate_solar_pricing_tiers(conn: sqlite3.Connection) -> None:
+    """A company's own solar package price list - see solar_calc.match_tier.
+    Empty for every company except one that has actually set it up, so the
+    calculate_solar_quote tool is only offered where it means something."""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS solar_pricing_tiers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            min_kwp REAL NOT NULL,
+            inverter_kva REAL NOT NULL,
+            battery_kwh REAL NOT NULL,
+            price_ghs_low REAL NOT NULL,
+            price_ghs_high REAL NOT NULL,
+            supports TEXT NOT NULL DEFAULT '',
+            sort_order INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_solar_pricing_tiers_company
+            ON solar_pricing_tiers(company_id, sort_order);
     """)
 
 
@@ -1557,6 +1580,32 @@ def mark_connector_arrivals_seen(user_id: int) -> None:
         conn.execute(
             "UPDATE connector_arrivals SET seen_at=? WHERE user_id=? AND seen_at IS NULL",
             (time.time(), user_id),
+        )
+
+
+def list_solar_pricing_tiers(company_id: int) -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT * FROM solar_pricing_tiers WHERE company_id=? ORDER BY sort_order, min_kwp",
+            (company_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def set_solar_pricing_tiers(company_id: int, tiers: list[dict]) -> None:
+    """Replace this company's whole price list in one go - there is no
+    partial-update UI for this yet, so callers always send the full set."""
+    with _cursor() as conn:
+        conn.execute("DELETE FROM solar_pricing_tiers WHERE company_id=?", (company_id,))
+        conn.executemany(
+            """INSERT INTO solar_pricing_tiers
+               (company_id,name,min_kwp,inverter_kva,battery_kwh,price_ghs_low,price_ghs_high,supports,sort_order)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            [(company_id, str(t.get("name") or ""), float(t.get("min_kwp") or 0),
+              float(t.get("inverter_kva") or 0), float(t.get("battery_kwh") or 0),
+              float(t.get("price_ghs_low") or 0), float(t.get("price_ghs_high") or 0),
+              str(t.get("supports") or ""), int(t.get("sort_order") or index))
+             for index, t in enumerate(tiers)],
         )
 
 

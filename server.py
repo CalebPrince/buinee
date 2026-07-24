@@ -68,6 +68,7 @@ import mailbox  # noqa: E402
 import outbound_mail  # noqa: E402
 import providers  # noqa: E402
 import secretstore  # noqa: E402
+import solar_tools  # noqa: E402
 import tools  # noqa: E402
 import voucher  # noqa: E402
 
@@ -3961,15 +3962,28 @@ class RouteHandlerMixin:
             if tools_context:
                 digest += "\n\n" + tools_context
 
+        # The solar tool is only offered to companies that have actually set
+        # up a price list - see solar_tools.run_solar_tool. Everyone else
+        # gets the reminder tools alone, same as before this existed.
+        chat_tools = list(ada_tools.REMINDER_TOOLS)
+        solar_tiers = db.list_solar_pricing_tiers(user["company_id"])
+        if solar_tiers:
+            chat_tools += solar_tools.SOLAR_TOOLS
+
+        def run_chat_tool(name: str, tool_input: dict) -> dict:
+            if name == "calculate_solar_quote":
+                return solar_tools.run_solar_tool(name, tool_input, company_id=user["company_id"])
+            return ada_tools.run_reminder_tool(
+                name, tool_input, company_id=user["company_id"], user_id=user["id"])
+
         try:
             reply = providers.chat(
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, digest, history, system=build_chat_system(pub),
                 briefing=effective_briefing(pub, include_library_text=False),
                 docs=(user_reference_docs(user["id"]) + docs) or None,
-                tools=ada_tools.REMINDER_TOOLS,
-                tool_runner=lambda name, inp: ada_tools.run_reminder_tool(
-                    name, inp, company_id=user["company_id"], user_id=user["id"]),
+                tools=chat_tools,
+                tool_runner=run_chat_tool,
             )
         except providers.ProviderError as exc:
             reference = report_application_error("ada.chat.provider", exc, user)
