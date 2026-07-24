@@ -296,6 +296,13 @@
   .upgrade-notice[hidden] { display:none; }
   .upgrade-notice h3 { margin:0 0 4px; color:var(--teal-deep); font:600 17px var(--serif); }
   .upgrade-notice p { margin:0; max-width:680px; font-size:12.5px; line-height:1.5; }
+  .ada-alert { display:flex; align-items:center; gap:14px; padding:14px 18px; margin:16px 26px 0; border:1px solid var(--ochre); border-radius:14px; background:var(--teal-soft); cursor:pointer; }
+  .ada-alert[hidden] { display:none; }
+  .ada-alert-copy { flex:1; min-width:0; }
+  .ada-alert-copy b { display:block; font:600 14.5px var(--serif); color:var(--ink); }
+  .ada-alert-copy span { display:block; font-size:12.5px; color:var(--ink-3); margin-top:2px; }
+  .ada-alert-dismiss { flex:none; border:0; background:none; color:var(--ink-3); font-size:19px; line-height:1; cursor:pointer; padding:4px 6px; }
+  .triage-source { display:inline-block; padding:1px 7px; margin-right:6px; border-radius:20px; font-size:10.5px; font-weight:700; text-transform:uppercase; background:var(--teal-soft); color:var(--teal-deep); }
 
   /* Connections. A tool the plan doesn't cover is dimmed and locked, never
      hidden - somebody on the Free tier should be able to see exactly what
@@ -883,6 +890,12 @@
     </header>
 
     <div id="loading">Loading your workspace…</div>
+
+    <div class="ada-alert" id="adaAlertBanner" hidden onclick="go('triage')">
+      <span class="triage-ada-mark">A</span>
+      <span class="ada-alert-copy"><b id="adaAlertTitle"></b><span id="adaAlertCopy"></span></span>
+      <button class="ada-alert-dismiss" type="button" onclick="event.stopPropagation(); dismissAdaAlert()">&times;</button>
+    </div>
 
     <!-- ===== OVERVIEW ===== -->
     <section class="view" data-view="overview" id="viewOverview" hidden>
@@ -1509,8 +1522,8 @@ Do not promise a payment date unless it has already been approved."></textarea>
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === view));
     document.getElementById('crumbView').textContent = CRUMB_NAMES[view] || 'Overview';
     if (view === 'teamchat' && teamChatAvailable) markTeamMessagesSeen();
-    if (view === 'triage' && (!triageMessages.length || notificationCounts.new_mail)) {
-      loadTriage(!!notificationCounts.new_mail);
+    if (view === 'triage' && (!triageMessages.length || notificationCounts.new_messages)) {
+      loadTriage(!!notificationCounts.new_messages);
     }
     if (view === 'followups') loadFollowUps();
     if (view === 'connections') loadConnections();
@@ -1798,7 +1811,12 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (n.awaiting_approval) items.push({ count: n.awaiting_approval, title: 'Vouchers waiting', copy: 'Review submissions awaiting your decision', view: 'vouchers' });
     if (n.rejected_vouchers) items.push({ count: n.rejected_vouchers, title: 'Returned vouchers', copy: 'Correct vouchers sent back to you', view: 'fix' });
     if (n.unread_email) items.push({ count: n.unread_email, title: 'Unread inbox messages', copy: 'Open your mailbox triage queue', view: 'triage' });
-    if (n.new_mail) items.push({ count: n.new_mail, title: 'New mailbox messages', copy: 'New mail arrived since your last inbox review', view: 'triage' });
+    if (n.new_messages) {
+      const parts = [];
+      if (n.new_mail) parts.push(`${n.new_mail} in your inbox`);
+      if (n.new_connector_messages) parts.push(`${n.new_connector_messages} from connected tools`);
+      items.push({ count: n.new_messages, title: 'New messages', copy: parts.join(' · ') || 'New messages arrived since your last review', view: 'triage' });
+    }
     if (n.team_messages && teamChatAvailable) items.push({ count: n.team_messages, title: 'New team messages', copy: 'Read messages sent since your last visit', view: 'teamchat' });
     if (n.follow_up_attention) items.push({ count: n.follow_up_attention, title: 'Follow-ups need action', copy: `${n.follow_up_overdue || 0} overdue · ${n.follow_up_due_today || 0} due today · ${n.follow_up_new || 0} new`, view: 'followups' });
     const box = document.getElementById('attentionCenter');
@@ -1813,6 +1831,29 @@ Do not promise a payment date unless it has already been approved."></textarea>
     const followBadge = document.getElementById('followUpNavCount');
     followBadge.style.display = n.follow_up_attention ? 'inline-block' : 'none';
     followBadge.textContent = n.follow_up_attention || '';
+    renderAdaAlertBanner();
+  }
+
+  function renderAdaAlertBanner() {
+    const banner = document.getElementById('adaAlertBanner');
+    if (!banner) return;
+    const n = notificationCounts;
+    const total = Number(n.new_messages || 0);
+    const dismissed = Number(sessionStorage.getItem('adaAlertDismissed') || 0);
+    if (!total || total <= dismissed) { banner.hidden = true; return; }
+    const parts = [];
+    if (n.new_mail) parts.push(`${n.new_mail} in your inbox`);
+    if (n.new_connector_messages) parts.push(`${n.new_connector_messages} from connected tools`);
+    document.getElementById('adaAlertTitle').textContent =
+      `Ada noticed ${total} new message${total === 1 ? '' : 's'}`;
+    document.getElementById('adaAlertCopy').textContent =
+      (parts.length ? parts.join(' · ') + ' — ' : '') + 'open Triage to review';
+    banner.hidden = false;
+  }
+
+  function dismissAdaAlert() {
+    sessionStorage.setItem('adaAlertDismissed', String(notificationCounts.new_messages || 0));
+    renderAdaAlertBanner();
   }
 
   const FOLLOW_PRIORITY = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
@@ -2306,7 +2347,10 @@ Do not promise a payment date unless it has already been approved."></textarea>
       const currentIds = new Set(messages.map(message => String(message.id || '')).filter(Boolean));
       if (mailboxPreviewIds) {
         const newlyArrived = [...currentIds].filter(id => !mailboxPreviewIds.has(id)).length;
-        if (newlyArrived) notificationCounts.new_mail = Number(notificationCounts.new_mail || 0) + newlyArrived;
+        if (newlyArrived) {
+          notificationCounts.new_mail = Number(notificationCounts.new_mail || 0) + newlyArrived;
+          notificationCounts.new_messages = Number(notificationCounts.new_mail || 0) + Number(notificationCounts.new_connector_messages || 0);
+        }
       }
       mailboxPreviewIds = currentIds;
       if (!messages.length) {
@@ -2351,17 +2395,42 @@ Do not promise a payment date unless it has already been approved."></textarea>
     }
     list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Reading your inbox…</h4><p>Loading the latest messages.</p></div>`;
     try {
-      const res = await fetch('/api/mailbox/messages?body=1', { credentials: 'same-origin' });
-      const data = await res.json();
-      if (!res.ok) {
+      const [mailRes, connectorRes] = await Promise.all([
+        fetch('/api/mailbox/messages?body=1', { credentials: 'same-origin' }),
+        fetch('/api/connectors/messages', { credentials: 'same-origin' }).catch(() => null),
+      ]);
+      const data = await mailRes.json();
+      if (!mailRes.ok) {
         list.innerHTML = `<div class="empty"><div class="ico">${ICO_MAIL}</div><h4>Inbox unavailable</h4><p>${escapeHtml(data.error || 'Reconnect your mailbox and try again.')}</p></div>`;
         return;
       }
-      triageMessages = Array.isArray(data.messages) ? data.messages : [];
-      selectedTriageId = triageMessages.some(m => m.id === selectedTriageId) ? selectedTriageId : null;
+      const mailMessages = Array.isArray(data.messages) ? data.messages : [];
+      let connectorMessages = [];
+      if (connectorRes && connectorRes.ok) {
+        const connectorData = await connectorRes.json();
+        connectorMessages = (Array.isArray(connectorData.messages) ? connectorData.messages : []).map(item => ({
+          id: item.id,
+          from: item.label + (item.subtitle ? ` · ${item.subtitle}` : ''),
+          subject: item.title || '(no title)',
+          received: item.when || '',
+          unread: !!item.unread,
+          body: item.title || '',
+          source: 'connector',
+          connectorLabel: item.label,
+        }));
+      }
+      triageMessages = [...mailMessages, ...connectorMessages]
+        .sort((a, b) => new Date(b.received || 0) - new Date(a.received || 0));
+      selectedTriageId = triageMessages.some(m => String(m.id) === selectedTriageId) ? selectedTriageId : null;
       notificationCounts.new_mail = 0;
+      notificationCounts.new_connector_messages = 0;
+      notificationCounts.new_messages = 0;
+      sessionStorage.removeItem('adaAlertDismissed');
       renderAttentionCenter();
       fetch('/api/mailbox/notifications/seen', {
+        method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'
+      }).catch(() => {});
+      fetch('/api/connectors/notifications/seen', {
         method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'
       }).catch(() => {});
       renderTriage();
@@ -2399,7 +2468,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
         <span class="triage-avatar">${escapeHtml(initials(mailboxSender(m.from)))}</span>
         <span class="triage-row-main">
           <span class="triage-row-top"><span class="triage-row-from">${escapeHtml(mailboxSender(m.from))}</span><time class="triage-row-time">${escapeHtml(mailboxWhen(m.received))}</time></span>
-          <span class="triage-row-subject">${escapeHtml(m.subject || '(no subject)')}</span>
+          <span class="triage-row-subject">${m.source === 'connector' ? `<span class="triage-source">${escapeHtml(m.connectorLabel || 'Connector')}</span>` : ''}${escapeHtml(m.subject || '(no subject)')}</span>
         </span>
       </button>`).join('');
   }
@@ -2478,20 +2547,23 @@ Do not promise a payment date unless it has already been approved."></textarea>
     if (!message || !box) return;
     box.innerHTML = '<div class="triage-ada-loading"><span class="spin"></span> Ada is reading this email…</div>';
     try {
-      const res = await fetch('/api/mailbox/triage', {
+      const isConnector = message.source === 'connector';
+      const res = isConnector ? { status: 404, ok: false } : await fetch('/api/mailbox/triage', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message_id: String(message.id) }),
       });
-      let data = await res.json();
+      let data = isConnector ? {} : await res.json();
       if (res.status === 404 && message.body) {
         const fallback = await fetch('/api/chat', {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: 'Summarize the attached email. Explain its priority, what I should do next, and whether it needs a reply. If it needs a reply, draft one.',
+            message: isConnector
+              ? 'Summarize this connected-tool message. Explain its priority and what I should do next.'
+              : 'Summarize the attached email. Explain its priority, what I should do next, and whether it needs a reply. If it needs a reply, draft one.',
             history: [],
-            docs: [{ name: message.subject || 'Email', text: message.body }],
+            docs: [{ name: message.subject || (isConnector ? 'Message' : 'Email'), text: message.body }],
           }),
         });
         data = await fallback.json();

@@ -734,6 +734,13 @@ def can_read(tool_id: str) -> bool:
     return tool_id in READERS
 
 
+def chat_tool_ids() -> list[str]:
+    """Connectors that carry genuine messages (Slack today; Teams/WhatsApp
+    once they get readers) rather than files, pages, or cards - the subset
+    worth folding into a "new messages" count alongside mailbox arrivals."""
+    return [t["id"] for t in CATALOG if t.get("category") == "chat" and t["id"] in READERS]
+
+
 def relevant_to(message: str, connected_ids) -> list[str]:
     """Which of somebody's connected tools a message is plausibly about.
 

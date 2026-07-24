@@ -1,4 +1,4 @@
-"""Run due read-only mailbox automations from cPanel Cron Jobs.
+"""Run due read-only mailbox and connector automations from cPanel Cron Jobs.
 
 Recommended cadence: every 5 minutes. The database advances each recipe's
 next_run_at before network work begins, which keeps an ordinary single cPanel
@@ -14,6 +14,8 @@ def main() -> None:
     server.db.init_db()
     mailbox_result = server.poll_connected_mailboxes()
     print("mailboxes " + " ".join(f"{key}={value}" for key, value in mailbox_result.items()))
+    connector_result = server.poll_connected_tools()
+    print("connectors " + " ".join(f"{key}={value}" for key, value in connector_result.items()))
     due = server.db.due_automations()
     for job in due:
         key = job["recipe_key"]

@@ -586,6 +586,7 @@ def init_db() -> None:
         _seed_individual_plans(conn)
         _migrate_plan_mailbox_limits(conn)
         _migrate_tool_connections(conn)
+        _migrate_connector_polling(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
         _migrate_team_message_recipient(conn)
@@ -789,6 +790,37 @@ def _migrate_mailbox_polling(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_mailbox_arrivals_user
             ON mailbox_arrivals(user_id, seen_at, created_at);
+    """)
+
+
+def _migrate_connector_polling(conn: sqlite3.Connection) -> None:
+    """Arrival tracking for chat-like connectors (Slack today), mirroring
+    mailbox_poll_state/mailbox_arrivals above so the two feeds can be summed
+    into one "new messages" count without either table knowing the other
+    exists."""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS connector_poll_state (
+            connection_id INTEGER PRIMARY KEY REFERENCES tool_connections(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            known_ids_json TEXT NOT NULL DEFAULT '[]',
+            last_polled_at REAL NOT NULL DEFAULT 0,
+            last_error TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS connector_arrivals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            connection_id INTEGER NOT NULL REFERENCES tool_connections(id) ON DELETE CASCADE,
+            tool TEXT NOT NULL,
+            item_key TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            subtitle TEXT NOT NULL DEFAULT '',
+            occurred_at TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            seen_at REAL,
+            UNIQUE(connection_id, item_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_connector_arrivals_user
+            ON connector_arrivals(user_id, seen_at, created_at);
     """)
 
 
@@ -1443,6 +1475,101 @@ def mark_mailbox_arrivals_seen(user_id: int) -> None:
             "UPDATE mailbox_arrivals SET seen_at=? WHERE user_id=? AND seen_at IS NULL",
             (time.time(), user_id),
         )
+
+
+def list_all_tool_connections(tool_ids) -> list[dict]:
+    """Every connected instance of the given tools, across all approved
+    users - for background polling, the connector counterpart of
+    list_all_mailbox_connections above."""
+    tool_ids = list(tool_ids)
+    if not tool_ids:
+        return []
+    placeholders = ",".join("?" for _ in tool_ids)
+    with _cursor() as conn:
+        rows = conn.execute(
+            f"""SELECT t.* FROM tool_connections t JOIN users u ON u.id=t.user_id
+                WHERE u.status='approved' AND t.tool IN ({placeholders})
+                ORDER BY t.user_id, t.id""",
+            tool_ids,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def record_connector_poll(connection: dict, items: list[dict]) -> int:
+    """Remember which connector items are new since the last poll; the first
+    poll is a baseline (see record_mailbox_poll)."""
+    now = time.time()
+    current_ids = [str(item.get("id") or "") for item in items if item.get("id")]
+    with _cursor() as conn:
+        state = conn.execute(
+            "SELECT known_ids_json FROM connector_poll_state WHERE connection_id=?",
+            (connection["id"],),
+        ).fetchone()
+        known = set(json.loads(state["known_ids_json"]) if state else [])
+        added = 0
+        if state:
+            for item in items:
+                item_key = str(item.get("id") or "")
+                if not item_key or item_key in known:
+                    continue
+                cur = conn.execute(
+                    """INSERT OR IGNORE INTO connector_arrivals
+                       (user_id,connection_id,tool,item_key,title,subtitle,occurred_at,created_at)
+                       VALUES(?,?,?,?,?,?,?,?)""",
+                    (connection["user_id"], connection["id"], connection["tool"], item_key,
+                     str(item.get("title") or "")[:300],
+                     str(item.get("subtitle") or "")[:300],
+                     str(item.get("when") or "")[:100], now),
+                )
+                added += cur.rowcount
+        remembered = list(dict.fromkeys(current_ids + list(known)))[:200]
+        conn.execute(
+            """INSERT INTO connector_poll_state
+               (connection_id,user_id,known_ids_json,last_polled_at,last_error)
+               VALUES(?,?,?,?, '') ON CONFLICT(connection_id) DO UPDATE SET
+               known_ids_json=excluded.known_ids_json,last_polled_at=excluded.last_polled_at,
+               last_error=''""",
+            (connection["id"], connection["user_id"], json.dumps(remembered), now),
+        )
+    return added
+
+
+def record_connector_poll_error(connection_id: int, user_id: int, message: str) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE connector_poll_state SET last_polled_at=?,last_error=?
+               WHERE connection_id=? AND user_id=?""",
+            (time.time(), message[:500], connection_id, user_id),
+        )
+
+
+def unread_connector_arrivals(user_id: int) -> int:
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM connector_arrivals WHERE user_id=? AND seen_at IS NULL",
+            (user_id,),
+        ).fetchone()
+    return row["n"]
+
+
+def mark_connector_arrivals_seen(user_id: int) -> None:
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE connector_arrivals SET seen_at=? WHERE user_id=? AND seen_at IS NULL",
+            (time.time(), user_id),
+        )
+
+
+def recent_connector_arrivals(user_id: int, limit: int = 25) -> list[dict]:
+    """Recently-seen connector items, newest first, tagged with whether each
+    one is still unseen - for merging into the Triage list alongside mail."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT * FROM connector_arrivals WHERE user_id=?
+               ORDER BY created_at DESC LIMIT ?""",
+            (user_id, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def get_mailbox_connection(user_id: int, connection_id: int | None = None) -> dict | None:
@@ -3028,12 +3155,18 @@ def notification_summary(user: dict) -> dict:
             "SELECT COUNT(*) AS n FROM mailbox_arrivals WHERE user_id=? AND seen_at IS NULL",
             (user_id,),
         ).fetchone()["n"]
+        new_connector_messages = conn.execute(
+            "SELECT COUNT(*) AS n FROM connector_arrivals WHERE user_id=? AND seen_at IS NULL",
+            (user_id,),
+        ).fetchone()["n"]
     return {"team_messages": unread_team, "team_conversations": unread_conversations,
             "pending_users": pending,
             "awaiting_approval": awaiting, "rejected_vouchers": rejected,
             "follow_up_open": task_open, "follow_up_overdue": task_overdue,
             "follow_up_due_today": task_due_today, "follow_up_new": task_new,
-            "follow_up_attention": task_attention, "new_mail": new_mail}
+            "follow_up_attention": task_attention, "new_mail": new_mail,
+            "new_connector_messages": new_connector_messages,
+            "new_messages": new_mail + new_connector_messages}
 
 
 def mark_team_messages_seen(user: dict, recipient_id: int | None = None) -> None:

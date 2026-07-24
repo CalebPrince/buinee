@@ -1813,6 +1813,26 @@ def poll_connected_mailboxes() -> dict:
     return {"checked": checked, "arrivals": arrivals, "failed": failed}
 
 
+def poll_connected_tools() -> dict:
+    """Header-only polling of chat-like connectors (Slack today) for arrival
+    alerts, the connector counterpart of poll_connected_mailboxes above."""
+    cfg = load_env()
+    checked = arrivals = failed = 0
+    chat_ids = tools.chat_tool_ids()
+    for saved in db.list_all_tool_connections(chat_ids):
+        try:
+            user = {"id": saved["user_id"], "company_id": saved["company_id"]}
+            creds = tool_credentials(user, saved, cfg)
+            items = tools.list_recent(cfg, saved["tool"], creds, limit=25)
+            arrivals += db.record_connector_poll(saved, items)
+            checked += 1
+        except Exception as exc:
+            failed += 1
+            db.record_connector_poll_error(saved["id"], saved["user_id"], str(exc))
+            print(f"connector poll failed connection={saved['id']}: {exc}")
+    return {"checked": checked, "arrivals": arrivals, "failed": failed}
+
+
 def _mail_received_timestamp(value: str) -> float:
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
@@ -2237,6 +2257,40 @@ class RouteHandlerMixin:
                 return self._json({"error": str(exc)}, 400)
             return self._json({"messages": msgs})
 
+        if path == "/api/connectors/messages":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            cfg = load_env()
+            chat_ids = set(tools.chat_tool_ids()) & set(db.plan_for_company(user["company_id"])["tool_ids"])
+            unseen = {
+                (row["connection_id"], row["item_key"])
+                for row in db.recent_connector_arrivals(user["id"], limit=200)
+                if row["seen_at"] is None
+            }
+            items = []
+            for saved in db.list_tool_connections(user["id"]):
+                if saved["tool"] not in chat_ids:
+                    continue
+                try:
+                    creds = tool_credentials(user, saved, cfg)
+                    for item in tools.list_recent(cfg, saved["tool"], creds, limit=25):
+                        item_id = str(item.get("id") or "")
+                        items.append({
+                            "id": f"{saved['tool']}:{saved['id']}:{item_id}",
+                            "tool": saved["tool"],
+                            "label": tools.LABELS.get(saved["tool"], saved["tool"]),
+                            "title": item.get("title") or "",
+                            "subtitle": item.get("subtitle") or "",
+                            "when": item.get("when") or "",
+                            "unread": (saved["id"], item_id) in unseen,
+                        })
+                except (tools.ToolError, secretstore.SecretsUnavailable) as exc:
+                    db.record_tool_error(saved["id"], str(exc))
+                    continue
+            items.sort(key=lambda i: i.get("when") or "", reverse=True)
+            return self._json({"messages": items[:50]})
+
         if path == "/api/mailbox/attachment":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -2577,6 +2631,7 @@ class RouteHandlerMixin:
             "/api/tools/connect-key": self._handle_tool_connect_key,
             "/api/tools/disconnect": self._handle_tool_disconnect,
             "/api/mailbox/notifications/seen": self._handle_mailbox_notifications_seen,
+            "/api/connectors/notifications/seen": self._handle_connectors_notifications_seen,
             "/api/mailbox/triage": self._handle_mailbox_triage,
             "/api/automations/update": self._handle_automation_update,
             "/api/automations/run": self._handle_automation_run,
@@ -3110,6 +3165,13 @@ class RouteHandlerMixin:
         if not user or user["status"] != "approved":
             return self._json({"error": "Not signed in."}, 401)
         db.mark_mailbox_arrivals_seen(user["id"])
+        return self._json({"ok": True})
+
+    def _handle_connectors_notifications_seen(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        db.mark_connector_arrivals_seen(user["id"])
         return self._json({"ok": True})
 
     def _handle_automation_update(self):
