@@ -2028,16 +2028,24 @@ def paystack_api(method: str, path: str, cfg: dict, payload: dict | None = None)
         # Paystack answered but refused the request - most often an IP
         # restriction on the account, not a network problem, so this needs
         # its own message rather than folding into the "unreachable" case
-        # below (HTTPError is itself a URLError subclass).
+        # below (HTTPError is itself a URLError subclass). A 403 with no
+        # JSON body at all usually means a WAF/CDN in front of Paystack's
+        # API blocked the request before it ever reached their
+        # application layer - the raw body (even if not JSON) and the
+        # server header are the only way to tell the difference from an
+        # account-level rejection, so both are captured rather than
+        # silently discarded on a parse failure.
+        raw = exc.read()
         detail = ""
         try:
-            detail = json.loads(exc.read()).get("message", "")
+            detail = json.loads(raw).get("message", "")
         except Exception:
             pass
-        raise ValueError(
-            f"Paystack rejected the request (HTTP {exc.code})"
-            + (f": {detail}" if detail else ".")
-        ) from exc
+        if not detail:
+            snippet = raw.decode("utf-8", errors="replace").strip()[:300]
+            server_header = exc.headers.get("Server", "") if exc.headers else ""
+            detail = (f"[{server_header}] " if server_header else "") + (snippet or "no response body")
+        raise ValueError(f"Paystack rejected the request (HTTP {exc.code}): {detail}") from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise ValueError("Paystack could not be reached. Try again.") from exc
     if not result.get("status"):
