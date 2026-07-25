@@ -4258,6 +4258,17 @@ def platform_alert_counts() -> dict:
         failed_payments = conn.execute(
             "SELECT COUNT(*) AS n FROM payments WHERE status = 'failed' AND created_at > ?", (cutoff_payments,)
         ).fetchone()["n"]
+        successful_payments = conn.execute(
+            "SELECT COUNT(*) AS n FROM payments WHERE status = 'success' AND created_at > ?", (cutoff_payments,)
+        ).fetchone()["n"]
+        # 15-minute buffer so someone who registered a minute ago and is
+        # still on Paystack's checkout page doesn't get flagged as "stuck" -
+        # this is specifically for registrations abandoned or broken, not
+        # every payment_pending row that has ever existed transiently.
+        stuck_signups = conn.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE status = 'payment_pending' AND created_at < ?",
+            (time.time() - 900,),
+        ).fetchone()["n"]
         ada_pending = conn.execute(
             "SELECT COUNT(*) AS n FROM users WHERE status = 'ada_pending'"
         ).fetchone()["n"]
@@ -4281,6 +4292,8 @@ def platform_alert_counts() -> dict:
         "needs_team_plan": needs_team_plan,
         "recent_errors": recent_errors,
         "failed_payments": failed_payments,
+        "successful_payments": successful_payments,
+        "stuck_signups": stuck_signups,
         "ada_pending": ada_pending,
         "security_lockouts": security_lockouts,
     }

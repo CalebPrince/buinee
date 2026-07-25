@@ -1327,6 +1327,14 @@ def admin_alerts(admin: dict, cfg: dict) -> dict:
         alerts.append({"key": "failed_payments", "n": counts["failed_payments"],
                        "title": "Failed payments in the last 24 hours", "copy": "Check Payments",
                        "href": "/admin/payments"})
+    if role in ("owner", "billing") and counts["successful_payments"]:
+        alerts.append({"key": "successful_payments", "n": counts["successful_payments"],
+                       "title": "New successful payments", "copy": "In the last 24 hours",
+                       "href": "/admin/payments"})
+    if role in ("owner", "billing") and counts["stuck_signups"]:
+        alerts.append({"key": "stuck_signups", "n": counts["stuck_signups"],
+                       "title": "Signups stuck without payment", "copy": "Registered but checkout never completed",
+                       "href": "/admin/payments"})
     if role == "owner" and counts["ada_pending"]:
         alerts.append({"key": "ada_pending", "n": counts["ada_pending"],
                        "title": "Ada-registered signups awaiting review", "copy": "Created via the landing chat",
