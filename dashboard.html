@@ -622,6 +622,9 @@
   .ada-msg.me { flex-direction: row-reverse; }
   .ada-msg.me .av { border-radius: 50%; background: linear-gradient(135deg, var(--teal), var(--teal-deep)); }
   .ada-msg.me .bub { background: var(--teal); color: #fff; border-top-right-radius: 4px; }
+  .ada-doc-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 7px 13px; border: 1px solid var(--teal); border-radius: 9px; background: var(--surface); color: var(--teal); text-decoration: none; font-size: 12.5px; font-weight: 700; }
+  .ada-doc-link:hover { background: var(--teal); color: #fff; }
+  .ada-doc-link::before { content: "\2193"; font-weight: 800; }
   .ada-msg .meta { display: block; margin-top: 8px; color: var(--ink-4); font: 10.5px var(--mono); }
   /* Voice: hear Ada's replies aloud (UK English, female) */
   .ada-voice-btn { align-self: flex-end; flex: none; width: 26px; height: 26px; margin-bottom: 2px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-3); cursor: pointer; display: grid; place-items: center; opacity: .55; transition: opacity .15s, color .15s, background .15s; }
@@ -3891,6 +3894,12 @@ Do not promise a payment date unless it has already been approved."></textarea>
     return escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/(^|\s)\*(?!\s)(.+?)\*(?=\s|$|[.,!?])/g, '$1<i>$2</i>')
+      // Render [label](url) as a download button, but only for same-origin
+      // paths (a leading "/" not followed by another "/") - never external or
+      // javascript: URLs, since the reply text can be steered by attachment
+      // content. This is what turns Ada's generated-document links clickable.
+      .replace(/\[([^\]]+)\]\((\/(?!\/)[^\s)]+)\)/g,
+        '<a class="ada-doc-link" href="$2" download>$1</a>')
       .replace(/\n/g, '<br>');
   }
 
