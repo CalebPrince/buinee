@@ -41,6 +41,16 @@ def main() -> None:
         except Exception as exc:
             print(f"reminder id={job['id']} failed unexpectedly: {exc}")
 
+    # Renewal notices. Safe to run on the same 5-minute cadence as everything
+    # else: each company is stamped with the renewal date it was reminded
+    # about, so this only actually emails once per billing cycle.
+    for row in server.db.due_subscription_reminders():
+        try:
+            result = server.send_subscription_reminder(row)
+            print(f"renewal reminder company={row['company_id']}: {result}")
+        except Exception as exc:
+            print(f"renewal reminder company={row['company_id']} failed unexpectedly: {exc}")
+
 
 if __name__ == "__main__":
     main()

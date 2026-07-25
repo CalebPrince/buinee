@@ -1471,6 +1471,25 @@ def send_due_reminder(job: dict) -> dict:
     return {"claimed": True, "email_sent": email_sent, "error": error}
 
 
+def send_subscription_reminder(row: dict) -> dict:
+    """Heads-up before a subscription auto-charges. Stamps the renewal date
+    as reminded first, so a send failure (or an SMTP outage) can't turn into
+    the same customer being emailed on every cron tick for three days -
+    losing one reminder is a far smaller problem than spamming."""
+    db.mark_subscription_reminded(row["company_id"], row["renewal_date"])
+    price = f"{row['plan_currency']} {float(row['plan_price']):.2f}"
+    notify_company_billing(
+        row["company_id"],
+        f"Your Buinee subscription renews on {row['renewal_date']}",
+        f"Your {row['plan_name']} plan for {row['company_name']} renews on "
+        f"{row['renewal_date']} and your card will be charged {price}.\n\n"
+        "Nothing to do if that's expected. To change plan, update your card or "
+        "cancel, open your billing settings:\n"
+        "https://buinee.app/dashboard#billing",
+    )
+    return {"company_id": row["company_id"], "renewal_date": row["renewal_date"]}
+
+
 def notify_company_billing(company_id: int, subject: str, body: str) -> None:
     """Best-effort billing notification (renewal reminder, dunning,
     subscription-ended) to every approved Supervisor at a company - same

@@ -37,6 +37,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -4356,6 +4357,50 @@ def due_reminders(now: float | None = None, limit: int = 50) -> list[dict]:
             (now, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+SUBSCRIPTION_REMINDER_DAYS = 3
+
+
+def due_subscription_reminders(days_ahead: int = SUBSCRIPTION_REMINDER_DAYS) -> list[dict]:
+    """Active subscriptions renewing within the next few days that haven't
+    already been reminded about this exact renewal date. renewal_date is
+    stored as YYYY-MM-DD, so plain string comparison is correct ordering.
+
+    Deliberately excludes cancel_at_period_end (they've already asked to
+    stop - a "you'll be charged" notice would be wrong) and anything with
+    renewal_date in the past (either already charged and the webhook moved
+    the date on, or the row is stale; neither wants an email)."""
+    today = datetime.now(timezone.utc).date()
+    horizon = today + timedelta(days=days_ahead)
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT s.company_id, s.renewal_date, s.paystack_subscription_code,
+                      c.name AS company_name, p.name AS plan_name,
+                      p.price AS plan_price, p.currency AS plan_currency
+               FROM crm_subscriptions s
+               JOIN companies c ON c.id = s.company_id
+               JOIN plans p ON p.id = c.plan_id
+               WHERE s.subscription_status = 'active'
+                 AND s.renewal_date != ''
+                 AND s.renewal_date >= ?
+                 AND s.renewal_date <= ?
+                 AND s.reminder_sent_for != s.renewal_date
+               ORDER BY s.renewal_date""",
+            (today.isoformat(), horizon.isoformat()),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_subscription_reminded(company_id: int, renewal_date: str) -> None:
+    """Stamps the renewal date this company has now been reminded about, so
+    the next cron tick skips it. Keyed on the date rather than a boolean so
+    the next billing cycle (a new renewal_date) reminds again."""
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE crm_subscriptions SET reminder_sent_for = ?, updated_at = ? WHERE company_id = ?",
+            (renewal_date, time.time(), company_id),
+        )
 
 
 def claim_reminder(reminder_id: int) -> bool:
