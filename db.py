@@ -1273,6 +1273,19 @@ def has_approved_supervisor(company_id: int) -> bool:
     return row is not None
 
 
+def list_company_supervisors(company_id: int) -> list[dict]:
+    """Who billing emails (renewal reminders, dunning, subscription-ended)
+    go to - same role _handle_payment_initialize already restricts billing
+    management to, so this is who's actually able to act on the email."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT id, name, email FROM users WHERE company_id = ? AND role = 'finance_supervisor' "
+            "AND status = 'approved'",
+            (company_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def register_company(company_name: str, name: str, email: str, password: str, role: str,
                       plan_id: int | None = None, allow_duplicate_name: bool = False,
                       initial_status: str = "approved") -> dict:
@@ -3806,6 +3819,119 @@ def record_paystack_payment(data: dict) -> dict | None:
             )
         row = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
     return dict(row)
+
+
+def _company_id_for_paystack_customer(data: dict) -> int | None:
+    """Every subscription-lifecycle webhook (subscription.create,
+    invoice.payment_failed, subscription.disable, subscription.not_renew)
+    identifies the customer by email, not by any Buinee id - initialize_plan_
+    subscription always passes the signed-in user's own email as the
+    Paystack customer email, so this is a reliable, unambiguous match back
+    to a company. Returns None (webhook handler no-ops) rather than raising,
+    since an unrecognized email just means this event isn't about a Buinee
+    subscription at all."""
+    email = str((data.get("customer") or {}).get("email") or "").strip().lower()
+    if not email:
+        return None
+    user = get_user_by_email(email)
+    return user["company_id"] if user else None
+
+
+def record_subscription_created(data: dict) -> int | None:
+    """subscription.create - the definitive signal that a customer's first
+    charge turned into a real recurring subscription. Stores the codes
+    needed to manage it (email_token is required by some Paystack
+    subscription-management calls, not just subscription_code) and the
+    next charge date, which the renewal-reminder job reads directly."""
+    company_id = _company_id_for_paystack_customer(data)
+    if not company_id:
+        return None
+    now = time.time()
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO crm_subscriptions
+                 (company_id, subscription_status, payment_status, renewal_date,
+                  paystack_subscription_code, paystack_email_token, updated_at)
+               VALUES (?, 'active', 'current', ?, ?, ?, ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 subscription_status='active', payment_status='current',
+                 renewal_date=excluded.renewal_date,
+                 paystack_subscription_code=excluded.paystack_subscription_code,
+                 paystack_email_token=excluded.paystack_email_token,
+                 reminder_sent_for='', dunning_sent_for='', updated_at=excluded.updated_at""",
+            (company_id, str(data.get("next_payment_date") or "")[:10],
+             str(data.get("subscription_code") or ""), str(data.get("email_token") or ""), now),
+        )
+    return company_id
+
+
+def record_payment_failed(data: dict) -> tuple[int, bool] | None:
+    """invoice.payment_failed - Paystack is retrying on its own schedule;
+    this only marks the account overdue (access is untouched - see
+    subscription.disable for the actual downgrade trigger) and reports
+    whether this is the first failure notice for the current billing cycle,
+    so the caller sends the dunning email once per cycle rather than once
+    per retry attempt."""
+    company_id = _company_id_for_paystack_customer(data)
+    if not company_id:
+        return None
+    invoice_key = str(data.get("id") or data.get("invoice_code") or "") or str(data.get("created_at") or "")
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT dunning_sent_for FROM crm_subscriptions WHERE company_id=?", (company_id,)
+        ).fetchone()
+        already_notified = bool(row and row["dunning_sent_for"] == invoice_key)
+        conn.execute(
+            """INSERT INTO crm_subscriptions (company_id, payment_status, dunning_sent_for, updated_at)
+               VALUES (?, 'overdue', ?, ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 payment_status='overdue', dunning_sent_for=excluded.dunning_sent_for,
+                 updated_at=excluded.updated_at""",
+            (company_id, invoice_key, time.time()),
+        )
+    return (company_id, not already_notified)
+
+
+def record_subscription_ended(data: dict) -> int | None:
+    """subscription.disable - Paystack's definitive "we gave up" signal,
+    covering both a failed-payment subscription that exhausted its retries
+    and a cancel_at_period_end subscription reaching its end. This is the
+    only place a subscription actually causes a downgrade - everything else
+    (invoice.payment_failed, subscription.not_renew) leaves access alone."""
+    company_id = _company_id_for_paystack_customer(data)
+    if not company_id:
+        return None
+    default_plan = get_default_plan()
+    with _cursor() as conn:
+        conn.execute("UPDATE companies SET plan_id=? WHERE id=?", (default_plan["id"], company_id))
+        conn.execute(
+            """INSERT INTO crm_subscriptions (company_id, subscription_status, updated_at)
+               VALUES (?, 'cancelled', ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 subscription_status='cancelled', updated_at=excluded.updated_at""",
+            (company_id, time.time()),
+        )
+    return company_id
+
+
+def record_subscription_not_renewing(data: dict) -> int | None:
+    """subscription.not_renew - a cancellation was requested (by the
+    customer via Paystack's hosted management page, or by an admin) but the
+    current billing period hasn't ended yet. Access continues; no plan_id
+    change here. subscription.disable will arrive at period end and is what
+    actually downgrades."""
+    company_id = _company_id_for_paystack_customer(data)
+    if not company_id:
+        return None
+    with _cursor() as conn:
+        conn.execute(
+            """INSERT INTO crm_subscriptions (company_id, subscription_status, updated_at)
+               VALUES (?, 'cancel_at_period_end', ?)
+               ON CONFLICT(company_id) DO UPDATE SET
+                 subscription_status='cancel_at_period_end', updated_at=excluded.updated_at""",
+            (company_id, time.time()),
+        )
+    return company_id
 
 
 def list_payments(company_id: int | None = None, limit: int = 200) -> list[dict]:

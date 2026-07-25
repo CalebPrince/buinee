@@ -1471,6 +1471,22 @@ def send_due_reminder(job: dict) -> dict:
     return {"claimed": True, "email_sent": email_sent, "error": error}
 
 
+def notify_company_billing(company_id: int, subject: str, body: str) -> None:
+    """Best-effort billing notification (renewal reminder, dunning,
+    subscription-ended) to every approved Supervisor at a company - same
+    fail-open pattern as every other outbound_mail call site in this app;
+    a delivery failure here must never break the webhook handler that
+    triggered it."""
+    cfg = load_env()
+    if not outbound_mail.is_configured(cfg):
+        return
+    for supervisor in db.list_company_supervisors(company_id):
+        try:
+            outbound_mail.send(cfg, supervisor["email"], subject, body)
+        except outbound_mail.MailSendError as exc:
+            print(f"billing email failed company={company_id} user={supervisor['id']}: {exc}")
+
+
 def build_chat_system(user: dict) -> str:
     label = {
         "account_assistant": "a Preparer, who prepares vouchers",
@@ -3914,8 +3930,36 @@ class RouteHandlerMixin:
             event = json.loads(raw)
         except json.JSONDecodeError:
             return self._json({"error": "Bad webhook."}, 400)
-        if event.get("event") == "charge.success":
-            db.record_paystack_payment(event.get("data") or {})
+        kind = event.get("event")
+        data = event.get("data") or {}
+        if kind == "charge.success":
+            db.record_paystack_payment(data)
+        elif kind == "subscription.create":
+            db.record_subscription_created(data)
+        elif kind == "invoice.payment_failed":
+            result = db.record_payment_failed(data)
+            if result:
+                company_id, should_notify = result
+                if should_notify:
+                    notify_company_billing(
+                        company_id, "Your Buinee payment didn't go through",
+                        "We tried to charge your card for your Buinee subscription and it "
+                        "didn't go through. Your access hasn't changed, we'll keep retrying "
+                        "automatically, but if it keeps failing your subscription will "
+                        "eventually be cancelled and your workspace moved to the free plan.\n\n"
+                        "Update your card: https://buinee.app/dashboard#billing",
+                    )
+        elif kind == "subscription.disable":
+            company_id = db.record_subscription_ended(data)
+            if company_id:
+                notify_company_billing(
+                    company_id, "Your Buinee subscription has ended",
+                    "Your Buinee subscription has ended and your workspace has been moved "
+                    "to the free plan. Your data is safe, nothing has been deleted.\n\n"
+                    "Resubscribe any time: https://buinee.app/dashboard#billing",
+                )
+        elif kind == "subscription.not_renew":
+            db.record_subscription_not_renewing(data)
         return self._json({"ok": True})
 
     def _handle_team_message(self):
