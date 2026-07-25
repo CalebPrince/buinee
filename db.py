@@ -3776,6 +3776,28 @@ def get_payment(reference: str) -> dict | None:
     return dict(row) if row else None
 
 
+def list_payment_pending_signups() -> list[dict]:
+    """Registrations stuck without a completed payment - most often because
+    the initial Paystack checkout attempt failed (see server.paystack_api)
+    and the customer never got redirected to pay. The company already holds
+    its chosen plan (register_company sets plan_id up front; a successful
+    payment just confirms it), so an admin can generate a fresh checkout
+    link here rather than the customer having to retry the exact same
+    broken registration flow."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email,
+                      u.created_at AS user_created_at, c.id AS company_id, c.name AS company_name,
+                      p.id AS plan_id, p.name AS plan_name, p.price AS plan_price, p.currency AS plan_currency
+               FROM users u
+               JOIN companies c ON c.id = u.company_id
+               JOIN plans p ON p.id = c.plan_id
+               WHERE u.status = 'payment_pending'
+               ORDER BY u.created_at"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def delete_payment(payment_id: int) -> None:
     """Remove a single payment record - a test/bad row, not a real
     transaction reversal. Command Center only; unlike delete_company this

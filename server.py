@@ -2665,10 +2665,14 @@ class RouteHandlerMixin:
             if not admin:
                 return
             ps = paystack_config(load_env())
-            return self._json({"payments": db.list_payments(), "configuration": {
-                "public_key": ps["public_key"], "public_key_configured": bool(ps["public_key"]),
-                "secret_key_configured": bool(ps["secret_key"]), "webhook_url": ps["webhook_url"],
-                "callback_url": ps["callback_url"]}})
+            return self._json({
+                "payments": db.list_payments(),
+                "pending_signups": db.list_payment_pending_signups(),
+                "configuration": {
+                    "public_key": ps["public_key"], "public_key_configured": bool(ps["public_key"]),
+                    "secret_key_configured": bool(ps["secret_key"]), "webhook_url": ps["webhook_url"],
+                    "callback_url": ps["callback_url"]},
+            })
 
         if path == "/api/admin/team":
             admin = current_admin(self)
@@ -2832,6 +2836,7 @@ class RouteHandlerMixin:
             "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
             "/api/admin/company/delete": self._handle_admin_delete_company,
             "/api/admin/payment/delete": self._handle_admin_delete_payment,
+            "/api/admin/payments/link": self._handle_admin_generate_payment_link,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
@@ -4467,6 +4472,35 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
+
+    def _handle_admin_generate_payment_link(self):
+        """A fresh Paystack checkout link for a registration stuck at
+        payment_pending - the same call the registration/login flow makes
+        automatically, just triggered by an admin instead of the customer's
+        browser, so a broken first attempt (see paystack_api) doesn't strand
+        the signup with no way to pay."""
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            req = self._body()
+            user_id = int(req.get("user_id"))
+        except (TypeError, ValueError, Exception):
+            return self._json({"error": "Bad request."}, 400)
+        user = db.get_user(user_id)
+        if not user or user["status"] != "payment_pending":
+            return self._json({"error": "That signup is no longer awaiting payment."}, 400)
+        plan = db.plan_for_company(user["company_id"])
+        try:
+            payment = initialize_plan_payment(user, plan, load_env())
+        except ValueError as exc:
+            reference = report_application_error(
+                "paystack.admin_link", exc, user=user, context=f"plan_id={plan['id']}")
+            return self._json({"error": f"{exc} (Reference: {reference})"}, 503)
+        db.record_admin_activity(admin, "generated", "payment_link", user_id,
+                                 details=f"For {user['email']}, plan={plan['name']}")
+        return self._json({"ok": True, "authorization_url": payment.get("authorization_url") or "",
+                           "reference": payment.get("reference") or ""})
 
     def _handle_admin_mfa_setup(self):
         admin = current_admin(self)

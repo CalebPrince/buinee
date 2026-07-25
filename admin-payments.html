@@ -51,6 +51,19 @@
     .del-btn { border:1px solid var(--bad); color:var(--bad); background:transparent; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:700; cursor:pointer; }
     .del-btn:hover { background:var(--bad-soft); }
     .empty { padding:35px; text-align:center; color:var(--muted); }
+    .pending { display:grid; }
+    .pending-row { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(140px,.7fr) auto; gap:16px; align-items:center; padding:14px 17px; border-bottom:1px solid var(--line); }
+    .pending-row:last-child { border-bottom:0; }
+    .pending-row b,.pending-row span { display:block; overflow-wrap:anywhere; }
+    .pending-row span { color:var(--muted); font-size:11px; }
+    .link-btn { border:1px solid var(--green); color:var(--green); background:transparent; border-radius:8px; padding:6px 11px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .link-btn:hover { background:var(--green-soft); }
+    .link-btn:disabled { opacity:.6; cursor:default; }
+    .link-box { grid-column:1/-1; display:flex; gap:8px; align-items:center; margin-top:10px; padding:10px; background:var(--surface-2); border-radius:9px; }
+    .link-box input { flex:1; min-width:0; padding:7px 9px; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink); font:12px var(--mono); }
+    .link-box a,.link-box button { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:7px; padding:7px 10px; font-size:11.5px; font-weight:700; cursor:pointer; text-decoration:none; white-space:nowrap; }
+    .link-box a:hover,.link-box button:hover { border-color:var(--green); color:var(--green); }
+    .link-err { grid-column:1/-1; color:var(--bad); font-size:12px; margin-top:6px; }
     @media (max-width:760px) { .side{width:72px;padding:16px 8px}.brand{font-size:0;text-align:center}.brand:before{content:'B';font-size:20px}.tag,.nav a{font-size:0;text-align:center}.nav a:before{content:'•';font-size:18px}.config-grid,.kpis{grid-template-columns:1fr}.payment{grid-template-columns:1fr}.status{justify-self:start}main{padding:24px 14px} }
   </style>
 </head>
@@ -66,6 +79,7 @@
       <header class="hero"><div class="eyebrow">Revenue ledger</div><h1>Payments</h1><p>Verified Paystack transactions and safe payment-method metadata.</p></header>
       <section class="config"><h2>Paystack configuration</h2><div class="config-grid" id="config"></div></section>
       <div class="kpis" id="kpis"></div>
+      <section class="card" id="pendingCard" style="display:none;margin-bottom:18px"><h2>Pending signups</h2><div class="pending" id="pendingSignups"></div></section>
       <section class="card"><h2>Recent payments</h2><div class="payments" id="payments"><div class="empty">Loading payments…</div></div></section>
     </div></main>
   </div>
@@ -79,13 +93,37 @@
       myRole=(await me.json()).admin.role;
       const res=await fetch('/api/admin/payments',{credentials:'same-origin'}),data=await res.json();
       if(!res.ok){document.getElementById('payments').innerHTML=`<div class="empty">${esc(data.error||'Payments could not be loaded.')}</div>`;return}
-      const c=data.configuration,p=data.payments||[];
+      const c=data.configuration,p=data.payments||[],pending=data.pending_signups||[];
       allPayments=p;
       document.getElementById('config').innerHTML=`<div class="cfg"><b>Public key <span class="${c.public_key_configured?'ok':'bad'}">${c.public_key_configured?'Configured':'Missing'}</span></b><span>${esc(c.public_key||'Set PAYSTACK_PUBLIC_KEY in cPanel')}</span></div><div class="cfg"><b>Secret key <span class="${c.secret_key_configured?'ok':'bad'}">${c.secret_key_configured?'Configured':'Missing'}</span></b><span>The secret is never returned to the browser.</span></div><div class="cfg"><b>Webhook URL</b><span>${esc(c.webhook_url)}</span></div><div class="cfg"><b>Callback URL</b><span>${esc(c.callback_url)}</span></div>`;
       const success=p.filter(x=>x.status==='success'),curr={};success.forEach(x=>curr[x.currency]=(curr[x.currency]||0)+x.amount_subunit);
       document.getElementById('kpis').innerHTML=`<div class="kpi"><b>${success.length}</b><span>Successful payments</span></div><div class="kpi"><b>${p.filter(x=>x.status==='initialized').length}</b><span>Awaiting confirmation</span></div><div class="kpi"><b>${Object.entries(curr).map(([c,n])=>money(n,c)).join(' · ')||'-'}</b><span>Verified volume by currency</span></div>`;
       const canDelete=myRole==='owner'||myRole==='billing';
       document.getElementById('payments').innerHTML=p.length?p.map(x=>`<article class="payment"><div><b>${esc(x.company_name)}</b><span>${esc(x.customer_email)} · ${esc(x.plan_name)}</span><span>${esc(x.reference)}</span></div><div><b class="amount">${money(x.amount_subunit,x.currency)}</b><span>${date(x.paid_at||x.created_at)}</span></div><div><b>${x.card_last4?`${esc(x.card_brand||x.card_type)} •••• ${esc(x.card_last4)}`:esc(x.channel||'Checkout')}</b><span>${esc(x.card_bank||x.gateway_response||'No card metadata')}</span></div><div class="row-actions"><span class="status ${esc(x.status)}">${esc(x.status)}</span>${canDelete?`<button type="button" class="del-btn" onclick="deletePayment(${x.id})">Delete</button>`:''}</div></article>`).join(''):'<div class="empty">No payment attempts yet.</div>';
+      const pendingCard=document.getElementById('pendingCard');
+      pendingCard.style.display=pending.length?'':'none';
+      document.getElementById('pendingSignups').innerHTML=pending.map(x=>`<div class="pending-row" id="pendingRow-${x.user_id}"><div><b>${esc(x.company_name)}</b><span>${esc(x.user_name)} · ${esc(x.user_email)}</span><span>${esc(x.plan_name)} · ${money(Math.round(x.plan_price*100),x.plan_currency)}/mo · signed up ${date(x.user_created_at)}</span></div><div><span>Awaiting payment</span></div><button type="button" class="link-btn" onclick="generateLink(${x.user_id},this)">Generate payment link</button></div>`).join('');
+    }
+    async function generateLink(userId,btn){
+      btn.disabled=true;btn.textContent='Generating…';
+      const row=document.getElementById(`pendingRow-${userId}`);
+      row.querySelectorAll('.link-box,.link-err').forEach(el=>el.remove());
+      const res=await fetch('/api/admin/payments/link',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
+      const data=await res.json();
+      btn.disabled=false;btn.textContent='Generate payment link';
+      if(!res.ok||!data.authorization_url){
+        row.insertAdjacentHTML('beforeend',`<div class="link-err">${esc(data.error||'Could not generate a payment link.')}</div>`);
+        return;
+      }
+      const url=data.authorization_url;
+      const mailBody=encodeURIComponent(`Hi,\n\nHere's the link to complete your Buinee registration payment:\n\n${url}\n\nLet us know if you have any trouble.`);
+      row.insertAdjacentHTML('beforeend',`<div class="link-box"><input type="text" readonly value="${esc(url)}" onclick="this.select()"><button type="button" onclick="copyLink(this)">Copy</button><a href="mailto:?subject=${encodeURIComponent('Complete your Buinee registration')}&body=${mailBody}">Email</a></div>`);
+    }
+    function copyLink(btn){
+      const input=btn.previousElementSibling;
+      input.select();
+      navigator.clipboard?.writeText(input.value).catch(()=>document.execCommand('copy'));
+      const original=btn.textContent;btn.textContent='Copied';setTimeout(()=>btn.textContent=original,1500);
     }
     async function deletePayment(id){
       const payment=allPayments.find(x=>x.id===id);
