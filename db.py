@@ -3972,6 +3972,43 @@ def list_payment_pending_signups() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def list_manual_billing_companies() -> list[dict]:
+    """Paying customers still on the old one-time-charge model: they paid
+    once, hold a paid plan, and have no Paystack subscription on file, so
+    nothing will ever auto-charge them again.
+
+    These are deliberately not migrated automatically - moving someone to
+    recurring billing means taking their card details again, which has to
+    be their choice. An admin sends each one a subscription-setup link
+    when it's the right moment (see server._handle_admin_subscription_link),
+    the same one-at-a-time pattern as the stuck-signup links above.
+
+    Only rows where a Supervisor exists are returned, since that's who the
+    link has to go to - a company with nobody able to act on it is noise."""
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT c.id AS company_id, c.name AS company_name,
+                      p.id AS plan_id, p.name AS plan_name,
+                      p.price AS plan_price, p.currency AS plan_currency,
+                      p.paystack_plan_code,
+                      u.id AS user_id, u.name AS user_name, u.email AS user_email,
+                      (SELECT MAX(created_at) FROM payments
+                        WHERE company_id = c.id AND status = 'success') AS last_paid_at
+               FROM companies c
+               JOIN plans p ON p.id = c.plan_id
+               JOIN users u ON u.company_id = c.id
+                           AND u.role = 'finance_supervisor' AND u.status = 'approved'
+               LEFT JOIN crm_subscriptions s ON s.company_id = c.id
+               WHERE p.price > 0
+                 AND COALESCE(s.paystack_subscription_code, '') = ''
+                 AND EXISTS (SELECT 1 FROM payments
+                              WHERE company_id = c.id AND status = 'success')
+               GROUP BY c.id
+               ORDER BY last_paid_at"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def delete_payment(payment_id: int) -> None:
     """Remove a single payment record - a test/bad row, not a real
     transaction reversal. Command Center only; unlike delete_company this

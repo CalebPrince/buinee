@@ -80,6 +80,7 @@
       <section class="config"><h2>Paystack configuration</h2><div class="config-grid" id="config"></div></section>
       <div class="kpis" id="kpis"></div>
       <section class="card" id="pendingCard" style="display:none;margin-bottom:18px"><h2>Pending signups</h2><div class="pending" id="pendingSignups"></div></section>
+      <section class="card" id="manualCard" style="display:none;margin-bottom:18px"><h2>Not on recurring billing</h2><div style="padding:12px 17px 0;font-size:12.5px;color:var(--muted)">Paid once under the old model, so nothing will auto-charge them again. Send a setup link when it's the right moment to move them onto a subscription.</div><div class="pending" id="manualBilling"></div></section>
       <section class="card"><h2>Recent payments</h2><div class="payments" id="payments"><div class="empty">Loading payments…</div></div></section>
     </div></main>
   </div>
@@ -93,7 +94,7 @@
       myRole=(await me.json()).admin.role;
       const res=await fetch('/api/admin/payments',{credentials:'same-origin'}),data=await res.json();
       if(!res.ok){document.getElementById('payments').innerHTML=`<div class="empty">${esc(data.error||'Payments could not be loaded.')}</div>`;return}
-      const c=data.configuration,p=data.payments||[],pending=data.pending_signups||[];
+      const c=data.configuration,p=data.payments||[],pending=data.pending_signups||[],manual=data.manual_billing||[];
       allPayments=p;
       document.getElementById('config').innerHTML=`<div class="cfg"><b>Public key <span class="${c.public_key_configured?'ok':'bad'}">${c.public_key_configured?'Configured':'Missing'}</span></b><span>${esc(c.public_key||'Set PAYSTACK_PUBLIC_KEY in cPanel')}</span></div><div class="cfg"><b>Secret key <span class="${c.secret_key_configured?'ok':'bad'}">${c.secret_key_configured?'Configured':'Missing'}</span></b><span>The secret is never returned to the browser.</span></div><div class="cfg"><b>Webhook URL</b><span>${esc(c.webhook_url)}</span></div><div class="cfg"><b>Callback URL</b><span>${esc(c.callback_url)}</span></div>`;
       const success=p.filter(x=>x.status==='success'),curr={};success.forEach(x=>curr[x.currency]=(curr[x.currency]||0)+x.amount_subunit);
@@ -103,6 +104,23 @@
       const pendingCard=document.getElementById('pendingCard');
       pendingCard.style.display=pending.length?'':'none';
       document.getElementById('pendingSignups').innerHTML=pending.map(x=>`<div class="pending-row" id="pendingRow-${x.user_id}"><div><b>${esc(x.company_name)}</b><span>${esc(x.user_name)} · ${esc(x.user_email)}</span><span>${esc(x.plan_name)} · ${money(Math.round(x.plan_price*100),x.plan_currency)}/mo · signed up ${date(x.user_created_at)}</span></div><div><span>Awaiting payment</span></div><button type="button" class="link-btn" onclick="generateLink(${x.user_id},this)">Generate payment link</button></div>`).join('');
+      document.getElementById('manualCard').style.display=manual.length?'':'none';
+      document.getElementById('manualBilling').innerHTML=manual.map(x=>`<div class="pending-row" id="manualRow-${x.user_id}"><div><b>${esc(x.company_name)}</b><span>${esc(x.user_name)} · ${esc(x.user_email)}</span><span>${esc(x.plan_name)} · ${money(Math.round(x.plan_price*100),x.plan_currency)}/mo · last paid ${x.last_paid_at?date(x.last_paid_at):'unknown'}</span></div><div><span>${x.paystack_plan_code?'One-time only':'Plan not set up for recurring'}</span></div><button type="button" class="link-btn" onclick="subscriptionLink(${x.user_id},this)" ${x.paystack_plan_code?'':'disabled title="Set this plan up for recurring billing on the Plans page first."'}>Send subscription setup link</button></div>`).join('');
+    }
+    async function subscriptionLink(userId,btn){
+      btn.disabled=true;btn.textContent='Generating…';
+      const row=document.getElementById(`manualRow-${userId}`);
+      row.querySelectorAll('.link-box,.link-err').forEach(el=>el.remove());
+      const res=await fetch('/api/admin/payments/subscription-link',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
+      const data=await res.json();
+      btn.disabled=false;btn.textContent='Send subscription setup link';
+      if(!res.ok||!data.authorization_url){
+        row.insertAdjacentHTML('beforeend',`<div class="link-err">${esc(data.error||'Could not generate a subscription link.')}</div>`);
+        return;
+      }
+      const url=data.authorization_url;
+      const mailBody=encodeURIComponent(`Hi,\n\nWe're moving Buinee subscriptions onto automatic monthly billing, so you don't have to remember to renew.\n\nUse this link to set it up:\n\n${url}\n\nYour plan and everything in your workspace stays exactly as it is.`);
+      row.insertAdjacentHTML('beforeend',`<div class="link-box"><input type="text" readonly value="${esc(url)}" onclick="this.select()"><button type="button" onclick="copyLink(this)">Copy</button><a href="mailto:?subject=${encodeURIComponent('Set up automatic billing for Buinee')}&body=${mailBody}">Email</a></div>`);
     }
     async function generateLink(userId,btn){
       btn.disabled=true;btn.textContent='Generating…';

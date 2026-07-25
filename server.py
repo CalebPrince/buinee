@@ -2808,6 +2808,7 @@ class RouteHandlerMixin:
             return self._json({
                 "payments": db.list_payments(),
                 "pending_signups": db.list_payment_pending_signups(),
+                "manual_billing": db.list_manual_billing_companies(),
                 "configuration": {
                     "public_key": ps["public_key"], "public_key_configured": bool(ps["public_key"]),
                     "secret_key_configured": bool(ps["secret_key"]), "webhook_url": ps["webhook_url"],
@@ -2977,6 +2978,7 @@ class RouteHandlerMixin:
             "/api/admin/company/delete": self._handle_admin_delete_company,
             "/api/admin/payment/delete": self._handle_admin_delete_payment,
             "/api/admin/payments/link": self._handle_admin_generate_payment_link,
+            "/api/admin/payments/subscription-link": self._handle_admin_subscription_link,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
@@ -4667,6 +4669,38 @@ class RouteHandlerMixin:
                 "paystack.admin_link", exc, user=user, context=f"plan_id={plan['id']}")
             return self._json({"error": f"{exc} (Reference: {reference})"}, 503)
         db.record_admin_activity(admin, "generated", "payment_link", user_id,
+                                 details=f"For {user['email']}, plan={plan['name']}")
+        return self._json({"ok": True, "authorization_url": payment.get("authorization_url") or "",
+                           "reference": payment.get("reference") or ""})
+
+    def _handle_admin_subscription_link(self):
+        """A subscription-setup link for an existing customer still on the
+        old one-time model. Unlike the stuck-signup link above, this one
+        requires the plan to be linked to Paystack - the whole point is to
+        move them onto recurring billing, so falling back to another
+        one-time charge would silently do nothing useful."""
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            user_id = int(self._body().get("user_id"))
+        except (TypeError, ValueError, Exception):
+            return self._json({"error": "Bad request."}, 400)
+        user = db.get_user(user_id)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "That account isn't active."}, 400)
+        plan = db.plan_for_company(user["company_id"])
+        if not plan.get("paystack_plan_code"):
+            return self._json(
+                {"error": f"The {plan['name']} plan isn't set up for recurring billing yet. "
+                          f"Set it up on the Plans page first."}, 400)
+        try:
+            payment = initialize_plan_subscription(user, plan, load_env())
+        except ValueError as exc:
+            reference = report_application_error(
+                "paystack.subscription_link", exc, user=user, context=f"plan_id={plan['id']}")
+            return self._json({"error": f"{exc} (Reference: {reference})"}, 503)
+        db.record_admin_activity(admin, "generated", "subscription_link", user_id,
                                  details=f"For {user['email']}, plan={plan['name']}")
         return self._json({"ok": True, "authorization_url": payment.get("authorization_url") or "",
                            "reference": payment.get("reference") or ""})
