@@ -2994,8 +2994,11 @@ class RouteHandlerMixin:
         try:
             payment = initialize_plan_payment(user, plan, load_env())
         except ValueError as exc:
+            reference = report_application_error(
+                "paystack.initialize", exc, user=user, context=f"plan_id={plan['id']}")
             return self._json(
-                {"error": f"Your account was created, but payment could not start: {exc}"}, 503,
+                {"error": f"Your account was created, but payment could not start: {exc} "
+                          f"(Reference: {reference})"}, 503,
                 [("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
             )
         return self._json(
@@ -3102,8 +3105,11 @@ class RouteHandlerMixin:
             try:
                 payment = initialize_plan_payment(user, plan, load_env())
             except ValueError as exc:
+                reference = report_application_error(
+                    "paystack.initialize", exc, user=user, context=f"plan_id={plan['id']}")
                 return self._json(
-                    {"error": f"Your account was created, but payment could not start: {exc}"},
+                    {"error": f"Your account was created, but payment could not start: {exc} "
+                              f"(Reference: {reference})"},
                     503,
                     [("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
                 )
@@ -3543,12 +3549,13 @@ class RouteHandlerMixin:
         token = db.create_session(user["id"])
         if user["status"] == "payment_pending":
             try:
-                payment = initialize_plan_payment(
-                    user, db.plan_for_company(user["company_id"]), load_env()
-                )
+                plan = db.plan_for_company(user["company_id"])
+                payment = initialize_plan_payment(user, plan, load_env())
             except ValueError as exc:
+                reference = report_application_error(
+                    "paystack.initialize", exc, user=user, context=f"plan_id={plan['id']}")
                 return self._json(
-                    {"error": f"Payment could not start: {exc}"}, 503,
+                    {"error": f"Payment could not start: {exc} (Reference: {reference})"}, 503,
                     [("Set-Cookie", _cookie_header(COOKIE_NAME, token, db.SESSION_TTL_SECONDS))],
                 )
             return self._json(
