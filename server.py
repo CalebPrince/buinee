@@ -217,6 +217,8 @@ STATIC_PAGES = {
     "/": "index.html",
     "/register": "register.html",
     "/login": "login.html",
+    "/payment/success": "payment-success.html",
+    "/payment/failed": "payment-failed.html",
     "/contact": "contact.html",
     "/privacy": "legal.html",
     "/terms": "legal.html",
@@ -2280,7 +2282,7 @@ class RouteHandlerMixin:
                     verified = bool(recorded and recorded.get("status") == "success")
                 except ValueError:
                     pass
-            return self._redirect("/dashboard?payment=success" if verified else "/login?payment=failed")
+            return self._redirect("/payment/success" if verified else "/payment/failed")
 
         if path == "/api/team-chat":
             user = current_user(self)

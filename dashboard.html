@@ -2635,15 +2635,12 @@ Do not promise a payment date unless it has already been approved."></textarea>
   function showMailboxResult() {
     const params = new URLSearchParams(location.search);
     const code = params.get('mailbox');
-    const payment = params.get('payment');
     const hit = code && MAILBOX_RESULTS[code];
     if (hit) alert(hit[1]);
-    if (payment === 'success') alert('Payment confirmed. Your upgraded plan is now active.');
-    if (!code && !payment) return;
+    if (!code) return;
     // Strip it so a refresh doesn't repeat the message.
     const url = new URL(location);
     url.searchParams.delete('mailbox');
-    url.searchParams.delete('payment');
     history.replaceState(null, '', url);
   }
 
