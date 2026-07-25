@@ -690,7 +690,7 @@ def load_env() -> dict:
         "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_REDIRECT_URI",
         "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
         "BUINEE_SECRET_KEY",
-        "BUINEE_COOKIE_SECURE", "BUINEE_TRUST_PROXY",
+        "BUINEE_COOKIE_SECURE", "BUINEE_TRUST_PROXY", "BUINEE_CANONICAL_HOST",
         "PAYSTACK_PUBLIC_KEY", "PAYSTACK_SECRET_KEY", "PAYSTACK_CALLBACK_URL", "PAYSTACK_WEBHOOK_URL",
         *outbound_mail.SMTP_KEYS,
         # Two per connectable tool plus the shared callback. Generated rather
@@ -2066,6 +2066,23 @@ class RouteHandlerMixin:
         navigation rather than a fetch, so it can't answer in JSON."""
         self._send(status, b"", "text/plain; charset=utf-8", [("Location", location)])
 
+    def _canonical_host_redirect_target(self) -> str | None:
+        """The session cookie is host-only (no Domain= - narrower is safer),
+        so if the same site answers on more than one hostname (bare domain
+        and www being the classic case), a session set on one hostname
+        simply does not exist on the other - a visitor can look logged out
+        mid-session for no reason other than which link or bookmark they
+        used. Set BUINEE_CANONICAL_HOST (e.g. buinee.app) to pin everything
+        to one hostname; unset (the default), this is a no-op so it can't
+        affect local dev or any deployment that hasn't opted in."""
+        canonical = load_env().get("BUINEE_CANONICAL_HOST", "").strip().lower()
+        if not canonical:
+            return None
+        host = (self.headers.get("Host") or "").split(":")[0].lower()
+        if not host or host == canonical:
+            return None
+        return f"https://{canonical}{self.path}"
+
     def _body(self, max_len: int = 20000) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if length > max_len:
@@ -2115,6 +2132,10 @@ class RouteHandlerMixin:
                 pass
 
     def _route_get(self):
+        target = self._canonical_host_redirect_target()
+        if target:
+            return self._redirect(target, 301)
+
         path = self.path.split("?")[0]
 
         if path in LEGACY_PAGE_REDIRECTS:
@@ -2709,6 +2730,10 @@ class RouteHandlerMixin:
     # --------------------------------------------------------------- POST
 
     def _route_post(self):
+        target = self._canonical_host_redirect_target()
+        if target:
+            return self._redirect(target, 307)
+
         path = self.path.split("?")[0]
         if path != "/api/paystack/webhook" and not self._post_is_same_origin():
             return self._json({"error": "This request did not come from Buinee."}, 403)
