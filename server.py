@@ -2024,6 +2024,20 @@ def paystack_api(method: str, path: str, cfg: dict, payload: dict | None = None)
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             result = json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        # Paystack answered but refused the request - most often an IP
+        # restriction on the account, not a network problem, so this needs
+        # its own message rather than folding into the "unreachable" case
+        # below (HTTPError is itself a URLError subclass).
+        detail = ""
+        try:
+            detail = json.loads(exc.read()).get("message", "")
+        except Exception:
+            pass
+        raise ValueError(
+            f"Paystack rejected the request (HTTP {exc.code})"
+            + (f": {detail}" if detail else ".")
+        ) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise ValueError("Paystack could not be reached. Try again.") from exc
     if not result.get("status"):
