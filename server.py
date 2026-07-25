@@ -2027,7 +2027,13 @@ def paystack_api(method: str, path: str, cfg: dict, payload: dict | None = None)
         raise ValueError("Paystack is not configured.")
     body = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request("https://api.paystack.co" + path, data=body, method=method,
-        headers={"Authorization": "Bearer " + ps["secret_key"], "Content-Type": "application/json"})
+        headers={"Authorization": "Bearer " + ps["secret_key"], "Content-Type": "application/json",
+                 # Cloudflare (in front of Paystack's API) blocks urllib's
+                 # default "Python-urllib/x.y" User-Agent outright - a
+                 # generic-library signature, not anything about this
+                 # request - and answers with its own 403 page (error 1010)
+                 # before Paystack's application ever sees it.
+                 "User-Agent": "Buinee/1.0 (+https://buinee.app)"})
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             result = json.loads(response.read())
