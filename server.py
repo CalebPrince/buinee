@@ -2094,6 +2094,64 @@ def initialize_plan_payment(user: dict, plan: dict, cfg: dict) -> dict:
     return {"authorization_url": result.get("authorization_url"), "reference": reference}
 
 
+def initialize_plan_subscription(user: dict, plan: dict, cfg: dict) -> dict:
+    """Same shape as initialize_plan_payment, but passes Paystack's `plan`
+    parameter - this is what turns the first charge into a real recurring
+    subscription (Paystack auto-creates it from the authorization used on
+    this transaction) instead of a one-time charge. Only callable once a
+    plan has been linked via sync_paystack_plan; callers fall back to
+    initialize_plan_payment when plan["paystack_plan_code"] is empty."""
+    if not plan.get("paystack_plan_code"):
+        raise ValueError("This plan isn't set up for recurring billing yet.")
+    amount = int(round(float(plan["price"]) * 100))
+    if amount <= 0:
+        raise ValueError("This plan has no payment due.")
+    reference = "buinee-" + secrets.token_hex(12)
+    ps = paystack_config(cfg)
+    db.create_payment_intent(user["company_id"], user["id"], plan["id"], amount,
+                             plan["currency"].upper(), user["email"], reference)
+    result = paystack_api("POST", "/transaction/initialize", cfg, {
+        "email": user["email"], "amount": str(amount),
+        "currency": plan["currency"].upper(), "reference": reference,
+        "callback_url": ps["callback_url"], "plan": plan["paystack_plan_code"],
+        "metadata": json.dumps({"company_id": user["company_id"],
+                                "plan_id": plan["id"], "registration": True}),
+    })
+    return {"authorization_url": result.get("authorization_url"), "reference": reference}
+
+
+def start_plan_checkout(user: dict, plan: dict, cfg: dict) -> dict:
+    """The one place callers should reach for - picks subscription checkout
+    when the plan is linked to Paystack, one-time otherwise, so the three
+    call sites (upgrade, payment-pending login retry, admin payment link)
+    don't each need to know which mode a given plan is in."""
+    if plan.get("paystack_plan_code"):
+        return initialize_plan_subscription(user, plan, cfg)
+    return initialize_plan_payment(user, plan, cfg)
+
+
+def sync_paystack_plan(plan: dict, cfg: dict) -> dict:
+    """Creates (or re-creates, after a price/currency change) the Paystack
+    Plan object this Buinee plan bills against, and stores the resulting
+    code. Paystack plans are immutable in amount, so a price change doesn't
+    edit the existing one - it creates a new one and swaps the stored code,
+    which leaves subscribers already on the old plan_code billing at their
+    original price (standard grandfathering) while new signups get the new
+    price. Never deletes the old Paystack plan object; Paystack has no
+    delete endpoint for plans still referenced by active subscriptions."""
+    amount = int(round(float(plan["price"]) * 100))
+    if amount <= 0:
+        raise ValueError("A free plan has nothing to bill, so there's no recurring plan to set up.")
+    result = paystack_api("POST", "/plan", cfg, {
+        "name": f"{plan['name']} ({plan['currency'].upper()} {plan['price']:.2f}/month)",
+        "amount": str(amount), "currency": plan["currency"].upper(), "interval": "monthly",
+    })
+    code = result.get("plan_code")
+    if not code:
+        raise ValueError("Paystack didn't return a plan code.")
+    return db.set_plan_paystack_code(plan["id"], code)
+
+
 # --------------------------------------------------------------- route logic
 #
 # Every route lives here, transport-agnostic. A caller just needs to provide
@@ -2896,6 +2954,7 @@ class RouteHandlerMixin:
             "/api/admin/opportunity/delete": self._handle_admin_delete_opportunity,
             "/api/admin/plans/create": self._handle_admin_create_plan,
             "/api/admin/plans/update": self._handle_admin_update_plan,
+            "/api/admin/plans/setup-billing": self._handle_admin_setup_plan_billing,
             "/api/admin/company/set-plan": self._handle_admin_set_company_plan,
             "/api/admin/team/create": self._handle_admin_team_create,
             "/api/admin/team/update": self._handle_admin_team_update,
@@ -4888,6 +4947,7 @@ class RouteHandlerMixin:
             plan_id = int(req.get("plan_id"))
         except (TypeError, ValueError):
             return self._json({"error": "Bad request."}, 400)
+        old_plan = db.get_plan(plan_id)
         try:
             if "chat_monthly_limit" in req:
                 raw_limit = req["chat_monthly_limit"]
@@ -4911,6 +4971,46 @@ class RouteHandlerMixin:
                 plan = db.get_plan(plan_id)
         except (db.AuthError, TypeError, ValueError) as exc:
             return self._json({"error": str(exc) or "Bad request."}, 400)
+        paystack_warning = ""
+        price_or_currency_changed = (
+            old_plan and old_plan.get("paystack_plan_code")
+            and (old_plan["price"] != plan["price"] or old_plan["currency"] != plan["currency"])
+        )
+        if price_or_currency_changed:
+            try:
+                plan = sync_paystack_plan(plan, load_env())
+            except ValueError as exc:
+                reference = report_application_error(
+                    "paystack.plan_resync", exc, context=f"plan_id={plan_id}")
+                paystack_warning = (
+                    f"Price saved, but the linked Paystack plan couldn't be updated: {exc} "
+                    f"(Reference: {reference}). New subscribers may still be charged the old "
+                    f"price until this is retried."
+                )
+        result = {"ok": True, "plan": plan}
+        if paystack_warning:
+            result["paystack_warning"] = paystack_warning
+        return self._json(result)
+
+    def _handle_admin_setup_plan_billing(self):
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            plan_id = int(self._body().get("plan_id"))
+        except (TypeError, ValueError):
+            return self._json({"error": "Bad request."}, 400)
+        plan = db.get_plan(plan_id)
+        if not plan:
+            return self._json({"error": "No such plan."}, 404)
+        try:
+            plan = sync_paystack_plan(plan, load_env())
+        except ValueError as exc:
+            reference = report_application_error(
+                "paystack.plan_setup", exc, context=f"plan_id={plan_id}")
+            return self._json({"error": f"{exc} (Reference: {reference})"}, 503)
+        db.record_admin_activity(admin, "linked", "plan", plan_id,
+                                 details=f"Recurring billing set up, code={plan['paystack_plan_code']}")
         return self._json({"ok": True, "plan": plan})
 
     def _handle_admin_set_company_plan(self):

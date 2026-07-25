@@ -587,6 +587,8 @@ def init_db() -> None:
         _seed_default_plans(conn)
         _seed_individual_plans(conn)
         _migrate_plan_mailbox_limits(conn)
+        _migrate_plan_paystack_code(conn)
+        _migrate_crm_subscription_paystack_fields(conn)
         _migrate_tool_connections(conn)
         _migrate_connector_polling(conn)
         _migrate_generated_documents(conn)
@@ -687,6 +689,40 @@ def _migrate_plan_mailbox_limits(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE plans ADD COLUMN mailbox_limit INTEGER NOT NULL DEFAULT 1")
         conn.execute("UPDATE plans SET mailbox_limit=3 WHERE name IN ('Starter','Solo Pro')")
         conn.execute("UPDATE plans SET mailbox_limit=10 WHERE name='Growth'")
+
+
+def _migrate_plan_paystack_code(conn: sqlite3.Connection) -> None:
+    """Links a plan to a Paystack Plan object (POST /plan) so checkout can
+    pass `plan: <code>` to /transaction/initialize and get a real recurring
+    subscription instead of a one-time charge. NULL until an owner presses
+    "Set up recurring billing" on the Plans page - nothing here creates
+    Paystack objects on its own."""
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(plans)").fetchall()]
+    if "paystack_plan_code" not in cols:
+        conn.execute("ALTER TABLE plans ADD COLUMN paystack_plan_code TEXT")
+
+
+def _migrate_crm_subscription_paystack_fields(conn: sqlite3.Connection) -> None:
+    """Fields the Paystack subscription webhooks (subscription.create,
+    invoice.payment_failed, subscription.disable, subscription.not_renew)
+    populate automatically - separate from the pre-existing manually-edited
+    CRM columns on this table. reminder_sent_for/dunning_sent_for dedupe
+    against renewal_date so a renewal-reminder or dunning email only ever
+    goes out once per billing cycle, even if Paystack retries a failed
+    charge (and therefore invoice.payment_failed) more than once."""
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(crm_subscriptions)").fetchall()]
+    if "paystack_subscription_code" not in cols:
+        conn.execute(
+            "ALTER TABLE crm_subscriptions ADD COLUMN paystack_subscription_code TEXT NOT NULL DEFAULT ''")
+    if "paystack_email_token" not in cols:
+        conn.execute(
+            "ALTER TABLE crm_subscriptions ADD COLUMN paystack_email_token TEXT NOT NULL DEFAULT ''")
+    if "reminder_sent_for" not in cols:
+        conn.execute(
+            "ALTER TABLE crm_subscriptions ADD COLUMN reminder_sent_for TEXT NOT NULL DEFAULT ''")
+    if "dunning_sent_for" not in cols:
+        conn.execute(
+            "ALTER TABLE crm_subscriptions ADD COLUMN dunning_sent_for TEXT NOT NULL DEFAULT ''")
 
 
 # What each seeded tier starts out including. Only ever applied when the
@@ -1876,6 +1912,17 @@ def update_plan(plan_id: int, name: str | None = None, price: float | None = Non
             "chat_enabled = ?, chat_monthly_limit = ?, mailbox_limit=? WHERE id = ?",
             (new_name, new_price, new_currency, new_limit, new_chat_enabled, new_chat_limit, new_mailbox_limit, plan_id),
         )
+    return get_plan(plan_id)
+
+
+def set_plan_paystack_code(plan_id: int, code: str) -> dict:
+    """Links (or re-links, after a price/currency change - Paystack plans
+    are immutable in amount) this plan to a Paystack Plan object. See
+    server.sync_paystack_plan, which is what actually calls Paystack's API
+    and then calls this to store the result - this function never talks to
+    Paystack itself, matching every other db.py function in this app."""
+    with _cursor() as conn:
+        conn.execute("UPDATE plans SET paystack_plan_code = ? WHERE id = ?", (code, plan_id))
     return get_plan(plan_id)
 
 

@@ -409,9 +409,18 @@
             ? `AI assistant: <b>${p.chat_monthly_limit == null ? 'unlimited' : p.chat_monthly_limit + '/mo'}</b>`
             : 'AI assistant: <b>not included</b>'}</div>
         <div class="plan-tools">${toolSummary(p)}</div>
+        <div class="plan-limit">Recurring billing: ${
+          p.price <= 0 ? '<b>not applicable, free plan</b>'
+          : p.paystack_plan_code ? '<b style="color:var(--good)">set up</b>'
+          : '<b style="color:var(--bad)">not set up yet</b>'
+        }</div>
         <div class="plan-actions">
           <button class="btn sm" onclick="toggleEdit(${p.id})">Edit</button>
+          ${p.price > 0 && !p.paystack_plan_code
+            ? `<button class="btn sm primary" onclick="setupBilling(${p.id}, this)">Set up recurring billing</button>`
+            : ''}
         </div>
+        <div class="msg error" id="billingError-${p.id}"></div>
         <div class="edit-form" id="edit-${p.id}">
           <div class="msg error" id="editError-${p.id}"></div>
           <label>Name
@@ -481,9 +490,38 @@
         return;
       }
       await loadPlans();
+      if (data.paystack_warning) alert(data.paystack_warning);
     } catch {
       errBox.textContent = 'Could not reach the server.';
       errBox.classList.add('show');
+    }
+  }
+
+  async function setupBilling(id, btn) {
+    const errBox = document.getElementById(`billingError-${id}`);
+    errBox.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = 'Setting up…';
+    try {
+      const res = await fetch('/api/admin/plans/setup-billing', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errBox.textContent = data.error || 'Could not set up recurring billing.';
+        errBox.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Set up recurring billing';
+        return;
+      }
+      await loadPlans();
+    } catch {
+      errBox.textContent = 'Could not reach the server.';
+      errBox.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Set up recurring billing';
     }
   }
 
