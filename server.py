@@ -293,8 +293,8 @@ SITE_CONTENT_SCHEMA = {
         {"key": "hero_eyebrow", "label": "Hero eyebrow", "type": "text",
          "default": "One assistant, built into every workspace"},
         {"key": "hero_headline", "label": "Hero headline", "type": "paragraph",
-         "default": "Every person on your team gets their own AI assistant. Not a chatbot bolted to the "
-                     "corner, one that already knows the work."},
+         "default": "Every person on your team gets their own AI assistant, not a chatbot bolted to "
+                     "the corner."},
         {"key": "hero_lede", "label": "Hero subtext", "type": "paragraph",
          "default": "Connect a mailbox and it sorts, drafts and flags overnight. Hand it a file and it "
                      "reads, extracts and acts. Tell it your rules once, and it works to them, your "
