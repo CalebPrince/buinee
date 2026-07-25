@@ -3117,7 +3117,7 @@ class RouteHandlerMixin:
 
         token = db.create_session(user["id"])
         try:
-            payment = initialize_plan_payment(user, plan, load_env())
+            payment = start_plan_checkout(user, plan, load_env())
         except ValueError as exc:
             reference = report_application_error(
                 "paystack.initialize", exc, user=user, context=f"plan_id={plan['id']}")
@@ -3228,7 +3228,7 @@ class RouteHandlerMixin:
         payment = None
         if payment_required:
             try:
-                payment = initialize_plan_payment(user, plan, load_env())
+                payment = start_plan_checkout(user, plan, load_env())
             except ValueError as exc:
                 reference = report_application_error(
                     "paystack.initialize", exc, user=user, context=f"plan_id={plan['id']}")
@@ -3675,7 +3675,7 @@ class RouteHandlerMixin:
         if user["status"] == "payment_pending":
             try:
                 plan = db.plan_for_company(user["company_id"])
-                payment = initialize_plan_payment(user, plan, load_env())
+                payment = start_plan_checkout(user, plan, load_env())
             except ValueError as exc:
                 reference = report_application_error(
                     "paystack.initialize", exc, user=user, context=f"plan_id={plan['id']}")
@@ -3894,7 +3894,7 @@ class RouteHandlerMixin:
         if requested_id is not None and float(plan["price"]) <= float(current_plan["price"]):
             return self._json({"error": "Choose a plan above your current plan."}, 400)
         try:
-            payment = initialize_plan_payment(user, plan, load_env())
+            payment = start_plan_checkout(user, plan, load_env())
         except ValueError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json(payment)
@@ -4598,7 +4598,7 @@ class RouteHandlerMixin:
             return self._json({"error": "That signup is no longer awaiting payment."}, 400)
         plan = db.plan_for_company(user["company_id"])
         try:
-            payment = initialize_plan_payment(user, plan, load_env())
+            payment = start_plan_checkout(user, plan, load_env())
         except ValueError as exc:
             reference = report_application_error(
                 "paystack.admin_link", exc, user=user, context=f"plan_id={plan['id']}")
