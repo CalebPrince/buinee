@@ -3906,7 +3906,9 @@ class RouteHandlerMixin:
             return self._json(
                 {"error": "Ada is busy right now. Please wait a few minutes and try again."}, 429)
         try:
-            req = self._body(max_len=60000)  # higher than the default - a pasted document is bigger than a chat message
+            # Roomy enough for a few base64-encoded attachments (each capped at
+            # 5 MB by normalize_document_upload) plus the message and history.
+            req = self._body(max_len=16 * 1024 * 1024)
         except Exception:
             return self._json({"error": "Bad request."}, 400)
 
@@ -3942,19 +3944,32 @@ class RouteHandlerMixin:
             if text:
                 history.append({"role": role, "content": text})
 
-        # Tagged 'text'/'attached' unconditionally here, never taken from the
-        # request - there's no template/reference-library feature to draw
-        # from, so nothing a client sends should ever be labelled trusted
-        # 'library' content (see providers.split_docs).
+        # Attachments run through the same extractor the reference library uses
+        # (normalize_document_upload): Office files become extracted text, PDFs
+        # and images ride along natively, plain text folds straight in. Always
+        # tagged 'attached', never 'library' - nothing a client sends should be
+        # treated as trusted reference content (see providers.split_docs). An
+        # unreadable attachment is skipped rather than failing the whole chat.
         docs = []
         for d in (req.get("docs") or [])[:3]:
-            text = str(d.get("text") or "").strip()[:20000]
-            if text:
-                docs.append({
-                    "kind": "text", "source": "attached",
-                    "name": str(d.get("name") or "attachment").strip()[:120],
-                    "text": text,
+            media_type = str(d.get("media_type") or "").lower()
+            if not media_type and d.get("text"):
+                media_type = "text/plain"  # legacy/pasted text with no declared type
+            try:
+                norm = normalize_document_upload({
+                    "name": d.get("name"), "media_type": media_type,
+                    "text": d.get("text"), "data": d.get("data"),
                 })
+            except (ValueError, binascii.Error):
+                continue
+            if norm["kind"] == "text":
+                if norm["text_content"].strip():
+                    docs.append({"kind": "text", "source": "attached",
+                                 "name": norm["name"], "text": norm["text_content"]})
+            else:
+                docs.append({"kind": norm["kind"], "source": "attached",
+                             "name": norm["name"], "media_type": norm["media_type"],
+                             "data": norm["data_base64"]})
 
         vouchers = db.list_vouchers(user["company_id"], user["id"], user["role"])
         for v in vouchers:

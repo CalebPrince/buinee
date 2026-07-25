@@ -1057,11 +1057,12 @@
         <form class="ada-composer" onsubmit="return sendChat(event)">
           <div class="ada-composer-inner">
             <div class="ada-attach-row" id="chatAttachRow"></div>
+            <div class="msg-error" id="chatAttachErr" style="display:none; margin-bottom:8px"></div>
             <div class="ada-box">
               <button class="icobtn" type="button" onclick="document.getElementById('chatFile').click()" title="Attach a document" aria-label="Attach a document" style="width:32px;height:32px;flex:none;margin-bottom:1px">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </button>
-              <input type="file" id="chatFile" accept=".txt,.md,.csv" multiple hidden onchange="attachChatFiles(event)">
+              <input type="file" id="chatFile" accept=".docx,.xlsx,.pptx,.rtf,.txt,.md,.csv,.json,.xml,.html,.htm,.pdf,.png,.jpg,.jpeg,.webp,.gif" multiple hidden onchange="attachChatFiles(event)">
               <textarea id="chatInput" rows="1" placeholder="Ask Ada about your inbox, invoices, or a reply to draft…" oninput="autoGrowChat(this)" onkeydown="chatKey(event)"></textarea>
               <button class="ada-mic-btn" type="button" id="adaMicBtn" aria-label="Dictate your message" title="Speak your message" onclick="adaMicToggle(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
               <button class="ada-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
@@ -4105,17 +4106,32 @@ Do not promise a payment date unless it has already been approved."></textarea>
     }
   }
 
-  function attachChatFiles(ev) {
+  async function attachChatFiles(ev) {
     const files = [...ev.target.files].slice(0, Math.max(0, 3 - pendingAttachments.length));
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        pendingAttachments.push({ name: file.name, text: String(reader.result || '').slice(0, 20000) });
-        renderChatAttachments();
-      };
-      reader.readAsText(file);
-    });
     ev.target.value = '';
+    const err = document.getElementById('chatAttachErr');
+    err.style.display = 'none';
+    for (const file of files) {
+      try {
+        if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than 5 MB.`);
+        // Same handling as the reference library: text files fold in as text,
+        // Office/PDF/image files ride along as base64 for the server to extract
+        // or pass natively. Reading a .pptx/.pdf as plain text (the old
+        // behaviour) just handed Ada unreadable binary.
+        const mediaType = referenceMediaType(file);
+        const isText = ['text/plain', 'text/markdown', 'text/csv', 'application/json',
+          'application/xml', 'text/xml', 'text/html', 'application/rtf', 'text/rtf'].includes(mediaType);
+        const content = await readReferenceFile(file, isText);
+        const att = { name: file.name, media_type: mediaType };
+        if (isText) att.text = content;
+        else att.data = content.includes(',') ? content.split(',', 2)[1] : '';
+        pendingAttachments.push(att);
+        renderChatAttachments();
+      } catch (error) {
+        err.textContent = error.message || 'Could not attach that file.';
+        err.style.display = 'block';
+      }
+    }
   }
 
   function renderChatAttachments() {
