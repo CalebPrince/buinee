@@ -39,8 +39,6 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-import verticals
-
 ROOT = Path(__file__).parent
 DB_FILE = ROOT / "storage" / "ledgerline.db"
 
@@ -590,11 +588,9 @@ def init_db() -> None:
         _migrate_plan_mailbox_limits(conn)
         _migrate_tool_connections(conn)
         _migrate_connector_polling(conn)
-        _migrate_quote_tiers(conn)
         _migrate_generated_documents(conn)
         _migrate_company_plan_id(conn)
         _migrate_company_ai_settings(conn)
-        _migrate_company_verticals(conn)
         _migrate_team_message_recipient(conn)
         _migrate_crm_profile_fields(conn)
         _migrate_crm_task_assignee(conn)
@@ -830,33 +826,6 @@ def _migrate_connector_polling(conn: sqlite3.Connection) -> None:
     """)
 
 
-def _migrate_quote_tiers(conn: sqlite3.Connection) -> None:
-    """A company's own quote-package price list, generic across verticals -
-    see solar_calc.match_tier for the first (and so far only) consumer.
-    thresholds_json is opaque here: this table only knows a tier has a name,
-    a price range, and some numeric thresholds - what those threshold keys
-    mean ("kwp", "kva", "battery_kwh" for solar) is entirely up to whichever
-    vertical's calculator reads them. Empty for every company except one
-    that has actually set it up, so a vertical's quote tool is only offered
-    where it means something."""
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS quote_tiers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-            vertical TEXT NOT NULL DEFAULT '',
-            name TEXT NOT NULL,
-            thresholds_json TEXT NOT NULL DEFAULT '{}',
-            price_low REAL NOT NULL DEFAULT 0,
-            price_high REAL NOT NULL DEFAULT 0,
-            currency TEXT NOT NULL DEFAULT 'GHS',
-            supports TEXT NOT NULL DEFAULT '',
-            sort_order INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE INDEX IF NOT EXISTS idx_quote_tiers_company
-            ON quote_tiers(company_id, vertical, sort_order);
-    """)
-
-
 def _migrate_generated_documents(conn: sqlite3.Connection) -> None:
     """Files Ada generated (invoices, reports, presentations - see
     doc_tools.py), stored the same way team_chat/reference_documents store
@@ -902,24 +871,6 @@ def _migrate_company_ai_settings(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE companies ADD COLUMN briefing TEXT NOT NULL DEFAULT ''")
     if "ada_notes" not in cols:
         conn.execute("ALTER TABLE companies ADD COLUMN ada_notes TEXT NOT NULL DEFAULT ''")
-
-
-# Which vertical-specific Ada tools/settings sections a company has opted
-# into - comma-separated tags, e.g. "solar". Deliberately not tied to plan
-# (a plan is what you pay for; a vertical is what business you're in), and
-# off by default so a brand-new accounting or airline signup never sees a
-# settings section meant for solar installers. Self-service (the company's
-# own Supervisor turns it on), not admin-set, since they're the ones who
-# know what kind of business they run. The known set lives in verticals.py,
-# the registry that also drives the settings UI - a new vertical only needs
-# adding there, not here too.
-KNOWN_VERTICALS = verticals.known_ids()
-
-
-def _migrate_company_verticals(conn: sqlite3.Connection) -> None:
-    cols = [r["name"] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
-    if "verticals" not in cols:
-        conn.execute("ALTER TABLE companies ADD COLUMN verticals TEXT NOT NULL DEFAULT ''")
 
 
 # Mon-Fri, 08:00-18:00 - a sensible starting point until an owner visits
@@ -1129,26 +1080,12 @@ def find_company_by_exact_name(name: str) -> dict | None:
 def get_company(company_id: int) -> dict | None:
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT id, name, plan_id, model_provider, model_model, briefing, ada_notes, verticals "
+            "SELECT id, name, plan_id, model_provider, model_model, briefing, ada_notes "
             "FROM companies WHERE id = ?", (company_id,)
         ).fetchone()
     if not row:
         return None
-    company = dict(row)
-    company["verticals"] = [v for v in company["verticals"].split(",") if v]
-    return company
-
-
-def set_company_verticals(company_id: int, verticals: list[str]) -> dict:
-    """Which vertical-specific tool sections (see KNOWN_VERTICALS) this
-    company's Supervisor has turned on for themselves."""
-    unknown = [v for v in verticals if v not in KNOWN_VERTICALS]
-    if unknown:
-        raise AuthError(f"Not a recognized vertical: {', '.join(unknown)}")
-    with _cursor() as conn:
-        conn.execute("UPDATE companies SET verticals=? WHERE id=?",
-                    (",".join(sorted(set(verticals))), company_id))
-    return get_company(company_id)
+    return dict(row)
 
 
 def set_company_model(company_id: int, provider: str | None, model: str) -> dict:
@@ -1645,43 +1582,6 @@ def mark_connector_arrivals_seen(user_id: int) -> None:
         conn.execute(
             "UPDATE connector_arrivals SET seen_at=? WHERE user_id=? AND seen_at IS NULL",
             (time.time(), user_id),
-        )
-
-
-def list_quote_tiers(company_id: int, vertical: str) -> list[dict]:
-    """A company's own quote tiers for one vertical (e.g. "solar"). Each
-    tier's opaque thresholds_json is parsed into a plain dict for the
-    caller - see solar_calc.match_tier for how solar reads it."""
-    with _cursor() as conn:
-        rows = conn.execute(
-            "SELECT * FROM quote_tiers WHERE company_id=? AND vertical=? ORDER BY sort_order, id",
-            (company_id, vertical),
-        ).fetchall()
-    out = []
-    for row in rows:
-        tier = dict(row)
-        tier["thresholds"] = json.loads(tier.pop("thresholds_json") or "{}")
-        out.append(tier)
-    return out
-
-
-def set_quote_tiers(company_id: int, vertical: str, tiers: list[dict]) -> None:
-    """Replace this company's whole tier list for one vertical in one go -
-    there is no partial-update UI for this yet, so callers always send the
-    full set. Each tier's "thresholds" dict is whatever shape that
-    vertical's calculator expects; this table stores it opaquely."""
-    with _cursor() as conn:
-        conn.execute("DELETE FROM quote_tiers WHERE company_id=? AND vertical=?", (company_id, vertical))
-        conn.executemany(
-            """INSERT INTO quote_tiers
-               (company_id,vertical,name,thresholds_json,price_low,price_high,currency,supports,sort_order)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
-            [(company_id, vertical, str(t.get("name") or ""),
-              json.dumps(t.get("thresholds") or {}),
-              float(t.get("price_low") or 0), float(t.get("price_high") or 0),
-              str(t.get("currency") or "GHS"), str(t.get("supports") or ""),
-              int(t.get("sort_order") if t.get("sort_order") is not None else index))
-             for index, t in enumerate(tiers)],
         )
 
 

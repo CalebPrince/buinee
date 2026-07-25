@@ -503,10 +503,6 @@
     background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical;
   }
   .readonly-note { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
-  .qtier-checkbox { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
-  .qtier-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
-  .qtier-card .vgrid { margin-bottom: 10px; }
-  .qtier-card input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-size: 13px; }
   .instructions-intro { max-width: 720px; }
   .instructions-note { display: flex; gap: 11px; align-items: flex-start; margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--teal); border-radius: 12px; background: var(--teal-soft); color: var(--ink-2); font-size: 12.5px; line-height: 1.6; }
   .instructions-note-mark { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 800; }
@@ -1241,11 +1237,12 @@
           </div>
           <div class="settings-sec">
             <h3>Company briefing</h3>
-            <p class="sub">Write durable facts and rules Ada should use every time. Real thresholds, role names, document requirements, and reply style are more useful than general advice.</p>
+            <p class="sub">Write durable facts and rules Ada should use every time — including how you price and quote your work. Real thresholds, role names, document requirements, prices, and reply style are more useful than general advice.</p>
             <div id="briefingReadonly" class="readonly-note" hidden></div>
             <form id="briefingForm" onsubmit="return saveBriefing(event)" hidden>
               <textarea id="briefingInput" spellcheck="true" placeholder="Example:
 Payment requests above GHS 25,000 require Supervisor approval.
+Our standard install runs GHS 18,000–22,000; confirm scope before quoting a figure.
 Always quote invoice numbers in vendor replies.
 Do not promise a payment date unless it has already been approved."></textarea>
               <div class="msg-error" id="briefingErr" style="display:none; margin-top:10px"></div>
@@ -1264,7 +1261,6 @@ Do not promise a payment date unless it has already been approved."></textarea>
               <button class="btn primary sm" type="submit" style="margin-top:10px">Save notes</button>
             </form>
           </div>
-          <div id="verticalsContainer"></div>
         </div>
         <aside class="card instruction-tips">
           <h3>Useful things to include</h3>
@@ -3684,181 +3680,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
         : 'Nothing noted yet. Only a Supervisor can review or edit this.';
     }
 
-    await loadVerticalsSection(me, isSupervisor);
-
     loadPersonalContext();
-  }
-
-  let verticalsRegistry = {};
-  let enabledVerticals = [];
-  let quoteTiersByVertical = {};
-
-  async function loadVerticalsSection(me, isSupervisor) {
-    const container = document.getElementById('verticalsContainer');
-    if (!container) return;
-    try {
-      const data = await (await fetch('/api/verticals', { credentials: 'same-origin' })).json();
-      verticalsRegistry = data.verticals || {};
-    } catch {
-      verticalsRegistry = {};
-    }
-    enabledVerticals = me.company.verticals || [];
-
-    container.innerHTML = Object.entries(verticalsRegistry).map(([id, v]) => `
-      <div class="settings-sec">
-        <h3>${escapeHtml(v.label)}</h3>
-        <p class="sub">${escapeHtml(v.description)}</p>
-        <div id="vert-${id}-readonly" class="readonly-note" hidden></div>
-        <label class="qtier-checkbox" id="vert-${id}-toggle" hidden>
-          <input type="checkbox" onchange="toggleVertical('${id}', this.checked)">
-          Enable ${escapeHtml(v.label.toLowerCase())} for this company
-        </label>
-        <div class="msg-error" id="vert-${id}-err" style="display:none; margin-top:10px"></div>
-        <div id="vert-${id}-tiers-block" hidden style="margin-top:16px; padding-top:16px; border-top:1px solid var(--line)">
-          <h4 style="margin-bottom:4px">${escapeHtml(v.tier_label)}</h4>
-          <p class="sub">${escapeHtml(v.tier_description)}</p>
-          <div id="vert-${id}-tiers-readonly" class="readonly-note" hidden></div>
-          <div id="vert-${id}-tiers-editor" hidden>
-            <div id="vert-${id}-tiers-rows"></div>
-            <button class="btn sm" type="button" onclick="addQuoteTierRow('${id}')">+ Add tier</button>
-            <div class="msg-error" id="vert-${id}-tiers-err" style="display:none; margin-top:10px"></div>
-            <div class="msg-ok" id="vert-${id}-tiers-ok" style="display:none; margin-top:10px"></div>
-            <button class="btn primary sm" type="button" onclick="saveQuoteTiers('${id}')" style="margin-top:10px">Save tiers</button>
-          </div>
-        </div>
-      </div>`).join('') || '<p class="sub">No optional vertical settings are configured on this server yet.</p>';
-
-    for (const id of Object.keys(verticalsRegistry)) {
-      const enabled = enabledVerticals.includes(id);
-      const readonly = document.getElementById(`vert-${id}-readonly`);
-      const toggle = document.getElementById(`vert-${id}-toggle`);
-      if (isSupervisor) {
-        readonly.hidden = true;
-        toggle.hidden = false;
-        toggle.querySelector('input').checked = enabled;
-      } else {
-        toggle.hidden = true;
-        readonly.hidden = false;
-        readonly.textContent = enabled
-          ? `${verticalsRegistry[id].label} is enabled for this company. Only a Supervisor can change this.`
-          : `${verticalsRegistry[id].label} is not enabled for this company. Only a Supervisor can turn it on.`;
-      }
-      document.getElementById(`vert-${id}-tiers-block`).hidden = !enabled;
-      if (enabled) await loadQuoteTiersBlock(id, isSupervisor);
-    }
-  }
-
-  async function toggleVertical(id, checked) {
-    const errEl = document.getElementById(`vert-${id}-err`);
-    errEl.style.display = 'none';
-    const next = checked
-      ? [...new Set([...enabledVerticals, id])]
-      : enabledVerticals.filter(v => v !== id);
-    try {
-      const res = await fetch('/api/company/verticals', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ verticals: next }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        errEl.textContent = data.error || 'Could not save.';
-        errEl.style.display = 'block';
-        document.getElementById(`vert-${id}-toggle`).querySelector('input').checked = !checked;
-        return;
-      }
-      enabledVerticals = data.company.verticals || [];
-      document.getElementById(`vert-${id}-tiers-block`).hidden = !checked;
-      if (checked) await loadQuoteTiersBlock(id, true);
-    } catch {
-      errEl.textContent = 'Could not reach the server.';
-      errEl.style.display = 'block';
-      document.getElementById(`vert-${id}-toggle`).querySelector('input').checked = !checked;
-    }
-  }
-
-  async function loadQuoteTiersBlock(id, isSupervisor) {
-    const readonly = document.getElementById(`vert-${id}-tiers-readonly`);
-    const editor = document.getElementById(`vert-${id}-tiers-editor`);
-    try {
-      const qt = await (await fetch(`/api/company/quote-tiers?vertical=${encodeURIComponent(id)}`, { credentials: 'same-origin' })).json();
-      quoteTiersByVertical[id] = (qt.tiers || []).map(t => ({ ...t, thresholds: t.thresholds || {} }));
-    } catch {
-      quoteTiersByVertical[id] = [];
-    }
-    if (isSupervisor) {
-      readonly.hidden = true;
-      editor.hidden = false;
-      renderQuoteTierRows(id);
-    } else {
-      editor.hidden = true;
-      readonly.hidden = false;
-      const n = quoteTiersByVertical[id].length;
-      readonly.textContent = n
-        ? `${n} tier(s) configured. Only a Supervisor can review or edit them.`
-        : 'No tiers configured yet. Only a Supervisor can add them.';
-    }
-  }
-
-  function renderQuoteTierRows(id) {
-    const box = document.getElementById(`vert-${id}-tiers-rows`);
-    if (!box) return;
-    const fields = (verticalsRegistry[id] || {}).fields || [];
-    const tiers = quoteTiersByVertical[id] || [];
-    box.innerHTML = tiers.length ? tiers.map((t, i) => `
-      <div class="qtier-card" data-i="${i}">
-        <div class="vgrid">
-          <label>Tier name<input value="${escapeHtml(t.name || '')}" oninput="quoteTiersByVertical['${id}'][${i}].name=this.value"></label>
-          ${fields.map(f => `
-          <label>${escapeHtml(f.label)}<input type="number" step="${f.step || 0.1}" value="${t.thresholds[f.key] ?? ''}" oninput="quoteTiersByVertical['${id}'][${i}].thresholds['${f.key}']=Number(this.value)"></label>`).join('')}
-          <label>Price low<input type="number" step="1" value="${t.price_low ?? ''}" oninput="quoteTiersByVertical['${id}'][${i}].price_low=Number(this.value)"></label>
-          <label>Price high<input type="number" step="1" value="${t.price_high ?? ''}" oninput="quoteTiersByVertical['${id}'][${i}].price_high=Number(this.value)"></label>
-          <label>Currency<input value="${escapeHtml(t.currency || 'GHS')}" oninput="quoteTiersByVertical['${id}'][${i}].currency=this.value"></label>
-          <label>What it supports<input value="${escapeHtml(t.supports || '')}" oninput="quoteTiersByVertical['${id}'][${i}].supports=this.value"></label>
-        </div>
-        <button class="btn sm" type="button" onclick="removeQuoteTierRow('${id}', ${i})">Remove tier</button>
-      </div>`).join('') : '<p class="sub">No tiers yet — add one below.</p>';
-  }
-
-  function addQuoteTierRow(id) {
-    const fields = (verticalsRegistry[id] || {}).fields || [];
-    const thresholds = {};
-    fields.forEach(f => { thresholds[f.key] = 0; });
-    (quoteTiersByVertical[id] = quoteTiersByVertical[id] || []).push(
-      { name: '', thresholds, price_low: 0, price_high: 0, currency: 'GHS', supports: '' });
-    renderQuoteTierRows(id);
-  }
-
-  function removeQuoteTierRow(id, i) {
-    quoteTiersByVertical[id].splice(i, 1);
-    renderQuoteTierRows(id);
-  }
-
-  async function saveQuoteTiers(id) {
-    const errEl = document.getElementById(`vert-${id}-tiers-err`);
-    const okEl = document.getElementById(`vert-${id}-tiers-ok`);
-    errEl.style.display = 'none';
-    okEl.style.display = 'none';
-    try {
-      const res = await fetch('/api/company/quote-tiers', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vertical: id, tiers: quoteTiersByVertical[id] || [] }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        errEl.textContent = data.error || 'Could not save.';
-        errEl.style.display = 'block';
-        return;
-      }
-      quoteTiersByVertical[id] = (data.tiers || []).map(t => ({ ...t, thresholds: t.thresholds || {} }));
-      renderQuoteTierRows(id);
-      okEl.textContent = 'Saved.';
-      okEl.style.display = 'block';
-    } catch {
-      errEl.textContent = 'Could not reach the server.';
-      errEl.style.display = 'block';
-    }
   }
 
   async function saveProvider(ev) {

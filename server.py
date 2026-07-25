@@ -69,9 +69,7 @@ import mailbox  # noqa: E402
 import outbound_mail  # noqa: E402
 import providers  # noqa: E402
 import secretstore  # noqa: E402
-import solar_tools  # noqa: E402
 import tools  # noqa: E402
-import verticals  # noqa: E402
 import voucher  # noqa: E402
 
 # Only the local dev transport reads these - production runs under Passenger,
@@ -2249,19 +2247,6 @@ class RouteHandlerMixin:
             disposition = "attachment; filename*=UTF-8''" + quote(doc["filename"])
             return self._send(200, body, doc["media_type"], [("Content-Disposition", disposition)])
 
-        if path == "/api/company/quote-tiers":
-            user = current_user(self)
-            if not user or user["status"] != "approved":
-                return self._json({"error": "Not signed in."}, 401)
-            vertical = parse_qs(urlparse(self.path).query).get("vertical", ["solar"])[0]
-            return self._json({"vertical": vertical, "tiers": db.list_quote_tiers(user["company_id"], vertical)})
-
-        if path == "/api/verticals":
-            user = current_user(self)
-            if not user or user["status"] != "approved":
-                return self._json({"error": "Not signed in."}, 401)
-            return self._json({"verticals": verticals.VERTICALS})
-
         if path == "/api/user/instructions":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -2721,8 +2706,6 @@ class RouteHandlerMixin:
             "/api/company/set-model": self._handle_set_company_model,
             "/api/company/briefing": self._handle_set_company_briefing,
             "/api/company/ada-notes": self._handle_set_company_ada_notes,
-            "/api/company/quote-tiers": self._handle_set_quote_tiers,
-            "/api/company/verticals": self._handle_set_company_verticals,
             "/api/company/profile": self._handle_set_company_profile,
             "/api/user/instructions": self._handle_set_user_instructions,
             "/api/user/onboarding/complete": self._handle_complete_onboarding,
@@ -3591,70 +3574,6 @@ class RouteHandlerMixin:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "company": company})
 
-    def _handle_set_company_verticals(self):
-        """Which vertical-specific settings sections (currently just
-        "solar") a company's Supervisor has turned on - self-service, not
-        admin-set, since they're the ones who know what business they run.
-        See db.set_company_verticals / KNOWN_VERTICALS."""
-        user = current_user(self)
-        if not user or user["status"] != "approved":
-            return self._json({"error": "Not signed in."}, 401)
-        if user["role"] != "finance_supervisor":
-            return self._json({"error": "Only a supervisor can change this."}, 403)
-        try:
-            req = self._body(max_len=2000)
-        except Exception:
-            return self._json({"error": "Bad request."}, 400)
-        verticals = req.get("verticals")
-        if not isinstance(verticals, list) or not all(isinstance(v, str) for v in verticals):
-            return self._json({"error": "verticals must be a list of strings."}, 400)
-        try:
-            company = db.set_company_verticals(user["company_id"], verticals)
-        except db.AuthError as exc:
-            return self._json({"error": str(exc)}, 400)
-        return self._json({"ok": True, "company": company})
-
-    def _handle_set_quote_tiers(self):
-        """Save a company's whole quote-tier price list for one vertical -
-        see db.set_quote_tiers. Same Supervisor-only gate as the other
-        company-settings endpoints above, since this changes what Ada
-        quotes customers."""
-        user = current_user(self)
-        if not user or user["status"] != "approved":
-            return self._json({"error": "Not signed in."}, 401)
-        if user["role"] != "finance_supervisor":
-            return self._json({"error": "Only a supervisor can change this."}, 403)
-        try:
-            req = self._body(max_len=20000)
-        except Exception:
-            return self._json({"error": "Bad request."}, 400)
-        vertical = str(req.get("vertical") or "solar").strip()[:40]
-        raw_tiers = req.get("tiers")
-        if not isinstance(raw_tiers, list) or len(raw_tiers) > 20:
-            return self._json({"error": "tiers must be a list of at most 20 entries."}, 400)
-        tiers = []
-        for t in raw_tiers:
-            if not isinstance(t, dict) or not str(t.get("name") or "").strip():
-                return self._json({"error": "Every tier needs a name."}, 400)
-            thresholds = t.get("thresholds") or {}
-            if not isinstance(thresholds, dict):
-                return self._json({"error": "thresholds must be an object."}, 400)
-            try:
-                clean_thresholds = {str(k)[:40]: float(v) for k, v in thresholds.items()}
-                price_low = float(t.get("price_low") or 0)
-                price_high = float(t.get("price_high") or 0)
-            except (TypeError, ValueError):
-                return self._json({"error": "Threshold and price values must be numbers."}, 400)
-            tiers.append({
-                "name": str(t["name"]).strip()[:120],
-                "thresholds": clean_thresholds,
-                "price_low": price_low, "price_high": price_high,
-                "currency": str(t.get("currency") or "GHS").strip()[:10],
-                "supports": str(t.get("supports") or "").strip()[:300],
-            })
-        db.set_quote_tiers(user["company_id"], vertical, tiers)
-        return self._json({"ok": True, "vertical": vertical, "tiers": db.list_quote_tiers(user["company_id"], vertical)})
-
     def _handle_set_company_profile(self):
         user = current_user(self)
         if not user or user["status"] != "approved":
@@ -4061,17 +3980,13 @@ class RouteHandlerMixin:
             if tools_context:
                 digest += "\n\n" + tools_context
 
-        # The solar tool is only offered to companies that have actually set
-        # up a price list - see solar_tools.run_solar_tool. The document
-        # tools are generic - every company gets them, same as reminders.
+        # Ada's tools are generic - every company gets reminders and the
+        # document generators, with no per-vertical gating. Pricing and
+        # quoting rules come from the company briefing (free-form text Ada
+        # already reads), not a structured tool.
         chat_tools = list(ada_tools.REMINDER_TOOLS) + list(doc_tools.DOC_TOOLS)
-        solar_tiers = db.list_quote_tiers(user["company_id"], vertical="solar")
-        if solar_tiers:
-            chat_tools += solar_tools.SOLAR_TOOLS
 
         def run_chat_tool(name: str, tool_input: dict) -> dict:
-            if name == "calculate_solar_quote":
-                return solar_tools.run_solar_tool(name, tool_input, company_id=user["company_id"])
             if name in ("generate_invoice", "generate_pdf_report", "generate_presentation"):
                 return doc_tools.run_doc_tool(
                     name, tool_input, company_id=user["company_id"], user_id=user["id"])

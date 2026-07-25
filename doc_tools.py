@@ -1,15 +1,15 @@
 """LLM-callable document-generation tools Ada can invoke via Gemini function
-calling (same tools/tool_runner wiring as ada_tools.py and solar_tools.py -
-see providers._chat_google).
+calling (same tools/tool_runner wiring as ada_tools.py - see
+providers._chat_google).
 
-Generic across every company and vertical - the solar company, the
-accounting client, an airline, all get the same three tools. What differs
-is the content Ada supplies as arguments, never the tool itself.
+Generic across every company - the solar installer, the accounting client,
+an airline, all get the same three tools. What differs is the content Ada
+supplies as arguments, never the tool itself.
 
 generate_invoice is the one exception to "the model composes the content
 freely": line-item math (subtotal, tax, total) is computed here, never
-trusted to the model, for the same reason voucher.py and solar_calc.py
-compute rather than ask an LLM to get arithmetic right by chance. Reports
+trusted to the model, for the same reason voucher.py computes rather than
+asks an LLM to get arithmetic right by chance. Reports
 and presentations carry no money math, so Ada supplies their content
 directly - doc_gen.py only lays it out.
 """
