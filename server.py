@@ -291,15 +291,19 @@ CMS_CHECK_SVG = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
 SITE_CONTENT_SCHEMA = {
     "index": [
         {"key": "hero_eyebrow", "label": "Hero eyebrow", "type": "text",
-         "default": "One workspace for the work behind your business"},
+         "default": "One assistant, built into every workspace"},
         {"key": "hero_headline", "label": "Hero headline", "type": "paragraph",
-         "default": "Your team already has a way of working.\nIt just lives in too many places."},
+         "default": "Every person on your team gets their own AI assistant. Not a chatbot bolted to the "
+                     "corner — one that already knows the work."},
         {"key": "hero_lede", "label": "Hero subtext", "type": "paragraph",
-         "default": "Buinee brings messages, documents, tasks, customer follow-ups, approvals and "
-                     "everyday decisions into one place. Give each person the right view, keep a clear "
-                     "history of what happened, and let AI help with the work without taking control away."},
+         "default": "Connect a mailbox and it sorts, drafts and flags overnight. Hand it a file and it "
+                     "reads, extracts and acts. Tell it your rules once, and it works to them — your "
+                     "approval steps, your templates, your terms. All inside one workspace for messages, "
+                     "documents, tasks, approvals and customer work."},
+        {"key": "hero_bold_note", "label": "Hero bold note (below subtext)", "type": "text",
+         "default": "Drafts, never sends. Suggests, never decides — until you say so."},
         {"key": "hero_cta_primary", "label": "Hero primary button", "type": "text", "default": "Create your workspace"},
-        {"key": "hero_cta_secondary", "label": "Hero secondary button", "type": "text", "default": "Meet the agents"},
+        {"key": "hero_cta_secondary", "label": "Hero secondary button", "type": "text", "default": "Meet your assistant"},
         {"key": "hero_note", "label": "Hero note", "type": "text",
          "default": "Your team joins by name — no per-seat setup, no IT project."},
 
@@ -412,6 +416,16 @@ SITE_CONTENT_SCHEMA = {
          "default": "Your approval, service and escalation rules\nYour documents and response templates\n"
                      "Your vocabulary, customers, teams and processes"},
 
+        {"key": "proof_stat1_value", "label": "Proof stat 1 value", "type": "text", "default": "[ X hours ]"},
+        {"key": "proof_stat1_label", "label": "Proof stat 1 label", "type": "text",
+         "default": "saved per person per week"},
+        {"key": "proof_stat2_value", "label": "Proof stat 2 value", "type": "text", "default": "[ X% ]"},
+        {"key": "proof_stat2_label", "label": "Proof stat 2 label", "type": "text",
+         "default": "of routine replies drafted automatically"},
+        {"key": "proof_stat3_value", "label": "Proof stat 3 value", "type": "text", "default": "[ < X min ]"},
+        {"key": "proof_stat3_label", "label": "Proof stat 3 label", "type": "text",
+         "default": "average time from request to first response"},
+
         {"key": "integrations_eyebrow", "label": "Integrations eyebrow", "type": "text",
          "default": "Connect what you already use"},
         {"key": "integrations_headline", "label": "Integrations headline", "type": "text",
@@ -423,10 +437,11 @@ SITE_CONTENT_SCHEMA = {
 
         {"key": "trust_eyebrow", "label": "Trust eyebrow", "type": "text", "default": "Built for dependable work"},
         {"key": "trust_headline", "label": "Trust headline", "type": "text",
-         "default": "AI can assist. Your rules and records remain in control."},
+         "default": "AI can assist. You stay in control."},
         {"key": "trust_subtext", "label": "Trust subtext", "type": "paragraph",
-         "default": "Business software earns its place by being predictable. Buinee separates suggestions "
-                     "from facts, keeps actions reviewable, and records important changes."},
+         "default": "Business software earns its place by being predictable. Buinee separates what the "
+                     "assistant suggests from what's actually true, keeps every action reviewable, and "
+                     "records what changed and when."},
         {"key": "trust_card1_title", "label": "Trust card 1 title", "type": "text", "default": "Facts stay verifiable"},
         {"key": "trust_card1_text", "label": "Trust card 1 text", "type": "paragraph",
          "default": "Stored records, calculated figures and completed actions remain distinct from AI "
@@ -457,7 +472,11 @@ SITE_CONTENT_SCHEMA = {
         {"key": "faq_subtext", "label": "FAQ subtext", "type": "paragraph",
          "default": "Can't find what you need here? Ask Ada in the corner, or get in touch directly."},
         {"key": "faq_items", "label": "FAQ questions and answers", "type": "qa_list",
-         "default": "Q: What exactly is Buinee?\n"
+         "default": "Q: What can the AI assistant actually do?\n"
+                     "A: It answers questions grounded in your own workspace data, drafts replies, reads "
+                     "documents you hand it, and flags what needs attention - but it never sends, approves "
+                     "or changes a record without a person choosing to.\n"
+                     "Q: What exactly is Buinee?\n"
                      "A: A single workspace for the work behind your business - team chat, documents, "
                      "tasks, approvals, customer follow-ups and an AI assistant, in one place instead of "
                      "scattered across separate tools.\n"
@@ -468,10 +487,6 @@ SITE_CONTENT_SCHEMA = {
                      "Q: How does everyone else join my company's workspace?\n"
                      "A: They register with your company's name and their own details, then a Supervisor "
                      "approves the request. Nobody gets in on the strength of the company name alone.\n"
-                     "Q: What can the AI assistant actually do?\n"
-                     "A: It answers questions grounded in your own workspace data, drafts replies, reads "
-                     "documents you hand it, and flags what needs attention - but it never sends, approves "
-                     "or changes a record without a person choosing to.\n"
                      "Q: Is my company's data visible to other companies on Buinee?\n"
                      "A: No. Every record is scoped to the company that created it - no document, figure or "
                      "conversation is visible outside your own workspace.\n"

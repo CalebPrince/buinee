@@ -1,6 +1,6 @@
 <meta charset="utf-8">
-<title>Buinee — the workspace your team already works like</title>
-<meta name="description" content="Bring team communication, documents, tasks, approvals, customer work and AI assistance into one secure business workspace.">
+<title>Buinee — an AI assistant for every workspace, built into how your team already works</title>
+<meta name="description" content="Every person on your team gets an AI assistant that already knows their mailbox, documents, customer records and business rules — inside one secure workspace for messages, tasks, approvals and customer work.">
 <script>
   // Applied before first paint, and before any CSS below, so there's no
   // flash of the wrong theme when a saved choice differs from the OS
@@ -262,6 +262,12 @@
   .file svg { width: 16px; height: 16px; color: var(--ochre); }
   .bub.agent { background: var(--ochre-soft); border: 1px solid var(--ochre); }
   .bub.agent .who { color: var(--ochre); }
+
+  /* proof strip */
+  .proof-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center; }
+  .proof-stat b { display: block; font-family: var(--serif); font-size: clamp(26px, 3.2vw, 34px); font-weight: 600; color: var(--teal); letter-spacing: -.02em; }
+  .proof-stat span { display: block; margin-top: 6px; font-size: 14px; color: var(--ink-2); }
+  @media (max-width: 900px) { .proof-strip { grid-template-columns: 1fr; gap: 26px; } }
 
   /* trust */
   .trust { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
@@ -549,10 +555,10 @@
       <span class="brand-name">Buinee</span>
     </a>
     <nav class="nav-links">
+      <a href="#agents">Your AI Assistant</a>
       <a href="#how">How it works</a>
       <a href="#roles">Roles</a>
       <a href="#workspace">Workspace</a>
-      <a href="#agents">AI agents</a>
       <a href="#integrations">Integrations</a>
       <a href="#trust">Trust</a>
       <a href="#pricing">Pricing</a>
@@ -581,10 +587,10 @@
     </button>
   </div>
   <nav class="drawer-links">
+    <a href="#agents">Your AI Assistant</a>
     <a href="#how">How it works</a>
     <a href="#roles">Roles</a>
     <a href="#workspace">Workspace</a>
-    <a href="#agents">AI agents</a>
     <a href="#integrations">Integrations</a>
     <a href="#trust">Trust</a>
     <a href="#pricing">Pricing</a>
@@ -607,6 +613,7 @@
         <p class="lede">
           {{cms:hero_lede}}
         </p>
+        <p class="lede" style="font-weight:700;color:var(--ink);margin-top:12px">{{cms:hero_bold_note}}</p>
         <div class="cta">
           <a class="btn primary" href="#pricing">
             {{cms:hero_cta_primary}}
@@ -618,32 +625,143 @@
       </div>
 
       <!-- One concrete workflow; the workspace supports many others. -->
-      <div class="voucher" aria-label="Example customer work request awaiting review">
+      <div class="voucher" aria-label="Example of Ada sorting an overnight inbox">
         <div class="v-head">
           <div>
-            <div class="t">Customer Work Request</div>
-            <div class="s">Onboarding · Northgate Services</div>
+            <div class="t">Your inbox · overnight</div>
+            <div class="s">Ada sorted 14 new messages while you were out</div>
           </div>
-          <span class="v-badge">Awaiting approval</span>
+          <span class="v-badge">3 need you</span>
         </div>
         <div class="v-body">
-          <div class="v-row"><span>Request</span><b>Set up new client workspace</b></div>
-          <div class="v-row"><span>Owner</span><b>Ama Boateng</b></div>
-          <div class="v-row"><span>Due</span><b>23 July</b></div>
-          <div class="v-row"><span>Documents</span><b>4 attached</b></div>
-          <div class="v-row"><span>Next step</span><b>Confirm access roles</b></div>
-          <div class="v-row total"><span>Priority</span><b>Ready for review</b></div>
+          <div class="v-row"><span>Needs you first</span><b>Coastal — proposal overdue</b></div>
+          <div class="v-row"><span>Drafted, ready to review</span><b>6 messages</b></div>
+          <div class="v-row"><span>Filed, no action needed</span><b>5 messages</b></div>
         </div>
         <div class="v-note">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <span>Ada found two missing contacts and drafted a welcome message. Nothing will be sent until the team approves it.</span>
+          <span><b>Coastal Ltd</b> — "Following up on the July proposal…" Ada drafted a reply based on your last quote and standard terms.</span>
         </div>
         <div class="v-foot">
           <div class="sig">
-            <span class="sig-av">AB</span>
-            <div><div class="n">Prepared by A. Boateng</div><div class="r">Operations · 20 Jul, 09:14</div></div>
+            <span class="sig-av">CL</span>
+            <div><div class="n">Coastal Ltd</div><div class="r">Awaiting your review</div></div>
           </div>
-          <a class="btn primary sm" style="margin-left:auto" href="#pricing">Review request</a>
+          <a class="btn primary sm" style="margin-left:auto" href="#pricing">Review 3 drafts</a>
+        </div>
+        <div style="padding:11px 18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-3)">
+          Nothing is sent until you press send.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AGENTS ============ -->
+  <section id="agents">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">{{cms:agents_eyebrow}}</span>
+        <h2>{{cms:agents_headline}}</h2>
+        <p>
+          {{cms:agents_subtext}}
+        </p>
+      </div>
+
+      <div class="roles" style="grid-template-columns:repeat(2,1fr)">
+        <div class="role">
+          <span class="tier">{{cms:agents_card1_tag}}</span>
+          <h3>{{cms:agents_card1_title}}</h3>
+          <p>
+            {{cms:agents_card1_text}}
+          </p>
+          <ul>{{cms:agents_card1_bullets}}</ul>
+          <p class="sees">{{cms:agents_card1_sees}}</p>
+        </div>
+
+        <div class="role">
+          <span class="tier">{{cms:agents_card2_tag}}</span>
+          <h3>{{cms:agents_card2_title}}</h3>
+          <p>
+            {{cms:agents_card2_text}}
+          </p>
+          <ul>{{cms:agents_card2_bullets}}</ul>
+          <p class="sees">{{cms:agents_card2_sees}}</p>
+        </div>
+      </div>
+
+      <div class="feat" style="margin-top:52px">
+        <div>
+          <h3>{{cms:agents_card3_title}}</h3>
+          <p>
+            {{cms:agents_card3_text}}
+          </p>
+          <ul>{{cms:agents_card3_bullets}}</ul>
+        </div>
+        <div class="chat">
+          <div class="chat-head">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Your assistant · in your dashboard
+          </div>
+          <div class="chat-body">
+            <div class="bub me">Which customer requests are still waiting on us, and what should happen next?</div>
+            <div class="bub agent">
+              <span class="who">Assistant</span>
+              Three need action. Coastal is waiting for a revised proposal, Meridian needs a
+              delivery date, and Northgate's issue should go to support. I can draft the two
+              replies and create the support follow-up for your review.
+            </div>
+          </div>
+          <div style="padding:11px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-3)">
+            Available in your dashboard once your company is registered.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROOF ============ -->
+  <section class="band">
+    <div class="wrap">
+      <div class="proof-strip">
+        <div class="proof-stat">
+          <b class="num">{{cms:proof_stat1_value}}</b>
+          <span>{{cms:proof_stat1_label}}</span>
+        </div>
+        <div class="proof-stat">
+          <b class="num">{{cms:proof_stat2_value}}</b>
+          <span>{{cms:proof_stat2_label}}</span>
+        </div>
+        <div class="proof-stat">
+          <b class="num">{{cms:proof_stat3_value}}</b>
+          <span>{{cms:proof_stat3_label}}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TRUST ============ -->
+  <section id="trust">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">{{cms:trust_eyebrow}}</span>
+        <h2>{{cms:trust_headline}}</h2>
+        <p>{{cms:trust_subtext}}</p>
+      </div>
+      <div class="trust">
+        <div class="tcard">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+          <h4>{{cms:trust_card1_title}}</h4>
+          <p>{{cms:trust_card1_text}}</p>
+        </div>
+        <div class="tcard">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+          <h4>{{cms:trust_card2_title}}</h4>
+          <p>{{cms:trust_card2_text}}</p>
+        </div>
+        <div class="tcard">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <h4>{{cms:trust_card3_title}}</h4>
+          <p>{{cms:trust_card3_text}}</p>
         </div>
       </div>
     </div>
@@ -774,69 +892,6 @@
     </div>
   </section>
 
-  <!-- ============ AGENTS ============ -->
-  <section id="agents">
-    <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow">{{cms:agents_eyebrow}}</span>
-        <h2>{{cms:agents_headline}}</h2>
-        <p>
-          {{cms:agents_subtext}}
-        </p>
-      </div>
-
-      <div class="roles" style="grid-template-columns:repeat(2,1fr)">
-        <div class="role">
-          <span class="tier">{{cms:agents_card1_tag}}</span>
-          <h3>{{cms:agents_card1_title}}</h3>
-          <p>
-            {{cms:agents_card1_text}}
-          </p>
-          <ul>{{cms:agents_card1_bullets}}</ul>
-          <p class="sees">{{cms:agents_card1_sees}}</p>
-        </div>
-
-        <div class="role">
-          <span class="tier">{{cms:agents_card2_tag}}</span>
-          <h3>{{cms:agents_card2_title}}</h3>
-          <p>
-            {{cms:agents_card2_text}}
-          </p>
-          <ul>{{cms:agents_card2_bullets}}</ul>
-          <p class="sees">{{cms:agents_card2_sees}}</p>
-        </div>
-      </div>
-
-      <div class="feat" style="margin-top:52px">
-        <div>
-          <h3>{{cms:agents_card3_title}}</h3>
-          <p>
-            {{cms:agents_card3_text}}
-          </p>
-          <ul>{{cms:agents_card3_bullets}}</ul>
-        </div>
-        <div class="chat">
-          <div class="chat-head">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            Your assistant · in your dashboard
-          </div>
-          <div class="chat-body">
-            <div class="bub me">Which customer requests are still waiting on us, and what should happen next?</div>
-            <div class="bub agent">
-              <span class="who">Assistant</span>
-              Three need action. Coastal is waiting for a revised proposal, Meridian needs a
-              delivery date, and Northgate's issue should go to support. I can draft the two
-              replies and create the support follow-up for your review.
-            </div>
-          </div>
-          <div style="padding:11px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-3)">
-            Available in your dashboard once your company is registered.
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ============ INTEGRATIONS ============ -->
   <section id="integrations" class="band">
     <div class="wrap">
@@ -886,34 +941,6 @@
           <div class="tool-chip"><span class="ico"><img src="data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjNDI4NUY0IiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+R29vZ2xlIENhbGVuZGFyPC90aXRsZT48cGF0aCBkPSJNMTguMzE2IDUuNjg0SDI0djEyLjYzMmgtNS42ODRWNS42ODR6TTUuNjg0IDI0aDEyLjYzMnYtNS42ODRINS42ODRWMjR6TTE4LjMxNiA1LjY4NFYwSDEuODk1QTEuODk0IDEuODk0IDAgMCAwIDAgMS44OTV2MTYuNDIxaDUuNjg0VjUuNjg0aDEyLjYzMnptLTcuMjA3IDYuMjV2LS4wNjVjLjI3Mi0uMTQ0LjUtLjM0OS42ODctLjYxN3MuMjc5LS41OTUuMjc5LS45ODJjMC0uMzc5LS4wOTktLjcyLS4zLTEuMDI1YTIuMDUgMi4wNSAwIDAgMC0uODMyLS43MTQgMi43MDMgMi43MDMgMCAwIDAtMS4xOTctLjI1N2MtLjYgMC0xLjA5NC4xNTYtMS40ODEuNDY3LS4zODYuMzExLS42NS42NzEtLjc5MyAxLjA3OGwxLjA4NS40NTJjLjA4Ni0uMjQ5LjIyNC0uNDYxLjQxMy0uNjMzLjE4OS0uMTcyLjQ0NS0uMjU3Ljc2Ny0uMjU3LjMzIDAgLjYwMi4wODguODE2LjI2NGEuODYuODYgMCAwIDEgLjMyMi43MDNjMCAuMzMtLjEyLjU4OS0uMzYuNzc4LS4yNC4xOS0uNTM1LjI4NC0uODg2LjI4NGgtLjU2N3YxLjA4NWguNjMzYy40MDcgMCAuNzQ4LjEwOSAxLjAyLjMyNy4yNzIuMjE4LjQwNy40OTkuNDA3Ljg0MyAwIC4zMzYtLjEyOS42MTQtLjM4Ny44MzJzLS41NjUuMzI3LS45MjQuMzI3Yy0uMzUxIDAtLjY1MS0uMTAzLS44OTctLjMxMS0uMjQ4LS4yMDgtLjQyMi0uNTAyLS41MjEtLjg4MWwtMS4wOTYuNDUyYy4xNzguNjE2LjUwNSAxLjA4Mi45NzcgMS40MDEuNDcyLjMxOS45ODQuNDc4IDEuNTM4LjQ3N2EyLjg0IDIuODQgMCAwIDAgMS4yOTMtLjI5MWMuMzgyLS4xOTMuNjg0LS40NTguOTAyLS43OTQuMjE4LS4zMzYuMzI3LS43Mi4zMjctMS4xNDkgMC0uNDI5LS4xMTUtLjc5Ny0uMzQ0LTEuMTA1YTIuMDY3IDIuMDY3IDAgMCAwLS44ODEtLjY4OXptMi4wOTMtMS45MzFsLjYwMi45MTNMMTUgMTAuMDQ1djUuNzQ0aDEuMTg3VjguNDQ2aC0uODI3bC0yLjE1OCAxLjU1N3pNMjIuMTA1IDBoLTMuMjg5djUuMTg0SDI0VjEuODk1QTEuODk0IDEuODk0IDAgMCAwIDIyLjEwNSAwem0tMy4yODkgMjMuNWw0LjY4NC00LjY4NGgtNC42ODRWMjMuNXpNMCAyMi4xMDVDMCAyMy4xNTIuODQ4IDI0IDEuODk1IDI0aDMuMjg5di01LjE4NEgwdjMuMjg5eiIvPjwvc3ZnPg==" alt="" loading="lazy"></span><span>Google Calendar</span></div>
           <div class="tool-chip"><span class="ico"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5OjcBCgoKDQwNGg8PGjclHyU3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3N//AABEIAEAAQAMBEQACEQEDEQH/xAAbAAACAwEBAQAAAAAAAAAAAAAABgQFBwMBAv/EADYQAAECBAQEAwQKAwAAAAAAAAECAwAEBREhMUFRBhJhcRMiUgdCocEjU2RygYLC0eHxJDI0/8QAGgEAAgMBAQAAAAAAAAAAAAAAAAQDBQYCAf/EACsRAAICAgECAwcFAAAAAAAAAAABAgMEESEFUSIxQRITFDKBofA0QrHR4f/aAAwDAQACEQMRAD8A3GAAgAIACAAgAIACAAgAIACACuqdYlpAFJPiPfVpOI77QxTjTt5XCEsnPqx/C3uXYWJupTE6u7q7J0QnACLOvHhWuEV6y52vbZyXWJiltpcZcvdQ+iXiFb/2I7+Ghe9SRYV3aQzUXiGTqqQlKg1MasrOJ7HWKzJw7KHt8ruNRmpFvCh2EABAAi1bjJUy6uXpd22knlL5/wBl9th1z7Rd4/TVFKVvn2M9ndTm24U8Lv6/QqmnL3Kj1JJhxx0UW3vZXztfaaJblLOr1X7o/eJIUN8yLCpteZVmaceXzurK1HUwwoqK0h2FpwqVRbZlXGwv6ZSbJCTik6G+ls49Udj1M22X/B/tJmZdbUlxAS+wSEpm/fR9/wBQ6594q8vpUZJzp4fb+iwUka3GfOz5cUlCFKWoJSBckmwAj1Jt6R42ktsxepMMyLi3ZOYQ81e/hpUOZPQbiNbVKUlqSMdpTeimmp6enByKSptr0DXvvE6jCPJNCmEeVyyMHA2CVmwGd47fls79ht8Ed2orV5WLpHq1iPeyeuj2eZEbPE4k/GO0NQloYKHw05NuodnrtMgg+H7y++w+MQXX+ytRJoXpvSN8GQjHlkLHtGfUxw04UqICnUJV1F7/ACiy6VFPJW+zK7qu/hml3Qi0qiyr9JXWa7PLlKfz+G2GhdbqumB1vpocrRcZGXONvuaI7l9kVONiRdfvbpaiRa/Q5RijJrlAnnJunhzw3kupstpV7Y4DUgZajO8cU5U5W+5ujqXp2YzPFgoKyp7QnVAPKSiaW2vwF+UOW8pUNL7w02t6Pamvl9QkJV+dVZhPlGa1YJEdI4vvrpXiY00ynMSZCreI761DLttHsuSpnmzslryQwSC7rEKWrgsMWzk1QZRljTCf7VFcvCqj9ob+cWfSf1P0Yj1Fbof0FOlGV4m4LZoSJ1iVqMk+pxtL6uVLoJUf1nLbrD98pY2U73HcZL09PzQnTCN2Oqt6af5/JHrqpXhjgiY4fVPMTdSnphLrqWFcyWQCk4n8gz36R5U5ZOUr9ajFa59fzZM4qmn3W9tnLg5Db/DymnkJcbU6sKSsXBGGkMXfOUOa3G7aJU1SQ0j/AAQEpSMGsgO0SV3+khJ7k9srm3DfHAiGfM4a0W1OVdYha5cFhhy8RrIyjJGyK+vUiWrlMdkJvmCHLEKScUqGIIiWi6VNinEjtrjbFxkZVWfZy/ILN54uMnJwS+H4+bCNBR1CNy8tMocqM8Z8x2u5UDg8E/8Adh0Z/mGnYJrqOv2ff/Blpso1T5REsxflTqcyTmYhly9sRttlbL2pEpTqUJKlkJAzJjnWyMXXVh2adcSDyqUSMIegmopMJMZOFqRMz00hRaWmXSQVuKFgRsNzFfnZMK4Nb5LPpmNZZPevD3NMjNGtCAAgA8sNoACw2gALDYQAFhsIAPYACAD/2Q==" alt="" loading="lazy"></span><span>Outlook Calendar</span></div>
           <div class="tool-chip"><span class="ico"><img src="data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDA2QkZGIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+Q2FsZW5kbHk8L3RpdGxlPjxwYXRoIGQ9Ik0xOS42NTUgMTQuMjYyYy4yODEgMCAuNTU3LjAyMy44MjguMDY0IDAgLjAwNS0uMDA1LjAxLS4wMDUuMDE0LS4xMDUuMjY3LS4yMzQuNTM0LS4zODEuNzg2bC0xLjIxOSAyLjEwNmMtMS4xMTIgMS45MzYtMy4xNzcgMy4xMjctNS40MTEgMy4xMjdoLTIuNDMyYy0yLjIzIDAtNC4yOTQtMS4xOTEtNS40MTItMy4xMjdsLTEuMjE4LTIuMTA2YTYuMjUxIDYuMjUxIDAgMCAxIDAtNi4yNTJsMS4yMTgtMi4xMDZDNi43MzYgNC44MzIgOC44IDMuNjQxIDExLjAzNSAzLjY0MWgyLjQzMmMyLjIzIDAgNC4yOTQgMS4xOTEgNS40MTEgMy4xMjdsMS4yMTkgMi4xMDZjLjE0Ny4yNTIuMjcxLjUxOS4zODEuNzg2IDAgLjAwNC4wMDUuMDA5LjAwNS4wMTQtLjI2Ny4wNDEtLjU0My4wNjQtLjgyOC4wNjQtMS44MTYgMC0yLjUwMS0uNjA3LTMuMjkxLTEuMzA2LS43NjQtLjY3Ni0xLjcxMS0xLjUxNy0zLjQ0LTEuNTE3aC0xLjAyOWMtMS4yNTEgMC0yLjM4Ny40NTUtMy4yIDEuMjc4LS43OTYuODA1LTEuMjMzIDEuOTA0LTEuMjMzIDMuMDk5djEuNDExYzAgMS4xOTYuNDM3IDIuMjk1IDEuMjMzIDMuMDk5LjgxMy44MjMgMS45NDkgMS4yNzggMy4yIDEuMjc4aDEuMDM0YzEuNzI5IDAgMi42NzYtLjg0MSAzLjQzOS0xLjUxNy43OTEtLjcwMyAxLjQ3MS0xLjMwNiAzLjI4Ny0xLjMwMVptLjAwNS0zLjIzN2MuMzk5IDAgLjc5NC0uMDM2IDEuMTc5LS4xMS0uMDAyLS4wMDQtLjAwMi0uMDEtLjAwMi0uMDE0LS4wNzMtLjQxNC0uMTkzLS44MjMtLjM0OS0xLjIxOC43MzEtLjEyIDEuNDA3LS4zOTYgMS45ODYtLjgxOSAwLS4wMDQtLjAwNS0uMDEzLS4wMDUtLjAxOC0uMzMxLTEuMDg1LS44MzItMi4xMDEtMS40ODktMy4wMy0uNjQ5LS45MTUtMS40MzUtMS43MTktMi4zMzEtMi4zOTUtMS44NjctMS4zOTgtNC4wODgtMi4xMzgtNi40MjgtMi4xMzgtMS40NDggMC0yLjg1NS4yOC00LjE3NS44NDEtMS4yNzMuNTQzLTIuNDIzIDEuMzE1LTMuNDA3IDIuMjk5UzIuODc4IDYuNTUyIDIuMzQxIDcuODNjLS41NTcgMS4zMjQtLjg0MiAyLjcyNi0uODQyIDQuMTc1IDAgMS40NDguMjgxIDIuODU1Ljg0MiA0LjE3NC41NDIgMS4yNzQgMS4zMTQgMi40MjMgMi4yOTggMy40MDdzMi4xMjkgMS43NjEgMy40MDcgMi4yOTljMS4zMjQuNTU2IDIuNzI3Ljg0MSA0LjE3NS44NDEgMi4zNCAwIDQuNTYxLS43NCA2LjQyOC0yLjEzN2ExMC44MTUgMTAuODE1IDAgMCAwIDIuMzMxLTIuMzk2Yy42NTItLjkyOSAxLjE1OC0xLjk0OSAxLjQ4OS0zLjAzIDAtLjAwNC4wMDUtLjAxNC4wMDUtLjAxOC0uNTc5LS40MjMtMS4yNTUtLjY5OS0xLjk4Ni0uODE5LjE2MS0uMzk1LjI3Ni0uODA0LjM0OS0xLjIxOC4wMDUtLjAwOS4wMDUtLjAxNC4wMDUtLjAyMy44NjkuMTY2IDEuNjkyLjUwNiAyLjQwNCAxLjAzNS42ODUuNTA1LjU1MiAxLjA3NS40NDYgMS40MTZDMjIuMTg0IDIwLjQzNyAxNy42MTkgMjQgMTIuMjIxIDI0Yy02LjYyNSAwLTEyLTUuMzc1LTEyLTEyczUuMzctMTIgMTItMTJjNS4zOTggMCA5Ljk2MyAzLjU2MyAxMS40NzEgOC40NjQuMTA2LjM0MS4yMzkuOTE1LS40NDYgMS40MjEtLjcxNy41MjktMS41MzUuODczLTIuNDA0IDEuMDM0LjEyOC43MTYuMTI4IDEuNDUgMCAyLjE2Ni0uMzg3LS4wNzQtLjc4Mi0uMTEtMS4xODItLjExLTQuMTg0IDAtMy45NjggMi44MjMtNi43MzYgMi44MjNoLTEuMDI5Yy0xLjg5OSAwLTMuMTUtMS4zNTctMy4xNS0zLjA5NXYtMS40MTFjMC0xLjczOCAxLjI1MS0zLjA5NCAzLjE1LTMuMDk0aDEuMDM0YzIuNzY4IDAgMi41NTIgMi44MjMgNi43MzEgMi44MjdaIi8+PC9zdmc+" alt="" loading="lazy"></span><span>Calendly</span></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ TRUST ============ -->
-  <section id="trust">
-    <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow">{{cms:trust_eyebrow}}</span>
-        <h2>{{cms:trust_headline}}</h2>
-        <p>{{cms:trust_subtext}}</p>
-      </div>
-      <div class="trust">
-        <div class="tcard">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
-          <h4>{{cms:trust_card1_title}}</h4>
-          <p>{{cms:trust_card1_text}}</p>
-        </div>
-        <div class="tcard">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
-          <h4>{{cms:trust_card2_title}}</h4>
-          <p>{{cms:trust_card2_text}}</p>
-        </div>
-        <div class="tcard">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-          <h4>{{cms:trust_card3_title}}</h4>
-          <p>{{cms:trust_card3_text}}</p>
         </div>
       </div>
     </div>
