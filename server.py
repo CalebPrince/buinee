@@ -2649,6 +2649,22 @@ class RouteHandlerMixin:
                 },
             })
 
+        if path == "/api/admin/diagnostics/outbound-ip":
+            # Shared hosting sometimes routes outbound connections through a
+            # different IP than the one shown for inbound/DNS purposes in
+            # cPanel, which is the classic reason an IP added to an API
+            # provider's allowlist still gets rejected - this asks a public
+            # echo service what IP the request actually left from.
+            admin = self._admin_role_request("owner")
+            if not admin:
+                return
+            try:
+                with urllib.request.urlopen("https://api.ipify.org?format=json", timeout=10) as response:
+                    data = json.loads(response.read())
+                return self._json({"ip": data.get("ip", "")})
+            except Exception as exc:
+                return self._json({"error": f"Could not determine the outbound IP: {exc}"}, 503)
+
         if path == "/api/admin/alerts":
             admin = current_admin(self)
             if not admin:
