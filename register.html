@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Register - Buinee</title>
+<title>Register · Buinee</title>
 <meta name="description" content="Register your company on Buinee, or join one that's already registered.">
 <script>
   (function () {
@@ -381,7 +381,7 @@
       <p>{{cms:gate_text}}</p>
       <a class="btn primary" href="/#pricing">{{cms:gate_cta}}</a>
       <p class="alt">Joining a company that's already here?
-        <button type="button" onclick="showMode('join')">Join instead</button> - no plan needed, you inherit theirs.</p>
+        <button type="button" onclick="showMode('join')">Join instead</button>, no plan needed, you inherit theirs.</p>
     </div>
 
     <div id="formArea">
@@ -405,8 +405,8 @@
             <div class="s" id="clashText"></div>
           </div>
           <div class="btnrow">
-            <button class="btn primary" type="button" id="clashJoin">That's my company - ask to join</button>
-            <button class="btn ghost" type="button" id="clashKeep">Different company - keep going</button>
+            <button class="btn primary" type="button" id="clashJoin">That's my company, ask to join</button>
+            <button class="btn ghost" type="button" id="clashKeep">Different company, keep going</button>
           </div>
         </div>
         <div class="plan-chip" id="planChip">
@@ -425,26 +425,26 @@
         </label>
         <label id="regRoleLabel">Your role
           <select id="regRole" required>
-            <optgroup label="Supervisor - oversees the workspace">
+            <optgroup label="Supervisor, oversees the workspace">
               <option value="finance_supervisor" selected>Owner / Managing Director</option>
               <option value="finance_supervisor">CEO / Founder</option>
               <option value="finance_supervisor">Finance Director</option>
-              <option value="finance_supervisor">Other - I oversee the whole workspace</option>
+              <option value="finance_supervisor">Other, I oversee the whole workspace</option>
             </optgroup>
-            <optgroup label="Approver - approves and signs">
+            <optgroup label="Approver, approves and signs">
               <option value="senior_accountant">Finance Manager</option>
               <option value="senior_accountant">Senior Accountant</option>
               <option value="senior_accountant">Head of Department</option>
               <option value="senior_accountant">Branch Manager</option>
-              <option value="senior_accountant">Other - I approve and sign</option>
+              <option value="senior_accountant">Other, I approve and sign</option>
             </optgroup>
-            <optgroup label="Preparer - prepares vouchers and letters">
+            <optgroup label="Preparer, prepares vouchers and letters">
               <option value="account_assistant">Accounts Assistant</option>
               <option value="account_assistant">Cashier</option>
               <option value="account_assistant">Store / Inventory Officer</option>
               <option value="account_assistant">Junior Accountant</option>
               <option value="account_assistant">Administrative Officer</option>
-              <option value="account_assistant">Other - I prepare vouchers and letters</option>
+              <option value="account_assistant">Other, I prepare vouchers and letters</option>
             </optgroup>
           </select>
         </label>
@@ -484,26 +484,26 @@
         <label>Your role
           <select id="joinRole" required>
             <option value="">Choose one</option>
-            <optgroup label="Preparer - prepares vouchers and letters">
+            <optgroup label="Preparer, prepares vouchers and letters">
               <option value="account_assistant">Accounts Assistant</option>
               <option value="account_assistant">Cashier</option>
               <option value="account_assistant">Store / Inventory Officer</option>
               <option value="account_assistant">Junior Accountant</option>
               <option value="account_assistant">Administrative Officer</option>
-              <option value="account_assistant">Other - I prepare vouchers and letters</option>
+              <option value="account_assistant">Other, I prepare vouchers and letters</option>
             </optgroup>
-            <optgroup label="Approver - approves and signs">
+            <optgroup label="Approver, approves and signs">
               <option value="senior_accountant">Finance Manager</option>
               <option value="senior_accountant">Senior Accountant</option>
               <option value="senior_accountant">Head of Department</option>
               <option value="senior_accountant">Branch Manager</option>
-              <option value="senior_accountant">Other - I approve and sign</option>
+              <option value="senior_accountant">Other, I approve and sign</option>
             </optgroup>
-            <optgroup label="Supervisor - only if nobody holds this role yet">
+            <optgroup label="Supervisor, only if nobody holds this role yet">
               <option value="finance_supervisor">Owner / Managing Director</option>
               <option value="finance_supervisor">CEO / Founder</option>
               <option value="finance_supervisor">Finance Director</option>
-              <option value="finance_supervisor">Other - I oversee the whole workspace</option>
+              <option value="finance_supervisor">Other, I oversee the whole workspace</option>
             </optgroup>
           </select>
         </label>
@@ -621,7 +621,7 @@
     document.getElementById('clashTitle').textContent =
       `A workspace called "${company.name}" is already here.`;
     document.getElementById('clashText').textContent =
-      "If that's your company, ask to join it rather than starting a second one - whoever set it up approves the request, and you land in the same workspace as them. If it's a different business that happens to share the name, carry on.";
+      "If that's your company, ask to join it rather than starting a second one, whoever set it up approves the request, and you land in the same workspace as them. If it's a different business that happens to share the name, carry on.";
     document.getElementById('clash').classList.add('show');
 
     document.getElementById('clashJoin').onclick = () => {
@@ -709,7 +709,7 @@
   function renderResults(companies) {
     resultsBox.innerHTML = '';
     if (!companies.length) {
-      resultsBox.innerHTML = '<div class="company-row none">No company found by that name - switch to <a href="#" onclick="showMode(\'register\');return false;">Register your company</a> instead.</div>';
+      resultsBox.innerHTML = '<div class="company-row none">No company found by that name, switch to <a href="#" onclick="showMode(\'register\');return false;">Register your company</a> instead.</div>';
     } else {
       for (const c of companies) {
         const row = document.createElement('div');

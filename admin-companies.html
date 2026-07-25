@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Companies - Command Center - Buinee</title>
+<title>Companies · Command Center · Buinee</title>
 <meta name="description" content="Every company registered on Buinee, with its Supervisor and full team.">
 <style>
   :root {
@@ -342,7 +342,7 @@
 
           <div class="panel" id="adaSignupsPanel" style="display:none">
             <h3 style="margin:0 0 4px">Ada-registered signups awaiting review</h3>
-            <p style="margin:0 0 14px;font-size:13px;color:var(--ink-3)">Free-plan workspaces created through the landing chat - nobody has confirmed there's a real business behind these yet.</p>
+            <p style="margin:0 0 14px;font-size:13px;color:var(--ink-3)">Free-plan workspaces created through the landing chat, nobody has confirmed there's a real business behind these yet.</p>
             <div id="adaSignupsList"></div>
           </div>
 
@@ -472,12 +472,12 @@
     if (c.plan.audience !== 'individual') {
       const atLimit = c.approved_count >= c.plan.user_limit;
       return `(${c.approved_count}/${c.plan.user_limit} users)` +
-        (atLimit ? ' <span class="no-super">- at limit</span>' : '');
+        (atLimit ? ' <span class="no-super">, at limit</span>' : '');
     }
     if (!c.needs_team_plan) return '(one person)';
     const approved = c.approved_count > 1 ? `${c.approved_count} approved` : 'one approved';
     const waiting = c.pending_count ? ` + ${c.pending_count} waiting` : '';
-    return `(${approved}${waiting}) <span class="no-super">- move to a Team tier</span>`;
+    return `(${approved}${waiting}) <span class="no-super">, move to a Team tier</span>`;
   }
 
   function renderCompanies(companies, updateSource = true) {
@@ -921,7 +921,7 @@
       <div class="crm-profile-head"><h4>Subscription & seats</h4><span>Plan capacity is enforced from real approved users</span></div>
       <div class="subscription-grid">
         <div class="seat-panel"><div class="seat-numbers"><b>${used} / ${limit}</b><span>approved seats</span></div><div class="seat-meter ${meterClass}"><span style="width:${percent}%"></span></div><div class="seat-caption">${limit-used > 0 ? `${limit-used} seat${limit-used===1?'':'s'} available` : used===limit ? 'At plan capacity' : `${used-limit} user${used-limit===1?'':'s'} over the current limit`}${c.pending_count ? ` · ${c.pending_count} pending request${c.pending_count===1?'':'s'} not counted as occupied` : ''}</div>
-          <div class="subscription-plan"><label for="planSelect-${c.id}"><b>Current plan: ${escapeHtml(c.plan.name)}</b></label><select id="planSelect-${c.id}">${allPlans.map(p => `<option value="${p.id}" ${p.id===c.plan.id?'selected':''}>${p.audience==='individual'?'Individual':'Team'} - ${escapeHtml(p.name)} · ${p.user_limit} seat${p.user_limit===1?'':'s'} · ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}</select><button class="btn sm" type="button" onclick="changePlan(${c.id})">Move to selected plan</button><span class="msg error" id="planError-${c.id}"></span></div>
+          <div class="subscription-plan"><label for="planSelect-${c.id}"><b>Current plan: ${escapeHtml(c.plan.name)}</b></label><select id="planSelect-${c.id}">${allPlans.map(p => `<option value="${p.id}" ${p.id===c.plan.id?'selected':''}>${p.audience==='individual'?'Individual':'Team'}, ${escapeHtml(p.name)} · ${p.user_limit} seat${p.user_limit===1?'':'s'} · ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}</select><button class="btn sm" type="button" onclick="changePlan(${c.id})">Move to selected plan</button><span class="msg error" id="planError-${c.id}"></span></div>
         </div>
         <form onsubmit="return saveCrmSubscription(event,${c.id})"><div class="crm-fields">
           <label>Subscription status<select id="subStatus-${c.id}">${options(SUBSCRIPTION_STATUS_LABELS,s.subscription_status||'active')}</select></label>

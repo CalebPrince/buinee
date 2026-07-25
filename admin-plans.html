@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Plans - Command Center - Buinee</title>
+<title>Plans · Command Center · Buinee</title>
 <meta name="description" content="Manage Buinee's pricing tiers and per-plan user limits.">
 <style>
   :root {
@@ -255,14 +255,14 @@
 
           <div class="panel">
             <h3>Add a new tier</h3>
-            <div class="sub">Shows up immediately as an option - no company is on it until you move one there.</div>
+            <div class="sub">Shows up immediately as an option, no company is on it until you move one there.</div>
             <div class="msg error" id="createError"></div>
             <div class="msg ok" id="createOk"></div>
             <form onsubmit="return submitCreate(event)">
               <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:10px">Sold to
                 <select id="newAudience" onchange="audienceChanged()" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink)">
-                  <option value="team" selected>A team - a company registering for its members</option>
-                  <option value="individual">An individual - one person working alone</option>
+                  <option value="team" selected>A team, a company registering for its members</option>
+                  <option value="individual">An individual, one person working alone</option>
                 </select>
               </label>
               <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">

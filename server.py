@@ -3793,7 +3793,7 @@ class RouteHandlerMixin:
         if not db.plan_for_company(user["company_id"])["team_chat_enabled"]:
             return self._json({"error": "Team chat requires a team plan."}, 403)
         if rate_limited(f"team-chat:{user['id']}", max_hits=30, window=60):
-            return self._json({"error": "Too many messages-wait a moment and try again."}, 429)
+            return self._json({"error": "Too many messages, wait a moment and try again."}, 429)
         try:
             req = self._body(max_len=18 * 1024 * 1024)
             body = str(req.get("message") or "").strip()[:4000]
