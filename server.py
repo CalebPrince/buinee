@@ -724,7 +724,14 @@ def load_env() -> dict:
           for k in (tools.client_id_key(t), tools.client_secret_key(t))),
     ]:
         if os.environ.get(k):
-            cfg[k] = os.environ[k]
+            # Passenger's environment-variable UI has no notion of the .env
+            # quoting convention above, but people used to writing .env
+            # files sometimes paste a value wrapped in quotes anyway (or a
+            # trailing newline sneaks in from copy-paste) - unlike the .env
+            # branch, this path never stripped either, so a credential could
+            # be sent to a provider's API with the extra characters still
+            # attached and fail in ways that look like anything but a typo.
+            cfg[k] = os.environ[k].strip().strip('"').strip("'")
     return cfg
 
 
