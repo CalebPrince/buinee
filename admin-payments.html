@@ -72,7 +72,7 @@
   <script>
     const esc=s=>{const d=document.createElement('div');d.textContent=s??'';return d.innerHTML};
     const money=(n,c)=>`${c} ${(Number(n||0)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-    const date=t=>t?new Date(typeof t==='number'?t*1000:t).toLocaleString():'—';
+    const date=t=>t?new Date(typeof t==='number'?t*1000:t).toLocaleString():'-';
     let myRole='',allPayments=[];
     async function main(){
       const me=await fetch('/api/admin/me',{credentials:'same-origin'});if(!me.ok){location.href='/admin/login';return}
@@ -83,7 +83,7 @@
       allPayments=p;
       document.getElementById('config').innerHTML=`<div class="cfg"><b>Public key <span class="${c.public_key_configured?'ok':'bad'}">${c.public_key_configured?'Configured':'Missing'}</span></b><span>${esc(c.public_key||'Set PAYSTACK_PUBLIC_KEY in cPanel')}</span></div><div class="cfg"><b>Secret key <span class="${c.secret_key_configured?'ok':'bad'}">${c.secret_key_configured?'Configured':'Missing'}</span></b><span>The secret is never returned to the browser.</span></div><div class="cfg"><b>Webhook URL</b><span>${esc(c.webhook_url)}</span></div><div class="cfg"><b>Callback URL</b><span>${esc(c.callback_url)}</span></div>`;
       const success=p.filter(x=>x.status==='success'),curr={};success.forEach(x=>curr[x.currency]=(curr[x.currency]||0)+x.amount_subunit);
-      document.getElementById('kpis').innerHTML=`<div class="kpi"><b>${success.length}</b><span>Successful payments</span></div><div class="kpi"><b>${p.filter(x=>x.status==='initialized').length}</b><span>Awaiting confirmation</span></div><div class="kpi"><b>${Object.entries(curr).map(([c,n])=>money(n,c)).join(' · ')||'—'}</b><span>Verified volume by currency</span></div>`;
+      document.getElementById('kpis').innerHTML=`<div class="kpi"><b>${success.length}</b><span>Successful payments</span></div><div class="kpi"><b>${p.filter(x=>x.status==='initialized').length}</b><span>Awaiting confirmation</span></div><div class="kpi"><b>${Object.entries(curr).map(([c,n])=>money(n,c)).join(' · ')||'-'}</b><span>Verified volume by currency</span></div>`;
       const canDelete=myRole==='owner'||myRole==='billing';
       document.getElementById('payments').innerHTML=p.length?p.map(x=>`<article class="payment"><div><b>${esc(x.company_name)}</b><span>${esc(x.customer_email)} · ${esc(x.plan_name)}</span><span>${esc(x.reference)}</span></div><div><b class="amount">${money(x.amount_subunit,x.currency)}</b><span>${date(x.paid_at||x.created_at)}</span></div><div><b>${x.card_last4?`${esc(x.card_brand||x.card_type)} •••• ${esc(x.card_last4)}`:esc(x.channel||'Checkout')}</b><span>${esc(x.card_bank||x.gateway_response||'No card metadata')}</span></div><div class="row-actions"><span class="status ${esc(x.status)}">${esc(x.status)}</span>${canDelete?`<button type="button" class="del-btn" onclick="deletePayment(${x.id})">Delete</button>`:''}</div></article>`).join(''):'<div class="empty">No payment attempts yet.</div>';
     }

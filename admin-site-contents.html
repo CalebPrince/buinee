@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Site Contents — Command Center — Buinee</title>
+<title>Site Contents - Command Center - Buinee</title>
 <meta name="description" content="Edit the text shown on the public landing, register, login and legal pages.">
 <style>
   :root {
@@ -169,7 +169,7 @@
           <div class="hero-line">
             <span class="eyebrow">Site contents</span>
             <h1>Edit your public pages</h1>
-            <p>Every headline, paragraph and button label on the landing, register, login and legal pages — changes go live immediately.</p>
+            <p>Every headline, paragraph and button label on the landing, register, login and legal pages - changes go live immediately.</p>
           </div>
 
           <div class="page-tabs" id="pageTabs"></div>
@@ -320,7 +320,7 @@
       const data = await res.json();
       if (!res.ok) { showMsg('contentError', data.error || 'Could not save.'); return; }
       currentFields = data.fields || currentFields;
-      showMsg('contentOk', 'Saved — live on the public site now.');
+      showMsg('contentOk', 'Saved - live on the public site now.');
     } catch {
       showMsg('contentError', 'Could not reach the server.');
     } finally {

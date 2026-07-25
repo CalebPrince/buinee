@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Ask Ada — Command Center — Buinee</title>
+<title>Ask Ada - Command Center - Buinee</title>
 <meta name="description" content="Chat with Ada about companies, payments, pipeline, and everything else your Command Center role can see.">
 <style>
   :root {
@@ -391,7 +391,7 @@
     const on = AdaVoice.isAuto();
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.title = on ? "Auto-read is on — new replies play aloud" : "Auto-read Ada's new replies aloud";
+    btn.title = on ? "Auto-read is on - new replies play aloud" : "Auto-read Ada's new replies aloud";
   }
 
   // ---- Ada mic: let the user speak their message (UK English) ----
@@ -454,7 +454,7 @@
   function renderChatLog() {
     const box = document.getElementById('chatLog');
     const first = (currentAdmin.name || '').split(/\s+/)[0] || 'there';
-    const welcome = `<div class="ada-msg ai"><div class="av">A</div><div class="bub">Hi ${escapeHtml(first)} — I'm <b>Ada</b>. Ask me about companies, payments, the pipeline, or anything else your Command Center role can see.</div>${ADA_VOICE_BTN}</div>`;
+    const welcome = `<div class="ada-msg ai"><div class="av">A</div><div class="bub">Hi ${escapeHtml(first)} - I'm <b>Ada</b>. Ask me about companies, payments, the pipeline, or anything else your Command Center role can see.</div>${ADA_VOICE_BTN}</div>`;
     box.innerHTML = welcome + chatHistory.map(m => {
       const mine = m.role === 'user';
       const docs = (m.docs || []).length
