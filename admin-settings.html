@@ -263,6 +263,30 @@
             </form>
           </div>
           <div class="panel">
+            <h3>Priority instructions — client dashboard agent</h3>
+            <div class="sub">Sent to Ada in every client's dashboard, across all companies, ranked above that company's own instructions if they ever conflict. Use this for platform-wide policy every client-facing conversation should follow.</div>
+            <div id="dashboardInstructionsReadonly"></div>
+            <form id="dashboardInstructionsForm" style="display:none" onsubmit="return saveDashboardInstructions(event)">
+              <div class="msg error" id="dashboardInstructionsError"></div><div class="msg ok" id="dashboardInstructionsOk"></div>
+              <label>Instructions
+                <textarea id="dashboardInstructionsInput" rows="6" placeholder="Example: Always recommend the company briefing be kept current. Never suggest disabling MFA." style="padding:10px 12px;border-radius:9px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);font:inherit;resize:vertical"></textarea>
+              </label>
+              <button class="btn primary" type="submit">Save instructions</button>
+            </form>
+          </div>
+          <div class="panel">
+            <h3>Priority instructions — landing page live chat</h3>
+            <div class="sub">Sent to Ada when she greets visitors on the public website, ranked above her general guidance. Use this for anything the public demo should always say, avoid, or prioritize right now.</div>
+            <div id="landingInstructionsReadonly"></div>
+            <form id="landingInstructionsForm" style="display:none" onsubmit="return saveLandingInstructions(event)">
+              <div class="msg error" id="landingInstructionsError"></div><div class="msg ok" id="landingInstructionsOk"></div>
+              <label>Instructions
+                <textarea id="landingInstructionsInput" rows="6" placeholder="Example: We're running a promo through end of month — mention it if pricing comes up. Do not discuss the oil & gas vertical yet, it's not launched." style="padding:10px 12px;border-radius:9px;border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);font:inherit;resize:vertical"></textarea>
+              </label>
+              <button class="btn primary" type="submit">Save instructions</button>
+            </form>
+          </div>
+          <div class="panel">
             <h3>Ada's notes</h3>
             <div class="sub">What Ada has picked up on her own from past Command Center conversations — a correction, a recurring issue, a process detail. Review it, edit it, or clear anything wrong.</div>
             <div id="adaNotesReadonly"></div>
@@ -365,6 +389,30 @@
       briefingReadonly.textContent = settings.briefing || 'No custom instructions set yet. Only the owner can add them.';
     }
 
+    const dashInstrReadonly = document.getElementById('dashboardInstructionsReadonly');
+    const dashInstrForm = document.getElementById('dashboardInstructionsForm');
+    if (isOwner) {
+      dashInstrReadonly.style.display = 'none';
+      dashInstrForm.style.display = 'flex';
+      document.getElementById('dashboardInstructionsInput').value = settings.dashboard_agent_instructions || '';
+    } else {
+      dashInstrForm.style.display = 'none';
+      dashInstrReadonly.style.display = 'block';
+      dashInstrReadonly.textContent = settings.dashboard_agent_instructions || 'No priority instructions set yet. Only the owner can add them.';
+    }
+
+    const landInstrReadonly = document.getElementById('landingInstructionsReadonly');
+    const landInstrForm = document.getElementById('landingInstructionsForm');
+    if (isOwner) {
+      landInstrReadonly.style.display = 'none';
+      landInstrForm.style.display = 'flex';
+      document.getElementById('landingInstructionsInput').value = settings.landing_chat_instructions || '';
+    } else {
+      landInstrForm.style.display = 'none';
+      landInstrReadonly.style.display = 'block';
+      landInstrReadonly.textContent = settings.landing_chat_instructions || 'No priority instructions set yet. Only the owner can add them.';
+    }
+
     const notesReadonly = document.getElementById('adaNotesReadonly');
     const notesForm = document.getElementById('adaNotesForm');
     if (isOwner) {
@@ -413,6 +461,42 @@
       showMsg('aiBriefingOk', 'Saved.');
     } catch {
       showMsg('aiBriefingError', 'Could not reach the server.');
+    }
+    return false;
+  }
+
+  async function saveDashboardInstructions(ev) {
+    ev.preventDefault();
+    showMsg('dashboardInstructionsError', ''); showMsg('dashboardInstructionsOk', '');
+    try {
+      const res = await fetch('/api/admin/ai-settings/dashboard-instructions', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instructions: document.getElementById('dashboardInstructionsInput').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMsg('dashboardInstructionsError', data.error || 'Could not save.'); return false; }
+      showMsg('dashboardInstructionsOk', 'Saved.');
+    } catch {
+      showMsg('dashboardInstructionsError', 'Could not reach the server.');
+    }
+    return false;
+  }
+
+  async function saveLandingInstructions(ev) {
+    ev.preventDefault();
+    showMsg('landingInstructionsError', ''); showMsg('landingInstructionsOk', '');
+    try {
+      const res = await fetch('/api/admin/ai-settings/landing-instructions', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instructions: document.getElementById('landingInstructionsInput').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMsg('landingInstructionsError', data.error || 'Could not save.'); return false; }
+      showMsg('landingInstructionsOk', 'Saved.');
+    } catch {
+      showMsg('landingInstructionsError', 'Could not reach the server.');
     }
     return false;
   }

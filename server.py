@@ -1470,6 +1470,13 @@ def build_admin_chat_system(admin: dict) -> str:
 
 def effective_briefing(user: dict, include_library_text: bool = True) -> str:
     parts = []
+    platform_text = db.get_platform_settings().get("dashboard_agent_instructions", "").strip()
+    if platform_text:
+        parts.append(
+            "## Priority instructions from Buinee (the platform operator)\n"
+            "These come from the platform owner, not this company - if they ever "
+            "conflict with the company or personal instructions below, follow "
+            "these first.\n" + platform_text)
     company_text = (user.get("company") or {}).get("briefing", "").strip()
     ada_notes = (user.get("company") or {}).get("ada_notes", "").strip()
     personal_text = db.get_user_instructions(user["id"]).strip()
@@ -2525,6 +2532,8 @@ class RouteHandlerMixin:
                 "saved": {"provider": settings["ai_provider"], "model": settings["ai_model"] or ""},
                 "briefing": settings["ai_briefing"] or "",
                 "ada_notes": settings.get("ada_notes") or "",
+                "dashboard_agent_instructions": settings.get("dashboard_agent_instructions") or "",
+                "landing_chat_instructions": settings.get("landing_chat_instructions") or "",
             })
 
         if path == "/api/admin/site-settings":
@@ -2732,6 +2741,8 @@ class RouteHandlerMixin:
             "/api/admin/ai-settings/model": self._handle_admin_set_ai_model,
             "/api/admin/ai-settings/briefing": self._handle_admin_set_ai_briefing,
             "/api/admin/ai-settings/ada-notes": self._handle_admin_set_ada_notes,
+            "/api/admin/ai-settings/dashboard-instructions": self._handle_admin_set_dashboard_instructions,
+            "/api/admin/ai-settings/landing-instructions": self._handle_admin_set_landing_instructions,
             "/api/admin/site-settings/livechat": self._handle_admin_set_livechat_settings,
             "/api/admin/mfa/setup": self._handle_admin_mfa_setup,
             "/api/admin/mfa/enable": self._handle_admin_mfa_enable,
@@ -2833,6 +2844,7 @@ class RouteHandlerMixin:
                 provider, model, cfg.get(PROVIDER_KEYS[provider], ""),
                 message, landing_plans_digest(),
                 history, system=build_system(computed),
+                briefing=db.get_platform_settings().get("landing_chat_instructions", "").strip(),
             )
         except providers.ProviderError as exc:
             reference = report_application_error("ada.demo.provider", exc)
@@ -4211,6 +4223,30 @@ class RouteHandlerMixin:
             return self._json({"error": "Bad request."}, 400)
         settings = db.set_platform_ai_briefing(str(req.get("briefing") or ""))
         db.record_admin_activity(admin, "ai_briefing_changed", "platform_settings", 1, "")
+        return self._json({"ok": True, "settings": settings})
+
+    def _handle_admin_set_dashboard_instructions(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body(max_len=8000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        settings = db.set_platform_dashboard_instructions(str(req.get("instructions") or ""))
+        db.record_admin_activity(admin, "dashboard_instructions_changed", "platform_settings", 1, "")
+        return self._json({"ok": True, "settings": settings})
+
+    def _handle_admin_set_landing_instructions(self):
+        admin = self._admin_role_request("owner")
+        if not admin:
+            return
+        try:
+            req = self._body(max_len=8000)
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        settings = db.set_platform_landing_instructions(str(req.get("instructions") or ""))
+        db.record_admin_activity(admin, "landing_instructions_changed", "platform_settings", 1, "")
         return self._json({"ok": True, "settings": settings})
 
     def _handle_admin_set_ada_notes(self):

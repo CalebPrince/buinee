@@ -901,6 +901,12 @@ def _migrate_platform_settings(conn: sqlite3.Connection) -> None:
         )
     if "ada_notes" not in cols:
         conn.execute("ALTER TABLE platform_settings ADD COLUMN ada_notes TEXT NOT NULL DEFAULT ''")
+    if "dashboard_agent_instructions" not in cols:
+        conn.execute(
+            "ALTER TABLE platform_settings ADD COLUMN dashboard_agent_instructions TEXT NOT NULL DEFAULT ''")
+    if "landing_chat_instructions" not in cols:
+        conn.execute(
+            "ALTER TABLE platform_settings ADD COLUMN landing_chat_instructions TEXT NOT NULL DEFAULT ''")
     conn.execute(
         "INSERT OR IGNORE INTO platform_settings (id, ai_provider, ai_model, ai_briefing, "
         "livechat_mode, livechat_schedule_json) VALUES (1, NULL, '', '', 'schedule', ?)",
@@ -4234,6 +4240,7 @@ def get_platform_settings() -> dict:
     return dict(row) if row else {
         "id": 1, "ai_provider": None, "ai_model": "", "ai_briefing": "",
         "livechat_mode": "schedule", "livechat_schedule_json": json.dumps(DEFAULT_LIVECHAT_SCHEDULE),
+        "dashboard_agent_instructions": "", "landing_chat_instructions": "",
     }
 
 
@@ -4305,6 +4312,30 @@ def set_platform_ai_briefing(briefing: str) -> dict:
         conn.execute(
             "UPDATE platform_settings SET ai_briefing = ? WHERE id = 1",
             (briefing.strip()[:4000],),
+        )
+    return get_platform_settings()
+
+
+def set_platform_dashboard_instructions(instructions: str) -> dict:
+    """Priority instructions the owner sets from the Command Center, folded
+    into every client dashboard Ada conversation across all companies - see
+    server.effective_briefing."""
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE platform_settings SET dashboard_agent_instructions = ? WHERE id = 1",
+            (instructions.strip()[:4000],),
+        )
+    return get_platform_settings()
+
+
+def set_platform_landing_instructions(instructions: str) -> dict:
+    """Priority instructions the owner sets from the Command Center, folded
+    into the public landing-page chat agent - see server.build_system and
+    the /api/chat handler used by unauthenticated visitors."""
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE platform_settings SET landing_chat_instructions = ? WHERE id = 1",
+            (instructions.strip()[:4000],),
         )
     return get_platform_settings()
 
