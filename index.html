@@ -1,6 +1,6 @@
 <meta charset="utf-8">
-<title>Buinee - an AI assistant for every workspace, built into how your team already works</title>
-<meta name="description" content="Every person on your team gets an AI assistant that already knows their mailbox, documents, customer records and business rules - inside one secure workspace for messages, tasks, approvals and customer work.">
+<title>Buinee, an AI assistant for every workspace, built into how your team already works</title>
+<meta name="description" content="Every person on your team gets an AI assistant that already knows their mailbox, documents, customer records and business rules, inside one secure workspace for messages, tasks, approvals and customer work.">
 <script>
   // Applied before first paint, and before any CSS below, so there's no
   // flash of the wrong theme when a saved choice differs from the OS
@@ -643,13 +643,13 @@
           <span class="v-badge">3 need you</span>
         </div>
         <div class="v-body">
-          <div class="v-row"><span>Needs you first</span><b>Coastal - proposal overdue</b></div>
+          <div class="v-row"><span>Needs you first</span><b>Coastal, proposal overdue</b></div>
           <div class="v-row"><span>Drafted, ready to review</span><b>6 messages</b></div>
           <div class="v-row"><span>Filed, no action needed</span><b>5 messages</b></div>
         </div>
         <div class="v-note">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <span><b>Coastal Ltd</b> - "Following up on the July proposal…" Ada drafted a reply based on your last quote and standard terms.</span>
+          <span><b>Coastal Ltd</b>, "Following up on the July proposal…" Ada drafted a reply based on your last quote and standard terms.</span>
         </div>
         <div class="v-foot">
           <div class="sig">
@@ -861,7 +861,7 @@
           </div>
           <div class="chat-body">
             <div class="bub them">
-              <span class="who">Ama - Preparer</span>
+              <span class="who">Ama, Preparer</span>
               Coastal's July invoice just came in. Sending it over.
               <span class="file">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
@@ -871,7 +871,7 @@
             <div class="bub me">Run it through and raise the voucher.</div>
             <div class="bub agent">
               <span class="who">Assistant</span>
-              Read it. GHS 9,200.00, vatable portion 1,250.00, received 20 July on 3-day terms - due the 23rd. Voucher prepared at GHS 9,106.25 net.
+              Read it. GHS 9,200.00, vatable portion 1,250.00, received 20 July on 3-day terms, due the 23rd. Voucher prepared at GHS 9,106.25 net.
             </div>
           </div>
         </div>
@@ -885,7 +885,7 @@
           </div>
           <div class="chat-body" style="gap:0">
             <div class="v-row" style="padding:11px 0"><span>Prepared</span><b style="font-family:var(--sans);font-weight:600">A. Boateng · 20 Jul 09:14</b></div>
-            <div class="v-row" style="padding:11px 0"><span>Returned - missing cost centre</span><b style="font-family:var(--sans);font-weight:600">S. Owusu · 20 Jul 11:02</b></div>
+            <div class="v-row" style="padding:11px 0"><span>Returned, missing cost centre</span><b style="font-family:var(--sans);font-weight:600">S. Owusu · 20 Jul 11:02</b></div>
             <div class="v-row" style="padding:11px 0"><span>Re-submitted</span><b style="font-family:var(--sans);font-weight:600">A. Boateng · 20 Jul 11:40</b></div>
             <div class="v-row" style="padding:11px 0"><span style="color:var(--good);font-weight:600">Approved &amp; signed</span><b style="font-family:var(--sans);font-weight:600;color:var(--good)">S. Owusu · 20 Jul 14:22</b></div>
           </div>
@@ -1117,7 +1117,7 @@
     document.getElementById("audIndividual").classList.toggle("active", audience === "individual");
     document.getElementById("audTeam").classList.toggle("active", audience === "team");
     document.getElementById("plansNote").textContent = audience === "individual"
-      ? "Per person, per month. A solo workspace is yours alone - it isn't listed for anyone to join."
+      ? "Per person, per month. A solo workspace is yours alone, it isn't listed for anyone to join."
       : "Per company, per month, however many of your team are in it. Your colleagues join by name afterward; only the person setting it up picks a tier.";
     renderPlans(allPlans.filter(p => p.audience === audience));
   }
@@ -1125,7 +1125,7 @@
   function renderPlans(plans) {
     const box = document.getElementById("plans");
     if (!plans.length) {
-      box.innerHTML = '<p class="plans-loading">Pricing is being set up - <a href="/register?join=1">join a company</a> or check back shortly.</p>';
+      box.innerHTML = '<p class="plans-loading">Pricing is being set up, <a href="/register?join=1">join a company</a> or check back shortly.</p>';
       return;
     }
     // Cheapest paid tier is the one worth nudging people toward, and it stays
@@ -1164,7 +1164,7 @@
     })
     .catch(() => {
       document.getElementById("plans").innerHTML =
-        '<p class="plans-loading">Couldn\'t load pricing just now - please refresh.</p>';
+        '<p class="plans-loading">Couldn\'t load pricing just now, please refresh.</p>';
     });
 
   // Smooth in-page nav without hijacking anything else.
@@ -1348,7 +1348,7 @@
     const on = AdaVoice.isAuto();
     btn.classList.toggle("on", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
-    btn.title = on ? "Auto-read is on - new replies play aloud" : "Auto-read Ada's new replies aloud";
+    btn.title = on ? "Auto-read is on, new replies play aloud" : "Auto-read Ada's new replies aloud";
   }
 
   // ---- Ada mic: let the visitor speak their message (UK English) ----
@@ -1439,7 +1439,7 @@
 
   function renderLandingAdaLog() {
     const box = document.getElementById("adaPanelLog");
-    const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee - what it does, pricing, or how to get your team started.</div>" + ADA_VOICE_BTN + "</div>";
+    const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee, what it does, pricing, or how to get your team started.</div>" + ADA_VOICE_BTN + "</div>";
     const offlineNotice = adaOnline ? "" : "<div class=\"ada-offline-notice\">We're offline right now. Send a message and leave a way to reach you, and our team will follow up as soon as we're back.</div>";
     box.innerHTML = offlineNotice + welcome + adaLandingHistory.map(m => {
       const mine = m.role === "user";
@@ -1729,7 +1729,7 @@
         errEl.textContent = data.error || "A company with that name already exists.";
         errEl.classList.add("show");
         card.dataset.draft = JSON.stringify({ ...draft, allow_duplicate_name: true });
-        btn.disabled = false; btn.textContent = "This is a different company - continue";
+        btn.disabled = false; btn.textContent = "This is a different company, continue";
         return false;
       }
       if (res.status === 503) {
@@ -1754,13 +1754,13 @@
       if (data.payment_required) {
         card.innerHTML = data.authorization_url
           ? `<div class="ok">
-              <div class="t">Almost there - one step left</div>
+              <div class="t">Almost there, one step left</div>
               <div>Your workspace is ready. Pay securely to activate it:</div>
               <a class="pay" href="${escapeHtmlAda(data.authorization_url)}" target="_blank" rel="noopener">Pay securely with Paystack</a>
             </div>`
           : `<div class="ok">
               <div class="t">Your workspace is ready</div>
-              <div>We couldn't open the payment page from here - sign in at
+              <div>We couldn't open the payment page from here, sign in at
                 <a href="/login">/login</a> and you'll be taken straight to it.</div>
             </div>`;
       } else {

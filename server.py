@@ -294,18 +294,18 @@ SITE_CONTENT_SCHEMA = {
          "default": "One assistant, built into every workspace"},
         {"key": "hero_headline", "label": "Hero headline", "type": "paragraph",
          "default": "Every person on your team gets their own AI assistant. Not a chatbot bolted to the "
-                     "corner - one that already knows the work."},
+                     "corner, one that already knows the work."},
         {"key": "hero_lede", "label": "Hero subtext", "type": "paragraph",
          "default": "Connect a mailbox and it sorts, drafts and flags overnight. Hand it a file and it "
-                     "reads, extracts and acts. Tell it your rules once, and it works to them - your "
+                     "reads, extracts and acts. Tell it your rules once, and it works to them, your "
                      "approval steps, your templates, your terms. All inside one workspace for messages, "
                      "documents, tasks, approvals and customer work."},
         {"key": "hero_bold_note", "label": "Hero bold note (below subtext)", "type": "text",
-         "default": "Drafts, never sends. Suggests, never decides - until you say so."},
+         "default": "Drafts, never sends. Suggests, never decides, until you say so."},
         {"key": "hero_cta_primary", "label": "Hero primary button", "type": "text", "default": "Create your workspace"},
         {"key": "hero_cta_secondary", "label": "Hero secondary button", "type": "text", "default": "Meet your assistant"},
         {"key": "hero_note", "label": "Hero note", "type": "text",
-         "default": "Your team joins by name - no per-seat setup, no IT project."},
+         "default": "Your team joins by name, no per-seat setup, no IT project."},
 
         {"key": "how_eyebrow", "label": "\"How it works\" eyebrow", "type": "text", "default": "How work moves"},
         {"key": "how_headline", "label": "\"How it works\" headline", "type": "text",
@@ -355,12 +355,12 @@ SITE_CONTENT_SCHEMA = {
 
         {"key": "workspace_eyebrow", "label": "Workspace eyebrow", "type": "text", "default": "The workspace"},
         {"key": "workspace_headline", "label": "Workspace headline", "type": "text",
-         "default": "Where your team already talks - with the work in the room."},
+         "default": "Where your team already talks, with the work in the room."},
         {"key": "workspace_feat1_title", "label": "Workspace feature 1 title", "type": "text",
          "default": "Send a file to a colleague. Or to an agent."},
         {"key": "workspace_feat1_text", "label": "Workspace feature 1 text", "type": "paragraph",
          "default": "The chat is where the team already works things out. Buinee puts the documents in "
-                     "the same place - so a file goes to a person or straight to an assistant that reads "
+                     "the same place, so a file goes to a person or straight to an assistant that reads "
                      "it, without leaving the conversation."},
         {"key": "workspace_feat1_bullets", "label": "Workspace feature 1 bullets (one per line)", "type": "bullets",
          "default": "Team and one-to-one chat\nShare PDFs, Word, Excel, images and more\n"
@@ -369,7 +369,7 @@ SITE_CONTENT_SCHEMA = {
          "default": "A signature that means something."},
         {"key": "workspace_feat2_text", "label": "Workspace feature 2 text", "type": "paragraph",
          "default": "Sign inside the system and the PDF prints ready. But the signature on the page is "
-                     "only the visible part - underneath it sits a record of who approved what, when, and "
+                     "only the visible part, underneath it sits a record of who approved what, when, and "
                      "what changed between drafts. That record is the thing an auditor actually asks for."},
         {"key": "workspace_feat2_bullets", "label": "Workspace feature 2 bullets (one per line)", "type": "bullets",
          "default": "No printing to sign, then scanning back\nEvery approval and return time-stamped\n"
@@ -379,7 +379,7 @@ SITE_CONTENT_SCHEMA = {
         {"key": "agents_headline", "label": "Agents headline", "type": "text",
          "default": "Every person gets an assistant that understands their work."},
         {"key": "agents_subtext", "label": "Agents subtext", "type": "paragraph",
-         "default": "Once your company is in, each person's dashboard comes with an AI assistant - one "
+         "default": "Once your company is in, each person's dashboard comes with an AI assistant, one "
                      "that works with the actual context: mailbox conversations, documents, customer "
                      "records, team instructions and outstanding tasks. Not a generic chatbot bolted to "
                      "the corner of the screen."},
@@ -387,7 +387,7 @@ SITE_CONTENT_SCHEMA = {
         {"key": "agents_card1_title", "label": "Agents card 1 title", "type": "text",
          "default": "It reads the mail before you do"},
         {"key": "agents_card1_text", "label": "Agents card 1 text", "type": "paragraph",
-         "default": "Connect your work mailbox and it goes through overnight - sorting what came in, "
+         "default": "Connect your work mailbox and it goes through overnight, sorting what came in, "
                      "drafting the replies that are obvious, and putting the things that genuinely need "
                      "you at the top."},
         {"key": "agents_card1_bullets", "label": "Agents card 1 bullets (one per line)", "type": "bullets",
@@ -405,11 +405,11 @@ SITE_CONTENT_SCHEMA = {
          "default": "PDFs, scans, Word and Excel\nSummarises, compares and extracts details\n"
                      "Explains what needs attention and why"},
         {"key": "agents_card2_sees", "label": "Agents card 2 \"sees\" line", "type": "text",
-         "default": "Works from your rules - your thresholds, your terms, your templates."},
+         "default": "Works from your rules, your thresholds, your terms, your templates."},
         {"key": "agents_card3_title", "label": "Agents card 3 title", "type": "text",
          "default": "You tell it how your business works. Once."},
         {"key": "agents_card3_text", "label": "Agents card 3 text", "type": "paragraph",
-         "default": "Every business has rules a new hire spends months learning - how customers are "
+         "default": "Every business has rules a new hire spends months learning, how customers are "
                      "handled, what needs approval, when work is escalated, and which templates to use. "
                      "Write them down once and the assistant works to them instead of generic practice."},
         {"key": "agents_card3_bullets", "label": "Agents card 3 bullets (one per line)", "type": "bullets",
@@ -432,7 +432,7 @@ SITE_CONTENT_SCHEMA = {
          "default": "Your team's tools, right where the work happens."},
         {"key": "integrations_subtext", "label": "Integrations subtext", "type": "paragraph",
          "default": "Once someone's in, they connect Slack, Drive, Trello and the rest from their own "
-                     "workstation in a couple of clicks. Buinee reads alongside them - nothing here "
+                     "workstation in a couple of clicks. Buinee reads alongside them, nothing here "
                      "replaces the tools your team already relies on."},
 
         {"key": "trust_eyebrow", "label": "Trust eyebrow", "type": "text", "default": "Built for dependable work"},
@@ -474,10 +474,10 @@ SITE_CONTENT_SCHEMA = {
         {"key": "faq_items", "label": "FAQ questions and answers", "type": "qa_list",
          "default": "Q: What can the AI assistant actually do?\n"
                      "A: It answers questions grounded in your own workspace data, drafts replies, reads "
-                     "documents you hand it, and flags what needs attention - but it never sends, approves "
+                     "documents you hand it, and flags what needs attention, but it never sends, approves "
                      "or changes a record without a person choosing to.\n"
                      "Q: What exactly is Buinee?\n"
-                     "A: A single workspace for the work behind your business - team chat, documents, "
+                     "A: A single workspace for the work behind your business, team chat, documents, "
                      "tasks, approvals, customer follow-ups and an AI assistant, in one place instead of "
                      "scattered across separate tools.\n"
                      "Q: Do I need a team to use it, or can I work alone?\n"
@@ -488,10 +488,10 @@ SITE_CONTENT_SCHEMA = {
                      "A: They register with your company's name and their own details, then a Supervisor "
                      "approves the request. Nobody gets in on the strength of the company name alone.\n"
                      "Q: Is my company's data visible to other companies on Buinee?\n"
-                     "A: No. Every record is scoped to the company that created it - no document, figure or "
+                     "A: No. Every record is scoped to the company that created it, no document, figure or "
                      "conversation is visible outside your own workspace.\n"
                      "Q: Can I change plans later?\n"
-                     "A: Yes - moving between solo and team plans, or up and down tiers, doesn't require "
+                     "A: Yes, moving between solo and team plans, or up and down tiers, doesn't require "
                      "setting anything up twice."},
 
         {"key": "cta_headline", "label": "Closing CTA headline", "type": "text",
@@ -506,20 +506,20 @@ SITE_CONTENT_SCHEMA = {
          "default": "If your company is already registered, you'll be placed in it automatically."},
 
         {"key": "footer_tagline", "label": "Footer tagline", "type": "text",
-         "default": "Buinee - one workspace for the work behind your business."},
+         "default": "Buinee, one workspace for the work behind your business."},
     ],
     "register": [
         {"key": "brand_headline", "label": "Brand panel headline", "type": "text",
          "default": "Bring your whole team into one place."},
         {"key": "brand_subtext", "label": "Brand panel subtext", "type": "paragraph",
-         "default": "Register your company once. Everyone else joins by name and gets the role - and "
-                     "the visibility - that fits them."},
+         "default": "Register your company once. Everyone else joins by name and gets the role, and "
+                     "the visibility, that fits them."},
         {"key": "brand_foot", "label": "Brand panel footnote", "type": "paragraph",
-         "default": "Every join request needs a supervisor's approval - a company name alone never "
+         "default": "Every join request needs a supervisor's approval, a company name alone never "
                      "grants access."},
         {"key": "gate_title", "label": "\"Choose a plan\" gate title", "type": "text", "default": "Choose a plan first"},
         {"key": "gate_text", "label": "\"Choose a plan\" gate text", "type": "paragraph",
-         "default": "Registering a company starts with picking the tier it runs on - how many people it "
+         "default": "Registering a company starts with picking the tier it runs on, how many people it "
                      "covers, and whether the AI assistant is included."},
         {"key": "gate_cta", "label": "\"Choose a plan\" gate button", "type": "text", "default": "See the plans"},
         {"key": "team_h1", "label": "Form heading (team plan)", "type": "text", "default": "Set up Buinee"},
@@ -527,7 +527,7 @@ SITE_CONTENT_SCHEMA = {
          "default": "Register your company, or join one that's already here."},
         {"key": "solo_h1", "label": "Form heading (solo plan)", "type": "text", "default": "Set up your workspace"},
         {"key": "solo_subtitle", "label": "Form subtitle (solo plan)", "type": "paragraph",
-         "default": "Yours alone - nobody else can see it or join it."},
+         "default": "Yours alone, nobody else can see it or join it."},
         {"key": "tab_register_team", "label": "Register tab label (team)", "type": "text",
          "default": "Register your company"},
         {"key": "tab_register_solo", "label": "Register tab label (solo)", "type": "text", "default": "Work on your own"},
@@ -536,17 +536,17 @@ SITE_CONTENT_SCHEMA = {
         {"key": "company_caption_solo", "label": "Company field label (solo)", "type": "text",
          "default": "Workspace name (optional)"},
         {"key": "reg_note_team", "label": "Register form note (team)", "type": "paragraph",
-         "default": "Not the boss? Pick your real role - you get full access to it right away. Whoever "
+         "default": "Not the boss? Pick your real role, you get full access to it right away. Whoever "
                      "should hold Supervisor can join afterward and claim it themselves, as long as nobody "
                      "holds it yet."},
         {"key": "reg_note_solo", "label": "Register form note (solo)", "type": "paragraph",
          "default": "You prepare and approve your own vouchers. If you later need colleagues in here, "
-                     "ask us to move you onto a team plan - nothing gets set up twice."},
+                     "ask us to move you onto a team plan, nothing gets set up twice."},
         {"key": "reg_submit_team", "label": "Register submit button (team)", "type": "text", "default": "Register company"},
         {"key": "reg_submit_solo", "label": "Register submit button (solo)", "type": "text",
          "default": "Create my workspace"},
         {"key": "join_note", "label": "Join form note", "type": "paragraph",
-         "default": "A supervisor at that company approves every join request before it's active - "
+         "default": "A supervisor at that company approves every join request before it's active, "
                      "company name alone doesn't grant access. The one exception: claiming Supervisor when "
                      "the company doesn't have one yet gets you in immediately, since there'd be no one to "
                      "approve it."},
@@ -556,10 +556,10 @@ SITE_CONTENT_SCHEMA = {
         {"key": "brand_headline", "label": "Brand panel headline", "type": "text",
          "default": "Everyone who touches a payment, in one place."},
         {"key": "brand_subtext", "label": "Brand panel subtext", "type": "paragraph",
-         "default": "The people who prepare, approve and sign - with the roles and the trail to prove "
+         "default": "The people who prepare, approve and sign, with the roles and the trail to prove "
                      "who did what, and when."},
         {"key": "brand_foot", "label": "Brand panel footnote", "type": "paragraph",
-         "default": "Visibility runs downward only - a supervisor sees everything, an assistant sees "
+         "default": "Visibility runs downward only, a supervisor sees everything, an assistant sees "
                      "their own work."},
         {"key": "card_eyebrow", "label": "Card eyebrow", "type": "text", "default": "Welcome back"},
         {"key": "card_h1", "label": "Card heading", "type": "text", "default": "Sign in"},
