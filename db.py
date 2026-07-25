@@ -52,7 +52,8 @@ ROLES = ("account_assistant", "senior_accountant", "finance_supervisor")
 # and its owner holds Supervisor, since there's nobody else to approve their
 # work.
 PLAN_AUDIENCES = ("individual", "team")
-SESSION_TTL_SECONDS = 30 * 24 * 60 * 60  # 30 days
+SESSION_TTL_SECONDS = 30 * 24 * 60 * 60  # 30 days - absolute ceiling
+SESSION_IDLE_TIMEOUT_SECONDS = 20 * 60   # sliding window - expires sooner if idle
 
 PBKDF2_ITERATIONS = 260_000
 
@@ -598,6 +599,7 @@ def init_db() -> None:
         _migrate_user_onboarding(conn)
         _migrate_platform_admin_roles(conn)
         _migrate_hashed_sessions(conn)
+        _migrate_session_activity(conn)
         _migrate_platform_settings(conn)
         _migrate_landing_chat_contact_name(conn)
 
@@ -976,6 +978,18 @@ def _migrate_platform_admin_roles(conn: sqlite3.Connection) -> None:
 
 def _session_digest(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _migrate_session_activity(conn: sqlite3.Connection) -> None:
+    """last_seen_at backs the idle timeout (SESSION_IDLE_TIMEOUT_SECONDS) -
+    separate from expires_at, which stays the absolute ceiling regardless of
+    activity. Backfilled from created_at so existing sessions don't all
+    appear to have just gone idle the moment this migration runs."""
+    for table in ("sessions", "admin_sessions"):
+        cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        if "last_seen_at" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN last_seen_at REAL")
+            conn.execute(f"UPDATE {table} SET last_seen_at = created_at WHERE last_seen_at IS NULL")
 
 
 def _migrate_hashed_sessions(conn: sqlite3.Connection) -> None:
@@ -2028,8 +2042,9 @@ def create_session(user_id: int) -> str:
     now = time.time()
     with _cursor() as conn:
         conn.execute(
-            "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-            (_session_digest(token), user_id, now, now + SESSION_TTL_SECONDS),
+            "INSERT INTO sessions (token, user_id, created_at, expires_at, last_seen_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (_session_digest(token), user_id, now, now + SESSION_TTL_SECONDS, now),
         )
     return token
 
@@ -2037,16 +2052,25 @@ def create_session(user_id: int) -> str:
 def get_user_by_session(token: str | None) -> dict | None:
     if not token:
         return None
+    digest = _session_digest(token)
+    now = time.time()
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT user_id, expires_at FROM sessions WHERE token = ?", (_session_digest(token),)
+            "SELECT user_id, expires_at, last_seen_at FROM sessions WHERE token = ?", (digest,)
         ).fetchone()
-        if not row or row["expires_at"] < time.time():
+        if not row or row["expires_at"] < now or _idle_expired(row["last_seen_at"], now):
+            if row:
+                conn.execute("DELETE FROM sessions WHERE token = ?", (digest,))
             return None
+        conn.execute("UPDATE sessions SET last_seen_at = ? WHERE token = ?", (now, digest))
         user = conn.execute(
             "SELECT * FROM users WHERE id = ?", (row["user_id"],)
         ).fetchone()
     return dict(user) if user else None
+
+
+def _idle_expired(last_seen_at, now: float) -> bool:
+    return last_seen_at is not None and now - last_seen_at > SESSION_IDLE_TIMEOUT_SECONDS
 
 
 def destroy_session(token: str | None) -> None:
@@ -2225,8 +2249,9 @@ def create_admin_session(admin_id: int) -> str:
     now = time.time()
     with _cursor() as conn:
         conn.execute(
-            "INSERT INTO admin_sessions (token, admin_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-            (_session_digest(token), admin_id, now, now + SESSION_TTL_SECONDS),
+            "INSERT INTO admin_sessions (token, admin_id, created_at, expires_at, last_seen_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (_session_digest(token), admin_id, now, now + SESSION_TTL_SECONDS, now),
         )
     return token
 
@@ -2234,12 +2259,17 @@ def create_admin_session(admin_id: int) -> str:
 def get_admin_by_session(token: str | None) -> dict | None:
     if not token:
         return None
+    digest = _session_digest(token)
+    now = time.time()
     with _cursor() as conn:
         row = conn.execute(
-            "SELECT admin_id, expires_at FROM admin_sessions WHERE token = ?", (_session_digest(token),)
+            "SELECT admin_id, expires_at, last_seen_at FROM admin_sessions WHERE token = ?", (digest,)
         ).fetchone()
-        if not row or row["expires_at"] < time.time():
+        if not row or row["expires_at"] < now or _idle_expired(row["last_seen_at"], now):
+            if row:
+                conn.execute("DELETE FROM admin_sessions WHERE token = ?", (digest,))
             return None
+        conn.execute("UPDATE admin_sessions SET last_seen_at = ? WHERE token = ?", (now, digest))
         admin = conn.execute(
             "SELECT * FROM platform_admins WHERE id = ?", (row["admin_id"],)
         ).fetchone()

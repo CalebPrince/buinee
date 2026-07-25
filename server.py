@@ -271,6 +271,12 @@ LEGACY_PAGE_REDIRECTS = {
     "/admin-site-contents.html": "/admin/site-contents",
 }
 
+# A signed-in client has no reason to see the marketing page or the sign-in/
+# register forms - they'd just have to log out to get back here, and seeing
+# "Sign in" while already signed in reads as broken. See PUBLIC_ONLY_PAGES
+# check in _route_get.
+PUBLIC_ONLY_PAGES = {"/", "/login", "/register"}
+
 # --- site contents CMS ------------------------------------------------------
 # Every visible string on the public pages that a business owner would
 # reasonably want to reword, grouped by page. `type` controls how a saved
@@ -2142,6 +2148,11 @@ class RouteHandlerMixin:
             query = urlparse(self.path).query
             location = LEGACY_PAGE_REDIRECTS[path] + (f"?{query}" if query else "")
             return self._redirect(location, 301)
+
+        if path in PUBLIC_ONLY_PAGES:
+            user = current_user(self)
+            if user and user["status"] == "approved":
+                return self._redirect("/dashboard", 302)
 
         if path == "/api/demo/status":
             cfg = load_env()
