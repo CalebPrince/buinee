@@ -2178,6 +2178,76 @@ def initialize_plan_subscription(user: dict, plan: dict, cfg: dict) -> dict:
     return {"authorization_url": result.get("authorization_url"), "reference": reference}
 
 
+def _add_one_month(value: date) -> date:
+    """Same day next month, clamped to the last day of a shorter month
+    (31 Jan -> 28/29 Feb). Avoids a dateutil dependency for the one place
+    this app needs month arithmetic."""
+    year, month = (value.year + 1, 1) if value.month == 12 else (value.year, value.month + 1)
+    for day in range(value.day, 0, -1):
+        try:
+            return date(year, month, day)
+        except ValueError:
+            continue
+    return value
+
+
+def subscription_start_for(last_paid_at: float | None) -> tuple[str, bool]:
+    """When a migrated customer's first automatic charge should land, and
+    whether that means charging them right away.
+
+    Someone who paid on the 1st has already bought the month, so the
+    subscription must not charge again until that month is up - passing
+    Paystack a `start_date` defers the first debit to exactly then. If the
+    paid period has already lapsed, there's nothing to defer: they owe it
+    now, and the caller shows that plainly before anyone clicks."""
+    if not last_paid_at:
+        return "", True
+    period_end = _add_one_month(datetime.fromtimestamp(last_paid_at, timezone.utc).date())
+    if period_end <= datetime.now(timezone.utc).date():
+        return "", True
+    return period_end.isoformat(), False
+
+
+def migrate_company_to_subscription(user: dict, plan: dict, last_reference: str,
+                                    last_paid_at: float | None, cfg: dict) -> dict:
+    """Put an existing one-time customer onto recurring billing without
+    asking them to pay again or re-enter a card.
+
+    Paystack still holds the authorization from their original payment, so
+    creating the subscription server-side against their customer record is
+    enough - "if an authorisation exists but is not passed as a parameter,
+    Paystack picks the most recent authorization to charge". That's why no
+    authorization code is fetched or stored here, keeping the promise in
+    the README that this app never handles them.
+
+    The first debit is deferred to the end of the period they've already
+    paid for (see subscription_start_for), so this is not a second charge."""
+    if not plan.get("paystack_plan_code"):
+        raise ValueError("This plan isn't set up for recurring billing yet.")
+    if not last_reference:
+        raise ValueError("No verified payment on file to take the card details from.")
+    # Their customer code isn't stored locally - re-verifying the original
+    # transaction is a read-only way to recover it from Paystack.
+    verified = paystack_api("GET", "/transaction/verify/" + quote(last_reference), cfg)
+    customer_code = str((verified.get("customer") or {}).get("customer_code") or "")
+    if not customer_code:
+        raise ValueError("Paystack has no customer record for that payment.")
+    start_date, charges_now = subscription_start_for(last_paid_at)
+    payload = {"customer": customer_code, "plan": plan["paystack_plan_code"]}
+    if start_date:
+        payload["start_date"] = start_date
+    result = paystack_api("POST", "/subscription", cfg, payload)
+    db.record_subscription_created({
+        "customer": {"email": user["email"]},
+        "subscription_code": result.get("subscription_code") or "",
+        "email_token": result.get("email_token") or "",
+        "next_payment_date": result.get("next_payment_date") or start_date,
+    })
+    return {"subscription_code": result.get("subscription_code") or "",
+            "next_payment_date": result.get("next_payment_date") or start_date,
+            "charged_now": charges_now}
+
+
 def start_plan_checkout(user: dict, plan: dict, cfg: dict) -> dict:
     """The one place callers should reach for - picks subscription checkout
     when the plan is linked to Paystack, one-time otherwise, so the three
@@ -3002,7 +3072,7 @@ class RouteHandlerMixin:
             "/api/admin/company/delete": self._handle_admin_delete_company,
             "/api/admin/payment/delete": self._handle_admin_delete_payment,
             "/api/admin/payments/link": self._handle_admin_generate_payment_link,
-            "/api/admin/payments/subscription-link": self._handle_admin_subscription_link,
+            "/api/admin/payments/migrate-subscription": self._handle_admin_migrate_subscription,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
             "/api/admin/company/contact/save": self._handle_admin_save_crm_contact,
             "/api/admin/company/contact/delete": self._handle_admin_delete_crm_contact,
@@ -4697,12 +4767,11 @@ class RouteHandlerMixin:
         return self._json({"ok": True, "authorization_url": payment.get("authorization_url") or "",
                            "reference": payment.get("reference") or ""})
 
-    def _handle_admin_subscription_link(self):
-        """A subscription-setup link for an existing customer still on the
-        old one-time model. Unlike the stuck-signup link above, this one
-        requires the plan to be linked to Paystack - the whole point is to
-        move them onto recurring billing, so falling back to another
-        one-time charge would silently do nothing useful."""
+    def _handle_admin_migrate_subscription(self):
+        """Move an existing one-time customer onto recurring billing using
+        the card Paystack already holds, with the first debit deferred to
+        the end of the period they've already paid for. No link to send, no
+        second charge, nothing for the customer to do."""
         admin = self._admin_role_request("owner", "billing")
         if not admin:
             return
@@ -4713,21 +4782,29 @@ class RouteHandlerMixin:
         user = db.get_user(user_id)
         if not user or user["status"] != "approved":
             return self._json({"error": "That account isn't active."}, 400)
+        row = next((r for r in db.list_manual_billing_companies()
+                    if r["user_id"] == user_id), None)
+        if not row:
+            return self._json(
+                {"error": "That company isn't awaiting migration - it may already have a "
+                          "subscription, or have no verified payment on file."}, 400)
         plan = db.plan_for_company(user["company_id"])
         if not plan.get("paystack_plan_code"):
             return self._json(
                 {"error": f"The {plan['name']} plan isn't set up for recurring billing yet. "
                           f"Set it up on the Plans page first."}, 400)
         try:
-            payment = initialize_plan_subscription(user, plan, load_env())
+            result = migrate_company_to_subscription(
+                user, plan, row["last_reference"], row["last_paid_at"], load_env())
         except ValueError as exc:
             reference = report_application_error(
-                "paystack.subscription_link", exc, user=user, context=f"plan_id={plan['id']}")
+                "paystack.subscription_migrate", exc, user=user, context=f"plan_id={plan['id']}")
             return self._json({"error": f"{exc} (Reference: {reference})"}, 503)
-        db.record_admin_activity(admin, "generated", "subscription_link", user_id,
-                                 details=f"For {user['email']}, plan={plan['name']}")
-        return self._json({"ok": True, "authorization_url": payment.get("authorization_url") or "",
-                           "reference": payment.get("reference") or ""})
+        db.record_admin_activity(
+            admin, "migrated", "subscription", user_id,
+            details=f"{user['email']} onto {plan['name']}, first debit "
+                    f"{result['next_payment_date'] or 'immediately'}")
+        return self._json({"ok": True, **result})
 
     def _handle_admin_mfa_setup(self):
         admin = current_admin(self)

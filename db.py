@@ -4002,9 +4002,14 @@ def list_manual_billing_companies() -> list[dict]:
                       p.price AS plan_price, p.currency AS plan_currency,
                       p.paystack_plan_code,
                       u.id AS user_id, u.name AS user_name, u.email AS user_email,
-                      (SELECT MAX(created_at) FROM payments
-                        WHERE company_id = c.id AND status = 'success') AS last_paid_at
+                      lp.created_at AS last_paid_at, lp.reference AS last_reference
                FROM companies c
+               LEFT JOIN (SELECT company_id, reference, created_at FROM payments
+                           WHERE status = 'success'
+                             AND created_at = (SELECT MAX(created_at) FROM payments p2
+                                                WHERE p2.company_id = payments.company_id
+                                                  AND p2.status = 'success')) lp
+                      ON lp.company_id = c.id
                JOIN plans p ON p.id = c.plan_id
                JOIN users u ON u.company_id = c.id
                            AND u.role = 'finance_supervisor' AND u.status = 'approved'

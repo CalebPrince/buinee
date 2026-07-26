@@ -105,22 +105,34 @@
       pendingCard.style.display=pending.length?'':'none';
       document.getElementById('pendingSignups').innerHTML=pending.map(x=>`<div class="pending-row" id="pendingRow-${x.user_id}"><div><b>${esc(x.company_name)}</b><span>${esc(x.user_name)} · ${esc(x.user_email)}</span><span>${esc(x.plan_name)} · ${money(Math.round(x.plan_price*100),x.plan_currency)}/mo · signed up ${date(x.user_created_at)}</span></div><div><span>Awaiting payment</span></div><button type="button" class="link-btn" onclick="generateLink(${x.user_id},this)">Generate payment link</button></div>`).join('');
       document.getElementById('manualCard').style.display=manual.length?'':'none';
-      document.getElementById('manualBilling').innerHTML=manual.map(x=>`<div class="pending-row" id="manualRow-${x.user_id}"><div><b>${esc(x.company_name)}</b><span>${esc(x.user_name)} · ${esc(x.user_email)}</span><span>${esc(x.plan_name)} · ${money(Math.round(x.plan_price*100),x.plan_currency)}/mo · last paid ${x.last_paid_at?date(x.last_paid_at):'unknown'}</span></div><div><span>${x.paystack_plan_code?'One-time only':'Plan not set up for recurring'}</span></div><button type="button" class="link-btn" onclick="subscriptionLink(${x.user_id},this)" ${x.paystack_plan_code?'':'disabled title="Set this plan up for recurring billing on the Plans page first."'}>Send subscription setup link</button></div>`).join('');
+      document.getElementById('manualBilling').innerHTML=manual.map(x=>{
+        // Say up front when the first automatic charge lands. A period that
+        // has already lapsed charges immediately, which is money owed rather
+        // than a double charge - but the admin should see that before clicking.
+        const end=x.last_paid_at?new Date((x.last_paid_at*1000)+2592000000):null;
+        const lapsed=!end||end<=new Date();
+        const when=lapsed?'charges immediately (paid period has lapsed)':`first charge ${end.toLocaleDateString()}`;
+        return `<div class="pending-row" id="manualRow-${x.user_id}"><div><b>${esc(x.company_name)}</b><span>${esc(x.user_name)} · ${esc(x.user_email)}</span><span>${esc(x.plan_name)} · ${money(Math.round(x.plan_price*100),x.plan_currency)}/mo · last paid ${x.last_paid_at?date(x.last_paid_at):'unknown'}</span></div><div><span>${x.paystack_plan_code?esc(when):'Plan not set up for recurring'}</span></div><button type="button" class="link-btn" onclick="migrateSubscription(${x.user_id},this,${lapsed})" ${x.paystack_plan_code?'':'disabled title="Set this plan up for recurring billing on the Plans page first."'}>Start subscription</button></div>`;
+      }).join('');
     }
-    async function subscriptionLink(userId,btn){
-      btn.disabled=true;btn.textContent='Generating…';
+    async function migrateSubscription(userId,btn,lapsed){
       const row=document.getElementById(`manualRow-${userId}`);
+      const name=row.querySelector('b').textContent;
+      const warning=lapsed
+        ? `Start a subscription for ${name}?\n\nTheir paid period has already lapsed, so Paystack will charge their saved card straight away.`
+        : `Start a subscription for ${name}?\n\nTheir saved card is used automatically. The first charge is deferred to the end of the period they've already paid for, so they are not charged twice.`;
+      if(!confirm(warning))return;
+      btn.disabled=true;btn.textContent='Starting…';
       row.querySelectorAll('.link-box,.link-err').forEach(el=>el.remove());
-      const res=await fetch('/api/admin/payments/subscription-link',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
+      const res=await fetch('/api/admin/payments/migrate-subscription',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
       const data=await res.json();
-      btn.disabled=false;btn.textContent='Send subscription setup link';
-      if(!res.ok||!data.authorization_url){
-        row.insertAdjacentHTML('beforeend',`<div class="link-err">${esc(data.error||'Could not generate a subscription link.')}</div>`);
+      if(!res.ok){
+        btn.disabled=false;btn.textContent='Start subscription';
+        row.insertAdjacentHTML('beforeend',`<div class="link-err">${esc(data.error||'Could not start the subscription.')}</div>`);
         return;
       }
-      const url=data.authorization_url;
-      const mailBody=encodeURIComponent(`Hi,\n\nWe're moving Buinee subscriptions onto automatic monthly billing, so you don't have to remember to renew.\n\nUse this link to set it up:\n\n${url}\n\nYour plan and everything in your workspace stays exactly as it is.`);
-      row.insertAdjacentHTML('beforeend',`<div class="link-box"><input type="text" readonly value="${esc(url)}" onclick="this.select()"><button type="button" onclick="copyLink(this)">Copy</button><a href="mailto:?subject=${encodeURIComponent('Set up automatic billing for Buinee')}&body=${mailBody}">Email</a></div>`);
+      btn.textContent='Subscription started';
+      main();
     }
     async function generateLink(userId,btn){
       btn.disabled=true;btn.textContent='Generating…';
