@@ -3729,6 +3729,14 @@ CRM_BILLING_CYCLES = {"monthly", "annual", "custom"}
 CRM_PAYMENT_STATUSES = {"not_connected", "current", "due", "overdue", "not_applicable"}
 
 
+def get_company_subscription(company_id: int) -> dict | None:
+    """One company's subscription record, or None if it has never had one."""
+    with _cursor() as conn:
+        row = conn.execute(
+            "SELECT * FROM crm_subscriptions WHERE company_id=?", (company_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def save_crm_subscription(company_id: int, fields: dict) -> dict:
     if not get_company(company_id):
         raise AuthError("No such company.")

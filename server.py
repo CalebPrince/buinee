@@ -964,6 +964,29 @@ def current_user(handler) -> dict | None:
     return db.get_user_by_session(session_token(handler))
 
 
+def public_subscription(company_id: int) -> dict | None:
+    """What a company's own Supervisor may see about their subscription.
+
+    The raw email_token never reaches the browser on its own - it's folded
+    into Paystack's hosted management URL here instead, so the page gets a
+    link it can open rather than a credential it could leak elsewhere. That
+    page is where updating a card or cancelling actually happens; Buinee
+    never handles card details itself."""
+    row = db.get_company_subscription(company_id)
+    if not row:
+        return None
+    code = row.get("paystack_subscription_code") or ""
+    token = row.get("paystack_email_token") or ""
+    manage_url = f"https://paystack.com/manage/subscriptions/{code}/{token}" if code and token else ""
+    return {
+        "status": row.get("subscription_status") or "",
+        "payment_status": row.get("payment_status") or "",
+        "renewal_date": row.get("renewal_date") or "",
+        "recurring": bool(code),
+        "manage_url": manage_url,
+    }
+
+
 def public_user(user: dict) -> dict:
     company = db.get_company(user["company_id"])
     plan = db.plan_for_company(user["company_id"])
@@ -2369,7 +2392,8 @@ class RouteHandlerMixin:
             if not user or user["status"] != "approved" or user["role"] != "finance_supervisor":
                 return self._json({"error": "Only a supervisor can manage billing."}, 403)
             return self._json({"payments": db.list_payments(user["company_id"], 20),
-                               "configured": bool(paystack_config(load_env())["secret_key"])})
+                               "configured": bool(paystack_config(load_env())["secret_key"]),
+                               "subscription": public_subscription(user["company_id"])})
 
         if path == "/api/paystack/callback":
             reference = parse_qs(urlparse(self.path).query).get("reference", [""])[0]

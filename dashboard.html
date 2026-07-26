@@ -3254,7 +3254,46 @@ Do not promise a payment date unless it has already been approved."></textarea>
 
   async function loadPayments(company) {
     const box=document.getElementById('billingContent');
-    try{const res=await fetch('/api/payments',{credentials:'same-origin'}),data=await res.json();if(!res.ok)throw new Error(data.error||'Could not load payments.');const payments=data.payments||[],last=payments.find(p=>p.status==='success');box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap"><div><b>${escapeHtml(company.plan.name)} · ${escapeHtml(company.plan.currency)} ${Number(company.plan.price).toFixed(2)}/month</b><div style="color:var(--ink-3);font-size:12px;margin-top:3px">${last?`Last verified payment: ${escapeHtml(last.currency)} ${(last.amount_subunit/100).toFixed(2)} · ${new Date(last.paid_at||last.created_at*1000).toLocaleDateString()}`:'No verified payment recorded yet.'}</div></div><button class="btn primary sm" type="button" onclick="startPlanPayment(this)" ${!data.configured||Number(company.plan.price)<=0?'disabled':''}>${Number(company.plan.price)<=0?'No payment due':data.configured?'Pay with Paystack':'Paystack not configured'}</button></div>`;}catch(error){box.innerHTML=`<div class="msg-error" style="display:block">${escapeHtml(error.message||'Could not load billing.')}</div>`;}
+    try {
+      const res = await fetch('/api/payments', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load payments.');
+      const payments = data.payments || [], last = payments.find(p => p.status === 'success');
+      const sub = data.subscription, isFree = Number(company.plan.price) <= 0;
+
+      const lastLine = last
+        ? `Last verified payment: ${escapeHtml(last.currency)} ${(last.amount_subunit / 100).toFixed(2)} · ${new Date(last.paid_at || last.created_at * 1000).toLocaleDateString()}`
+        : 'No verified payment recorded yet.';
+
+      // A subscription renewing normally needs no button - Paystack charges
+      // the card on file. Everything else (no subscription, or one that has
+      // ended) still needs a way to pay, so the original button stays.
+      let renewLine = '', banner = '', action = '';
+      const overdue = sub && sub.payment_status === 'overdue';
+      if (sub && sub.recurring && sub.status === 'active' && !overdue) {
+        renewLine = sub.renewal_date
+          ? `<div style="color:var(--ink-3);font-size:12px;margin-top:3px">Renews automatically on ${escapeHtml(sub.renewal_date)}.</div>`
+          : '<div style="color:var(--ink-3);font-size:12px;margin-top:3px">Renews automatically.</div>';
+      } else if (sub && sub.recurring && sub.status === 'cancel_at_period_end') {
+        renewLine = `<div style="color:var(--warn);font-size:12px;margin-top:3px">Cancelled${sub.renewal_date ? ` · access continues until ${escapeHtml(sub.renewal_date)}` : ''}.</div>`;
+      }
+      if (sub && sub.payment_status === 'overdue') {
+        banner = `<div class="source-modal-note" style="margin-bottom:12px">Your last payment didn't go through. We'll keep retrying, but update your card to avoid losing access.</div>`;
+      }
+      if (sub && sub.manage_url) {
+        action = `<a class="btn sm" href="${escapeHtml(sub.manage_url)}" target="_blank" rel="noopener">Manage billing</a>`;
+      }
+      if (!action || !(sub && sub.recurring && sub.status === 'active')) {
+        action += `<button class="btn primary sm" type="button" onclick="startPlanPayment(this)" ${!data.configured || isFree ? 'disabled' : ''}>${isFree ? 'No payment due' : data.configured ? 'Pay with Paystack' : 'Paystack not configured'}</button>`;
+      }
+
+      box.innerHTML = `${banner}<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+        <div><b>${escapeHtml(company.plan.name)} · ${escapeHtml(company.plan.currency)} ${Number(company.plan.price).toFixed(2)}/month</b>
+          <div style="color:var(--ink-3);font-size:12px;margin-top:3px">${lastLine}</div>${renewLine}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${action}</div></div>`;
+    } catch (error) {
+      box.innerHTML = `<div class="msg-error" style="display:block">${escapeHtml(error.message || 'Could not load billing.')}</div>`;
+    }
   }
 
   async function startPlanPayment(button){button.disabled=true;button.textContent='Opening Paystack…';try{const res=await fetch('/api/payments/initialize',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'}),data=await res.json();if(!res.ok)throw new Error(data.error||'Could not start payment.');location.href=data.authorization_url;}catch(error){alert(error.message||'Could not reach Paystack.');button.disabled=false;button.textContent='Pay with Paystack';}}
