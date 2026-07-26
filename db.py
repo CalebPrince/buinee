@@ -2774,6 +2774,7 @@ def list_companies_with_stats() -> list[dict]:
                       COALESCE(s.payment_status, 'not_connected') AS payment_status,
                       COALESCE(s.customer_reference, '') AS customer_reference,
                       COALESCE(s.notes, '') AS subscription_notes,
+                      COALESCE(s.paystack_subscription_code, '') AS paystack_subscription_code,
                       s.updated_at AS subscription_updated_at
                FROM companies c JOIN plans p ON c.plan_id = p.id
                LEFT JOIN crm_accounts a ON a.company_id = c.id
@@ -2838,6 +2839,7 @@ def list_companies_with_stats() -> list[dict]:
                     "payment_status": c["payment_status"],
                     "customer_reference": c["customer_reference"],
                     "notes": c["subscription_notes"],
+                    "paystack_subscription_code": c["paystack_subscription_code"],
                     "updated_at": c["subscription_updated_at"],
                 },
                 "crm": {

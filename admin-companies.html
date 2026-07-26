@@ -917,6 +917,12 @@
     const percent = Math.min(100, Math.round((used / limit) * 100));
     const meterClass = used > limit ? 'bad' : used >= limit ? 'warn' : '';
     const options = (labels, selected) => Object.entries(labels).map(([value,label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
+    // With a Paystack subscription on file the webhooks own these fields, so
+    // editing them here would just be overwritten (or worse, quietly disagree
+    // with what the customer is actually being charged). Disabled rather than
+    // removed so saveCrmSubscription still round-trips the current values
+    // instead of the server defaulting them and wiping the synced state.
+    const autoSynced = !!s.paystack_subscription_code;
     return `<section class="crm-subscription" onclick="event.stopPropagation()">
       <div class="crm-profile-head"><h4>Subscription & seats</h4><span>Plan capacity is enforced from real approved users</span></div>
       <div class="subscription-grid">
@@ -924,13 +930,15 @@
           <div class="subscription-plan"><label for="planSelect-${c.id}"><b>Current plan: ${escapeHtml(c.plan.name)}</b></label><select id="planSelect-${c.id}">${allPlans.map(p => `<option value="${p.id}" ${p.id===c.plan.id?'selected':''}>${p.audience==='individual'?'Individual':'Team'}, ${escapeHtml(p.name)} · ${p.user_limit} seat${p.user_limit===1?'':'s'} · ${escapeHtml(p.currency)} ${p.price}/mo</option>`).join('')}</select><button class="btn sm" type="button" onclick="changePlan(${c.id})">Move to selected plan</button><span class="msg error" id="planError-${c.id}"></span></div>
         </div>
         <form onsubmit="return saveCrmSubscription(event,${c.id})"><div class="crm-fields">
-          <label>Subscription status<select id="subStatus-${c.id}">${options(SUBSCRIPTION_STATUS_LABELS,s.subscription_status||'active')}</select></label>
-          <label>Billing cycle<select id="subCycle-${c.id}">${options(BILLING_CYCLE_LABELS,s.billing_cycle||'monthly')}</select></label>
-          <label>Payment status<select id="subPayment-${c.id}">${options(PAYMENT_STATUS_LABELS,s.payment_status||'not_connected')}</select></label>
-          <label>Renewal / end date<input id="subRenewal-${c.id}" type="date" value="${escapeAttr(s.renewal_date||'')}"></label>
+          <label>Subscription status<select id="subStatus-${c.id}" ${autoSynced?'disabled':''}>${options(SUBSCRIPTION_STATUS_LABELS,s.subscription_status||'active')}</select></label>
+          <label>Billing cycle<select id="subCycle-${c.id}" ${autoSynced?'disabled':''}>${options(BILLING_CYCLE_LABELS,s.billing_cycle||'monthly')}</select></label>
+          <label>Payment status<select id="subPayment-${c.id}" ${autoSynced?'disabled':''}>${options(PAYMENT_STATUS_LABELS,s.payment_status||'not_connected')}</select></label>
+          <label>Renewal / end date<input id="subRenewal-${c.id}" type="date" value="${escapeAttr(s.renewal_date||'')}" ${autoSynced?'disabled':''}></label>
           <label class="wide">Customer / contract reference<input id="subReference-${c.id}" maxlength="120" value="${escapeAttr(s.customer_reference||'')}" placeholder="External billing or contract ID"></label>
           <label class="wide">Subscription notes<textarea id="subNotes-${c.id}" maxlength="3000" placeholder="Commercial terms, renewal context, or billing notes…">${escapeHtml(s.notes||'')}</textarea></label>
-        </div><div class="crm-actions"><button class="btn sm" type="submit">Save subscription</button><span class="crm-saved" id="subSaved-${c.id}"></span><span class="msg error" id="subError-${c.id}"></span></div><div class="subscription-manual">Billing fields are maintained manually. No payment provider is connected yet.</div></form>
+        </div><div class="crm-actions"><button class="btn sm" type="submit">Save subscription</button><span class="crm-saved" id="subSaved-${c.id}"></span><span class="msg error" id="subError-${c.id}"></span></div><div class="subscription-manual">${autoSynced
+          ? `Status, cycle, payment state and renewal date are kept in sync automatically by Paystack (subscription ${escapeHtml(s.paystack_subscription_code)}) and can't be edited here. Reference and notes are still yours to set.`
+          : 'Billing fields are maintained manually. This company has no Paystack subscription on file.'}</div></form>
       </div>
     </section>`;
   }
