@@ -227,6 +227,7 @@
   .plan-chip .t { font-size: 13.5px; font-weight: 600; color: var(--teal-deep); }
   .plan-chip .s { font-size: 12.5px; color: var(--teal-deep); opacity: .85; font-weight: 400; }
   .plan-chip a { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--teal-deep); white-space: nowrap; }
+  .plan-chip .currency-mini { margin-left:6px; border:1px solid currentColor; background:transparent; color:var(--teal-deep); border-radius:999px; padding:3px 7px; font-size:11px; font-weight:700; cursor:pointer; }
 
   /* shown instead of the form when nobody has picked a tier yet */
   .gate { padding: 40px 28px; text-align: center; display: none; }
@@ -415,6 +416,7 @@
             <div class="t" id="planChipName"></div>
             <div class="s" id="planChipDetail"></div>
           </div>
+          <button class="currency-mini" type="button" id="planCurrencyToggle" onclick="togglePlanCurrency()">Show USD</button>
           <a href="/#pricing">Change</a>
         </div>
         <label id="regCompanyLabel"><span id="regCompanyCaption">{{cms:company_caption_team}}</span>
@@ -534,6 +536,8 @@
   // of reach and the gate sends people back to pricing. Joining an existing
   // company is exempt - that company already has a plan.
   let chosenPlan = null;
+  let planCurrency = localStorage.getItem('buinee-price-currency') || 'GHS';
+  let usdGhsRate = 0;
 
   function showMode(mode) {
     const gated = mode === 'register' && !chosenPlan;
@@ -550,12 +554,22 @@
 
   function describePlan(p) {
     const seats = p.audience === 'individual' ? 'just you' : `up to ${p.user_limit} people`;
-    const price = p.price > 0 ? `${p.currency} ${Number(p.price).toLocaleString()}/month` : 'Free';
+    let amount = Number(p.price), source = String(p.currency || 'GHS').toUpperCase();
+    if (usdGhsRate && source !== planCurrency) amount = planCurrency === 'GHS' ? amount * usdGhsRate : amount / usdGhsRate;
+    const displayCurrency = usdGhsRate || source === planCurrency ? planCurrency : source;
+    const price = p.price > 0 ? `${displayCurrency} ${amount.toLocaleString(undefined,{maximumFractionDigits:2})}/month (display estimate)` : 'Free';
     const chat = !p.chat_enabled ? 'no AI assistant'
       : (p.chat_monthly_limit === null || p.chat_monthly_limit === undefined)
         ? 'AI assistant, unlimited'
         : `AI assistant, ${p.chat_monthly_limit} messages a month`;
     return `${price} · ${seats} · ${chat}`;
+  }
+
+  function togglePlanCurrency() {
+    planCurrency = planCurrency === 'GHS' ? 'USD' : 'GHS';
+    localStorage.setItem('buinee-price-currency', planCurrency);
+    document.getElementById('planCurrencyToggle').textContent = planCurrency === 'GHS' ? 'Show USD' : 'Show GHS';
+    if (chosenPlan) document.getElementById('planChipDetail').textContent = describePlan(chosenPlan);
   }
 
   // A solo plan has no company and no colleagues, so the two questions that
@@ -579,6 +593,11 @@
   }
 
   async function boot() {
+    try {
+      const fxRes = await fetch('/api/exchange-rate');
+      if (fxRes.ok) usdGhsRate = Number((await fxRes.json()).rate || 0);
+    } catch {}
+    document.getElementById('planCurrencyToggle').textContent = planCurrency === 'GHS' ? 'Show USD' : 'Show GHS';
     const params = new URLSearchParams(location.search);
     const wanted = params.get('plan');
     if (wanted) {

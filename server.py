@@ -38,6 +38,7 @@ import hashlib
 import hmac
 import base64
 import binascii
+import csv
 import html
 import io
 import json
@@ -231,6 +232,7 @@ STATIC_PAGES = {
     "/admin/plans": "admin-plans.html",
     "/admin/pipeline": "admin-pipeline.html",
     "/admin/payments": "admin-payments.html",
+    "/admin/expenses": "admin-expenses.html",
     "/admin/team": "admin-team.html",
     "/admin/activity": "admin-activity.html",
     "/admin/errors": "admin-errors.html",
@@ -260,6 +262,7 @@ LEGACY_PAGE_REDIRECTS = {
     "/admin-plans.html": "/admin/plans",
     "/admin-pipeline.html": "/admin/pipeline",
     "/admin-payments.html": "/admin/payments",
+    "/admin-expenses.html": "/admin/expenses",
     "/admin-team.html": "/admin/team",
     "/admin-activity.html": "/admin/activity",
     "/admin-errors.html": "/admin/errors",
@@ -1090,6 +1093,50 @@ def fx() -> voucher.FxRates | None:
     return _fx
 
 
+def public_usd_ghs_rate(force: bool = False) -> dict:
+    """Return the shared public display rate, with a durable database cache."""
+    settings = db.get_platform_finance_settings()
+    cached_rate = float(settings.get("usd_ghs_rate") or 0)
+    cached_at = float(settings.get("fx_updated_at") or 0)
+    if cached_rate > 0 and not force and time.time() - cached_at < 12 * 3600:
+        return {"base": "USD", "quote": "GHS", "rate": cached_rate,
+                "provider": settings.get("fx_provider") or "Cached rate",
+                "updated_at": cached_at, "cached": True}
+
+    headers = {"Accept": "application/json", "User-Agent": "BuineeFinance/1.0"}
+    providers = (
+        ("Ghana API",
+         "https://api.ghana-api.dev/api/v1/exchange-rates/current?currencies=USD"),
+        ("ExchangeRate.fun fallback", "https://api.exchangerate.fun/latest?base=USD"),
+    )
+    for provider, url in providers:
+        try:
+            request = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(request, timeout=6) as response:
+                payload = json.loads(response.read())
+            if provider == "Ghana API":
+                row = next((item for item in payload.get("data", [])
+                            if item.get("baseCurrency") == "GHS"
+                            and item.get("targetCurrency") == "USD"), {})
+                quoted = float(row.get("rate") or 0)
+                rate = 1 / quoted if quoted > 0 else 0
+            else:
+                rate = float(payload.get("rates", {}).get("GHS") or 0)
+            if rate > 0:
+                updated_at = time.time()
+                db.cache_usd_ghs_rate(rate, provider, updated_at)
+                return {"base": "USD", "quote": "GHS", "rate": rate,
+                        "provider": provider, "updated_at": updated_at,
+                        "cached": False}
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+            continue
+    if cached_rate > 0:
+        return {"base": "USD", "quote": "GHS", "rate": cached_rate,
+                "provider": settings.get("fx_provider") or "Cached rate",
+                "updated_at": cached_at, "cached": True, "stale": True}
+    raise RuntimeError("The USD/GHS exchange rate is temporarily unavailable.")
+
+
 def compute_voucher(v: dict) -> dict:
     """Derive a stored voucher's figures for display. db.py only ever stores
     what a preparer typed - the tax/net numbers are always computed fresh
@@ -1501,7 +1548,7 @@ def send_subscription_reminder(row: dict) -> dict:
     losing one reminder is a far smaller problem than spamming."""
     db.mark_subscription_reminded(row["company_id"], row["renewal_date"])
     price = f"{row['plan_currency']} {float(row['plan_price']):.2f}"
-    notify_company_billing(
+    notify_company(
         row["company_id"],
         f"Your Buinee subscription renews on {row['renewal_date']}",
         f"Your {row['plan_name']} plan for {row['company_name']} renews on "
@@ -1513,12 +1560,94 @@ def send_subscription_reminder(row: dict) -> dict:
     return {"company_id": row["company_id"], "renewal_date": row["renewal_date"]}
 
 
-def notify_company_billing(company_id: int, subject: str, body: str) -> None:
-    """Best-effort billing notification (renewal reminder, dunning,
-    subscription-ended) to every approved Supervisor at a company - same
-    fail-open pattern as every other outbound_mail call site in this app;
-    a delivery failure here must never break the webhook handler that
-    triggered it."""
+CADENCE_ALIASES = {
+    "quarterly": 90, "quarter": 90, "3 months": 90, "90 days": 90,
+    "6 months": 180, "biannual": 180, "semi-annual": 180, "semiannual": 180,
+    "half-yearly": 180, "half yearly": 180, "180 days": 180,
+    "yearly": 365, "annual": 365, "annually": 365, "12 months": 365, "365 days": 365,
+}
+
+
+def parse_maintenance_cadence(raw: str) -> int:
+    """Accepts either a plain number of days or a common cadence word (used
+    by the clients CSV import, where a spreadsheet cell is more likely to
+    say "quarterly" than "90"). Falls back to the default 6-month cadence
+    for anything unrecognized rather than failing the whole row - a good
+    default beats rejecting an otherwise-valid client record."""
+    raw = (raw or "").strip().lower()
+    if not raw:
+        return 180
+    if raw in CADENCE_ALIASES:
+        return CADENCE_ALIASES[raw]
+    try:
+        return int(raw)
+    except ValueError:
+        return 180
+
+
+def send_maintenance_reminder(row: dict) -> dict:
+    """Heads-up that a client's next maintenance check-in is due (or already
+    overdue) - see db.due_maintenance_reminders. Stamps the due date as
+    reminded first, same fail-open ordering as send_subscription_reminder: a
+    send failure must not turn into re-emailing every cron tick until the
+    client's next_maintenance_due is actually advanced (mark_maintenance_done)."""
+    db.mark_maintenance_reminded(row["id"])
+    today = datetime.now(timezone.utc).date().isoformat()
+    when = (
+        f"was due on {row['next_maintenance_due']}"
+        if row["next_maintenance_due"] < today
+        else f"is due on {row['next_maintenance_due']}"
+    )
+    contact = f" ({row['contact']})" if row["contact"] else ""
+    notes = f"\nNotes: {row['notes']}" if row["notes"] else ""
+    notify_company(
+        row["company_id"],
+        f"Maintenance check-in due: {row['name']}",
+        f"{row['name']}{contact} {when} for a maintenance check-in.\n\n"
+        f"Installed {row['install_date'] or 'unknown date'}.{notes}\n\n"
+        "Once you've completed the visit, mark it done in Buinee so the "
+        "next check-in gets scheduled automatically.",
+    )
+    return {"client_id": row["id"], "company_id": row["company_id"], "next_maintenance_due": row["next_maintenance_due"]}
+
+
+def notify_client_maintenance_done(client: dict) -> dict:
+    """Confirms a completed visit directly to the end-customer - the
+    counterpart to send_maintenance_reminder/notify_company, which only ever
+    reach the company's own team. Silently does nothing (not an error) if
+    the client has no email on file or SMTP isn't configured: this is a
+    nice-to-have on top of mark_maintenance_done succeeding, never a
+    precondition for it."""
+    email = (client.get("email") or "").strip()
+    if not email:
+        return {"sent": False, "reason": "no client email on file"}
+    cfg = load_env()
+    if not outbound_mail.is_configured(cfg):
+        return {"sent": False, "reason": outbound_mail.why_unavailable(cfg)}
+    company = db.get_company(client["company_id"])
+    company_name = company["name"] if company else "your installer"
+    try:
+        outbound_mail.send(
+            cfg, email,
+            f"Maintenance visit complete - {company_name}",
+            f"Hi {client['name']},\n\n"
+            f"This confirms your maintenance check-in with {company_name} was completed on "
+            f"{client['last_maintenance_date']}.\n\n"
+            f"We'll be in touch again around {client['next_maintenance_due']} for your next "
+            "check-in - reach out any time before then if something comes up.\n\n"
+            f"- {company_name}",
+        )
+        return {"sent": True}
+    except outbound_mail.MailSendError as exc:
+        return {"sent": False, "reason": str(exc)}
+
+
+def notify_company(company_id: int, subject: str, body: str) -> None:
+    """Best-effort notification (billing renewal/dunning/subscription-ended,
+    a client's maintenance check-in coming due, etc.) to every approved
+    Supervisor at a company - same fail-open pattern as every other
+    outbound_mail call site in this app; a delivery failure here must never
+    break whatever triggered it (a webhook handler, a cron tick)."""
     cfg = load_env()
     if not outbound_mail.is_configured(cfg):
         return
@@ -2586,6 +2715,15 @@ class RouteHandlerMixin:
                 "reminders": db.list_reminders(user["company_id"], user["id"], user["role"]),
             })
 
+        if path == "/api/clients":
+            user = current_user(self)
+            if not user or user["status"] != "approved":
+                return self._json({"error": "Not signed in."}, 401)
+            status = parse_qs(urlparse(self.path).query).get("status", ["active"])[0]
+            return self._json({
+                "clients": db.list_company_clients(user["company_id"], status=None if status == "all" else status),
+            })
+
         if path == "/api/activity":
             user = current_user(self)
             if not user or user["status"] != "approved":
@@ -2859,6 +2997,12 @@ class RouteHandlerMixin:
                 },
             })
 
+        if path == "/api/exchange-rate":
+            try:
+                return self._json(public_usd_ghs_rate())
+            except RuntimeError as exc:
+                return self._json({"error": str(exc)}, 503)
+
         if path == "/api/admin/diagnostics/outbound-ip":
             # Shared hosting sometimes routes outbound connections through a
             # different IP than the one shown for inbound/DNS purposes in
@@ -2907,6 +3051,29 @@ class RouteHandlerMixin:
                     "public_key": ps["public_key"], "public_key_configured": bool(ps["public_key"]),
                     "secret_key_configured": bool(ps["secret_key"]), "webhook_url": ps["webhook_url"],
                     "callback_url": ps["callback_url"]},
+            })
+
+        if path == "/api/admin/expenses":
+            admin = self._admin_role_request("owner", "billing")
+            if not admin:
+                return
+            now = datetime.now(timezone.utc)
+            month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc).timestamp()
+            revenue = {}
+            for payment in db.list_payments(limit=1000):
+                if payment["status"] == "success" and float(payment["created_at"]) >= month_start:
+                    currency = payment["currency"].upper()
+                    revenue[currency] = revenue.get(currency, 0) + int(payment["amount_subunit"])
+            try:
+                exchange = public_usd_ghs_rate()
+            except RuntimeError:
+                exchange = None
+            return self._json({
+                "expenses": db.list_platform_expenses(),
+                "settings": db.get_platform_finance_settings(),
+                "revenue": revenue,
+                "month": now.strftime("%B %Y"),
+                "exchange_rate": exchange,
             })
 
         if path == "/api/admin/team":
@@ -3055,6 +3222,11 @@ class RouteHandlerMixin:
             "/api/vouchers/review": self._handle_voucher_review,
             "/api/reminders/create": self._handle_reminder_create,
             "/api/reminders/cancel": self._handle_reminder_cancel,
+            "/api/clients/import": self._handle_client_import,
+            "/api/clients/create": self._handle_client_create,
+            "/api/clients/update": self._handle_client_update,
+            "/api/clients/set-status": self._handle_client_set_status,
+            "/api/clients/maintenance-done": self._handle_client_maintenance_done,
             "/api/chat": self._handle_chat,
             "/api/admin/login": self._handle_admin_login,
             "/api/admin/logout": self._handle_admin_logout,
@@ -3071,6 +3243,9 @@ class RouteHandlerMixin:
             "/api/admin/mfa/disable": self._handle_admin_mfa_disable,
             "/api/admin/company/delete": self._handle_admin_delete_company,
             "/api/admin/payment/delete": self._handle_admin_delete_payment,
+            "/api/admin/expenses/save": self._handle_admin_save_expense,
+            "/api/admin/expenses/delete": self._handle_admin_delete_expense,
+            "/api/admin/expenses/settings": self._handle_admin_expense_settings,
             "/api/admin/payments/link": self._handle_admin_generate_payment_link,
             "/api/admin/payments/migrate-subscription": self._handle_admin_migrate_subscription,
             "/api/admin/company/crm": self._handle_admin_update_crm_account,
@@ -4056,7 +4231,7 @@ class RouteHandlerMixin:
             if result:
                 company_id, should_notify = result
                 if should_notify:
-                    notify_company_billing(
+                    notify_company(
                         company_id, "Your Buinee payment didn't go through",
                         "We tried to charge your card for your Buinee subscription and it "
                         "didn't go through. Your access hasn't changed, we'll keep retrying "
@@ -4067,7 +4242,7 @@ class RouteHandlerMixin:
         elif kind == "subscription.disable":
             company_id = db.record_subscription_ended(data)
             if company_id:
-                notify_company_billing(
+                notify_company(
                     company_id, "Your Buinee subscription has ended",
                     "Your Buinee subscription has ended and your workspace has been moved "
                     "to the free plan. Your data is safe, nothing has been deleted.\n\n"
@@ -4266,6 +4441,137 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "reminder": r})
+
+    # ------------------------------------------------------------- clients
+
+    def _handle_client_import(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body(max_len=2 * 1024 * 1024)
+            csv_text = str(req.get("csv") or "")
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        if not csv_text.strip():
+            return self._json({"error": "No CSV content found in that file."}, 400)
+
+        reader = csv.DictReader(io.StringIO(csv_text))
+        if not reader.fieldnames:
+            return self._json({"error": "Could not find a header row in that CSV."}, 400)
+        fieldmap = {(f or "").strip().lower(): f for f in reader.fieldnames}
+        if "name" not in fieldmap:
+            return self._json({"error": "The CSV needs a 'name' column."}, 400)
+
+        def cell(row: dict, col: str) -> str:
+            key = fieldmap.get(col)
+            return (row.get(key) or "").strip() if key else ""
+
+        created = 0
+        errors = []
+        for i, row in enumerate(reader, start=2):  # row 1 is the header
+            name = cell(row, "name")
+            if not name:
+                errors.append(f"Row {i}: no name, skipped.")
+                continue
+            try:
+                db.create_company_client(
+                    user["company_id"], user["id"],
+                    name=name,
+                    contact=cell(row, "contact"),
+                    email=cell(row, "email"),
+                    notes=cell(row, "notes"),
+                    install_date=cell(row, "install_date"),
+                    maintenance_interval_days=parse_maintenance_cadence(
+                        cell(row, "maintenance_interval_days") or cell(row, "cadence")),
+                )
+                created += 1
+            except db.AuthError as exc:
+                errors.append(f"Row {i} ({name}): {exc}")
+        return self._json({"ok": True, "created": created, "errors": errors})
+
+    def _handle_client_create(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            interval = req.get("maintenance_interval_days")
+            client = db.create_company_client(
+                user["company_id"], user["id"],
+                name=str(req.get("name") or ""),
+                contact=str(req.get("contact") or ""),
+                email=str(req.get("email") or ""),
+                notes=str(req.get("notes") or ""),
+                install_date=str(req.get("install_date") or ""),
+                maintenance_interval_days=int(interval) if interval else 180,
+            )
+        except (db.AuthError, TypeError, ValueError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        return self._json({"ok": True, "client": client})
+
+    def _handle_client_update(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            client_id = int(req.get("client_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        fields = {}
+        for key in ("name", "contact", "email", "notes", "install_date"):
+            if key in req:
+                fields[key] = str(req.get(key) or "")
+        if "maintenance_interval_days" in req:
+            try:
+                fields["maintenance_interval_days"] = int(req["maintenance_interval_days"])
+            except (TypeError, ValueError):
+                return self._json({"error": "Bad maintenance interval."}, 400)
+        try:
+            client = db.update_company_client(user["company_id"], client_id, **fields)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "client": client})
+
+    def _handle_client_set_status(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            client_id = int(req.get("client_id"))
+            status = str(req.get("status") or "")
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        try:
+            client = db.set_company_client_status(user["company_id"], client_id, status)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        return self._json({"ok": True, "client": client})
+
+    def _handle_client_maintenance_done(self):
+        user = current_user(self)
+        if not user or user["status"] != "approved":
+            return self._json({"error": "Not signed in."}, 401)
+        try:
+            req = self._body()
+            client_id = int(req.get("client_id"))
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+        done_on = str(req.get("done_on") or "").strip() or None
+        try:
+            client = db.mark_maintenance_done(user["company_id"], client_id, done_on=done_on)
+        except db.AuthError as exc:
+            return self._json({"error": str(exc)}, 400)
+        try:
+            notify_client_maintenance_done(client)
+        except Exception as exc:
+            print(f"maintenance-done client email failed client={client_id}: {exc}")
+        return self._json({"ok": True, "client": client})
 
     def _handle_chat(self):
         """The signed-in equivalent of the landing page's demo agent. Grounded
@@ -4737,6 +5043,60 @@ class RouteHandlerMixin:
         except db.AuthError as exc:
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True})
+
+    def _handle_admin_save_expense(self):
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            req = self._body()
+            raw_id = req.get("id")
+            expense_id = int(raw_id) if raw_id else None
+            amount_subunit = round(float(req.get("amount") or 0) * 100)
+            expense = db.save_platform_expense(
+                expense_id, str(req.get("name") or ""),
+                str(req.get("category") or ""), str(req.get("cost_type") or ""),
+                amount_subunit, str(req.get("currency") or ""),
+                str(req.get("notes") or ""),
+            )
+        except (ValueError, TypeError, db.AuthError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        db.record_admin_activity(
+            admin, "updated" if expense_id else "created", "expense",
+            expense["id"], expense["name"],
+            f'{expense["currency"]} {expense["amount_subunit"] / 100:,.2f} monthly',
+        )
+        return self._json({"ok": True, "expense": expense})
+
+    def _handle_admin_delete_expense(self):
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            expense_id = int(self._body().get("id"))
+            db.delete_platform_expense(expense_id)
+        except (ValueError, TypeError, db.AuthError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        db.record_admin_activity(admin, "deleted", "expense", expense_id)
+        return self._json({"ok": True})
+
+    def _handle_admin_expense_settings(self):
+        admin = self._admin_role_request("owner", "billing")
+        if not admin:
+            return
+        try:
+            req = self._body()
+            budget = round(float(req.get("monthly_budget") or 0) * 100)
+            settings = db.update_platform_finance_settings(
+                str(req.get("reporting_currency") or ""), budget
+            )
+        except (ValueError, TypeError, db.AuthError) as exc:
+            return self._json({"error": str(exc) or "Bad request."}, 400)
+        db.record_admin_activity(
+            admin, "updated", "finance_settings", 1,
+            details=f'{settings["reporting_currency"]} monthly reporting',
+        )
+        return self._json({"ok": True, "settings": settings})
 
     def _handle_admin_generate_payment_link(self):
         """A fresh Paystack checkout link for a registration stuck at

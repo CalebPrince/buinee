@@ -481,7 +481,7 @@
 
   .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
   .vgrid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
-  input[type=text], input[type=number], input[type=date], input[type=email], input:not([type]) {
+  input[type=text], input[type=number], input[type=date], input[type=email], input[type=search], input:not([type]) {
     padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
     background: var(--surface); color: var(--ink); font-size: 13.5px; font-family: inherit;
   }
@@ -826,6 +826,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
         Team chat
         <span class="count" id="teamChatNavCount" style="display:none"></span>
+      </button>
+      <button class="nav-item" data-view="clients" onclick="go('clients')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Clients
+        <span class="count" id="clientNavCount" style="display:none"></span>
       </button>
       <button class="nav-item" data-view="automations" onclick="go('automations')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -1175,6 +1180,66 @@
           <div id="reminderRows"></div>
         </div>
       </div>
+
+    </section>
+
+    <!-- ===== CLIENTS ===== -->
+    <section class="view" data-view="clients" id="viewClients" hidden>
+      <div class="hello">
+        <div>
+          <h1>Clients</h1>
+          <p>Your own customers and installations — track install dates, maintenance cadence, and keep check-ins from falling through the cracks.</p>
+        </div>
+      </div>
+      <div class="kpis" id="clientKpis"></div>
+
+      <div class="card full" style="margin-bottom:18px">
+        <div class="card-h">
+          <h3 id="clientFormHeading">Add a client</h3>
+        </div>
+        <div class="card-b">
+          <form id="clientForm" onsubmit="return submitClientForm(event)">
+            <div class="vgrid">
+              <label>Name<input id="clientName" maxlength="200" required placeholder="Client or business name"></label>
+              <label>Contact<input id="clientContact" maxlength="200" placeholder="Phone or WhatsApp"></label>
+              <label>Email <span style="font-weight:400">(for maintenance-done confirmations)</span><input id="clientEmail" type="email" maxlength="200" placeholder="client@example.com"></label>
+              <label>Install date<input id="clientInstallDate" type="date"></label>
+              <label>Maintenance check-in<select id="clientInterval">
+                <option value="180" selected>Every 6 months</option>
+                <option value="90">Every quarter</option>
+                <option value="365">Every year</option>
+              </select></label>
+            </div>
+            <label style="display:block;margin-top:10px">Notes<textarea id="clientNotes" rows="2" maxlength="2000" placeholder="System size, panels, inverter, anything worth remembering"></textarea></label>
+            <div class="msg-error" id="clientErr" style="display:none"></div>
+            <div style="display:flex; gap:10px; margin-top:10px">
+              <button class="btn primary sm" type="submit" id="clientFormSubmit">Add client</button>
+              <button class="btn sm" type="button" id="clientFormCancel" onclick="cancelEditClient()" style="display:none">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card full">
+        <div class="card-h">
+          <h3>All clients</h3>
+          <div class="sub" id="clientListSub"></div>
+        </div>
+        <div class="card-b">
+          <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <button class="btn sm" type="button" onclick="downloadClientCsvTemplate()">Download CSV template</button>
+            <button class="btn sm" type="button" onclick="document.getElementById('clientCsvInput').click()">Import CSV</button>
+            <input type="file" id="clientCsvInput" accept=".csv,text/csv" style="display:none" onchange="importClientsCsv(event)">
+          </div>
+          <div id="clientImportResult" style="display:none; margin-bottom:12px"></div>
+          <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <input type="search" id="clientSearchInput" placeholder="Search by client name…" oninput="setClientSearch(this.value)" style="flex:1; min-width:200px">
+            <button class="activity-filter on" type="button" id="clientFilterActive" onclick="setClientFilter('active')">Active</button>
+            <button class="activity-filter" type="button" id="clientFilterAll" onclick="setClientFilter('all')">All</button>
+          </div>
+          <div id="clientRows"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ===== ACTIVITY ===== -->
@@ -1499,7 +1564,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
   const CRUMB_NAMES = {
     overview: 'Overview', team: 'Team', vouchers: 'Vouchers', triage: 'Triage',
     flagged: 'Flagged', fix: 'To fix', followups: 'Follow-ups', chat: 'Ask Ada', teamchat: 'Team chat', automations: 'Automations',
-    activity: 'Activity', instructions: 'Instructions', connections: 'Connections',
+    clients: 'Clients', activity: 'Activity', instructions: 'Instructions', connections: 'Connections',
   };
   const STATUS_INFO = {
     draft: { label: 'Draft', cls: '' },
@@ -1775,6 +1840,7 @@ Do not promise a payment date unless it has already been approved."></textarea>
     loadInstructions();
     loadAutomations();
     loadReminders();
+    loadClients();
 
     document.getElementById('loading').style.display = 'none';
     go(location.hash.slice(1) || 'overview', { replace: true });
@@ -2081,6 +2147,244 @@ Do not promise a payment date unless it has already been approved."></textarea>
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Could not cancel that reminder.'); return; }
       loadReminders();
+    } catch { alert('Could not reach the server.'); }
+  }
+
+  // ----------------------------------------------------------------- clients
+
+  let allClients = [];
+  let clientFilter = 'active';
+  let clientSearch = '';
+  const CADENCE_LABELS = { 90: 'Quarterly', 180: 'Every 6 months', 365: 'Yearly' };
+
+  async function loadClients() {
+    const box = document.getElementById('clientRows');
+    try {
+      const res = await fetch(`/api/clients?status=${clientFilter}`, { credentials: 'same-origin' });
+      const data = await res.json();
+      allClients = data.clients || [];
+    } catch {
+      box.innerHTML = '<div class="empty"><h4>Could not load clients.</h4></div>';
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const activeClients = allClients.filter(c => c.status === 'active');
+    const overdue = activeClients.filter(c => c.next_maintenance_due && c.next_maintenance_due < today).length;
+    const upcoming = activeClients.filter(c => {
+      if (!c.next_maintenance_due || c.next_maintenance_due < today) return false;
+      return (new Date(c.next_maintenance_due) - new Date(today)) / 86400000 <= 30;
+    }).length;
+
+    document.getElementById('clientListSub').textContent = overdue
+      ? `${overdue} overdue for maintenance`
+      : (allClients.length ? `${allClients.length} client${allClients.length === 1 ? '' : 's'}` : '');
+    renderClientList();
+
+    const kpiBox = document.getElementById('clientKpis');
+    if (kpiBox) {
+      kpiBox.innerHTML = [
+        { key: 'total', n: activeClients.length, l: 'Active clients' },
+        { key: 'overdue', n: overdue, l: 'Overdue for maintenance' },
+        { key: 'upcoming', n: upcoming, l: 'Due in next 30 days' },
+      ].map(k => `<div class="kpi" data-kpi="${k.key}"><div class="eyebrow">${k.l}</div><div class="val num">${k.n}</div></div>`).join('');
+    }
+
+    const navBadge = document.getElementById('clientNavCount');
+    if (navBadge) {
+      if (overdue) { navBadge.style.display = 'inline-block'; navBadge.textContent = overdue; }
+      else { navBadge.style.display = 'none'; }
+    }
+  }
+
+  function setClientFilter(filter) {
+    clientFilter = filter;
+    document.getElementById('clientFilterActive').classList.toggle('on', filter === 'active');
+    document.getElementById('clientFilterAll').classList.toggle('on', filter === 'all');
+    loadClients();
+  }
+
+  function setClientSearch(value) {
+    clientSearch = value.trim().toLowerCase();
+    renderClientList();
+  }
+
+  function renderClientList() {
+    const box = document.getElementById('clientRows');
+    const visible = clientSearch
+      ? allClients.filter(c => c.name.toLowerCase().includes(clientSearch))
+      : allClients;
+    if (visible.length) {
+      box.innerHTML = visible.map(renderClientRow).join('');
+    } else if (clientSearch) {
+      box.innerHTML = '<div class="empty"><h4>No clients match that search</h4></div>';
+    } else {
+      box.innerHTML = '<div class="empty"><h4>No clients yet</h4></div>';
+    }
+  }
+
+  function renderClientRow(c) {
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = c.status === 'active' && c.next_maintenance_due && c.next_maintenance_due < today;
+    const dueLabel = c.next_maintenance_due
+      ? (overdue ? `Overdue since ${escapeHtml(c.next_maintenance_due)}` : `Next check-in ${escapeHtml(c.next_maintenance_due)}`)
+      : 'No install date on file yet';
+    const details = [
+      c.install_date ? `Installed ${escapeHtml(c.install_date)}` : '',
+      CADENCE_LABELS[c.maintenance_interval_days] || `Every ${c.maintenance_interval_days} days`,
+      c.last_maintenance_date ? `Last visit ${escapeHtml(c.last_maintenance_date)}` : '',
+    ].filter(Boolean).join(' &middot; ');
+    const doneBtn = c.status === 'active'
+      ? `<button class="btn sm primary" type="button" onclick="markMaintenanceDone(${c.id})">Mark maintenance done</button>` : '';
+    const editBtn = `<button class="btn sm" type="button" onclick="startEditClient(${c.id})">Edit</button>`;
+    const archiveBtn = c.status === 'active'
+      ? `<button class="btn sm" type="button" onclick="setClientStatus(${c.id}, 'archived')">Archive</button>`
+      : `<button class="btn sm" type="button" onclick="setClientStatus(${c.id}, 'active')">Reactivate</button>`;
+    const who = [c.contact, c.email].filter(Boolean).map(escapeHtml).join(' &middot; ');
+    return `<div class="auto" style="grid-template-columns:1fr auto">
+      <div class="auto-copy">
+        <div class="t">${escapeHtml(c.name)}${who ? ' &middot; ' + who : ''}</div>
+        <div class="m">${dueLabel} &middot; ${details}</div>
+        ${c.notes ? `<div class="m">${escapeHtml(c.notes)}</div>` : ''}
+      </div>
+      <div class="auto-actions">${doneBtn}${editBtn}${archiveBtn}</div>
+    </div>`;
+  }
+
+  let editingClientId = null;
+
+  function startEditClient(id) {
+    const c = allClients.find(x => x.id === id);
+    if (!c) return;
+    editingClientId = id;
+    document.getElementById('clientName').value = c.name || '';
+    document.getElementById('clientContact').value = c.contact || '';
+    document.getElementById('clientEmail').value = c.email || '';
+    document.getElementById('clientInstallDate').value = c.install_date || '';
+    document.getElementById('clientInterval').value = String(c.maintenance_interval_days);
+    document.getElementById('clientNotes').value = c.notes || '';
+    document.getElementById('clientErr').style.display = 'none';
+    document.getElementById('clientFormHeading').textContent = `Edit ${c.name}`;
+    document.getElementById('clientFormSubmit').textContent = 'Save changes';
+    document.getElementById('clientFormCancel').style.display = '';
+    document.getElementById('clientForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function cancelEditClient() {
+    editingClientId = null;
+    document.getElementById('clientForm').reset();
+    document.getElementById('clientErr').style.display = 'none';
+    document.getElementById('clientFormHeading').textContent = 'Add a client';
+    document.getElementById('clientFormSubmit').textContent = 'Add client';
+    document.getElementById('clientFormCancel').style.display = 'none';
+  }
+
+  async function submitClientForm(ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById('clientErr');
+    errEl.style.display = 'none';
+    const name = document.getElementById('clientName').value.trim();
+    if (!name) return false;
+    const body = {
+      name,
+      contact: document.getElementById('clientContact').value.trim(),
+      email: document.getElementById('clientEmail').value.trim(),
+      notes: document.getElementById('clientNotes').value.trim(),
+      install_date: document.getElementById('clientInstallDate').value,
+      maintenance_interval_days: Number(document.getElementById('clientInterval').value),
+    };
+    const editing = editingClientId;
+    if (editing) body.client_id = editing;
+    try {
+      const res = await fetch(editing ? '/api/clients/update' : '/api/clients/create', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || `Could not ${editing ? 'save' : 'add'} that client.`;
+        errEl.style.display = 'block';
+        return false;
+      }
+      if (editing) cancelEditClient(); else document.getElementById('clientForm').reset();
+      loadClients();
+    } catch { errEl.textContent = 'Could not reach the server.'; errEl.style.display = 'block'; }
+    return false;
+  }
+
+  function downloadClientCsvTemplate() {
+    const csv = 'name,contact,email,install_date,maintenance_interval_days,notes\n'
+      + 'Ama Owusu,024-000-0000,ama@example.com,2026-01-15,180,10kW system\n';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'clients-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importClientsCsv(ev) {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    const resultEl = document.getElementById('clientImportResult');
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<div class="empty"><h4>Importing…</h4></div>';
+    let csvText;
+    try {
+      csvText = await file.text();
+    } catch {
+      resultEl.innerHTML = '<div class="msg-error">Could not read that file.</div>';
+      return;
+    }
+    try {
+      const res = await fetch('/api/clients/import', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv: csvText }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        resultEl.innerHTML = `<div class="msg-error">${escapeHtml(data.error || 'Could not import that CSV.')}</div>`;
+        return;
+      }
+      const parts = [`<div class="empty"><h4>Imported ${data.created} client${data.created === 1 ? '' : 's'}</h4>`];
+      if (data.errors && data.errors.length) {
+        parts.push(`<p>${data.errors.length} row${data.errors.length === 1 ? '' : 's'} skipped:</p><ul style="margin:6px 0 0 18px; font-size:12.5px; color:var(--ink-3)">`
+          + data.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('') + '</ul>');
+      }
+      parts.push('</div>');
+      resultEl.innerHTML = parts.join('');
+      loadClients();
+    } catch {
+      resultEl.innerHTML = '<div class="msg-error">Could not reach the server.</div>';
+    }
+  }
+
+  async function setClientStatus(id, status) {
+    try {
+      const res = await fetch('/api/clients/set-status', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: id, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not update that client.'); return; }
+      loadClients();
+    } catch { alert('Could not reach the server.'); }
+  }
+
+  async function markMaintenanceDone(id) {
+    try {
+      const res = await fetch('/api/clients/maintenance-done', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Could not log that visit.'); return; }
+      loadClients();
     } catch { alert('Could not reach the server.'); }
   }
 

@@ -327,6 +327,9 @@
     background: var(--surface-2); border-radius: 11px; border: 1px solid var(--line);
   }
   .band .aud-toggle { background: var(--paper); }
+  .currency-switch { display:flex; justify-content:center; align-items:center; gap:8px; margin:12px 0 4px; color:var(--ink-3); font-size:12px; }
+  .currency-switch button { border:1px solid var(--line); background:var(--paper); color:var(--ink-2); border-radius:999px; padding:6px 11px; cursor:pointer; font-weight:700; }
+  .currency-switch button.active { background:var(--teal-deep); color:#fff; border-color:var(--teal-deep); }
   .aud {
     padding: 9px 20px; border-radius: 8px; border: none; background: transparent;
     font-size: 14px; font-weight: 600; color: var(--ink-2); cursor: pointer;
@@ -972,6 +975,12 @@
           {{cms:pricing_aud_team}}
         </button>
       </div>
+      <div class="currency-switch" aria-label="Display currency">
+        <span>Show prices in</span>
+        <button id="priceGHS" type="button" onclick="setPriceCurrency('GHS')">GHS</button>
+        <button id="priceUSD" type="button" onclick="setPriceCurrency('USD')">USD</button>
+        <span id="priceRate"></span>
+      </div>
 
       <div class="plans" id="plans">
         <p class="plans-loading">Loading plans…</p>
@@ -1112,6 +1121,27 @@
   // who only ever creates team plans still gets a working page - the toggle
   // hides itself rather than offering an empty tab.
   let allPlans = [];
+  let priceCurrency = localStorage.getItem("buinee-price-currency") || "GHS";
+  let usdGhsRate = 0;
+
+  function displayPlanPrice(plan) {
+    let amount = Number(plan.price), source = String(plan.currency || "GHS").toUpperCase();
+    if (usdGhsRate && source !== priceCurrency) {
+      amount = priceCurrency === "GHS" ? amount * usdGhsRate : amount / usdGhsRate;
+    } else if (source !== priceCurrency) {
+      return `${source} ${amount.toLocaleString()}`;
+    }
+    return `${priceCurrency} ${amount.toLocaleString(undefined, {maximumFractionDigits: 2})}`;
+  }
+
+  function setPriceCurrency(currency) {
+    priceCurrency = currency;
+    localStorage.setItem("buinee-price-currency", currency);
+    document.getElementById("priceGHS").classList.toggle("active", currency === "GHS");
+    document.getElementById("priceUSD").classList.toggle("active", currency === "USD");
+    const active = document.querySelector(".aud-toggle .aud.active");
+    showAudience(active && active.id === "audIndividual" ? "individual" : "team");
+  }
 
   function showAudience(audience) {
     document.getElementById("audIndividual").classList.toggle("active", audience === "individual");
@@ -1138,7 +1168,7 @@
       const card = document.createElement("div");
       card.className = "plan" + (p.id === featured ? " featured" : "");
       const price = p.price > 0
-        ? `<b>${p.currency} ${Number(p.price).toLocaleString()}</b><span>/month</span>`
+        ? `<b>${displayPlanPrice(p)}</b><span>/month · display estimate</span>`
         : `<b>Free</b><span>no card needed</span>`;
       card.innerHTML =
         (p.id === featured ? '<span class="pop">Most popular</span>' : "") +
@@ -1161,11 +1191,22 @@
       // Teams first: it's what most people arrive looking for, and the
       // heading asks the question in that order.
       showAudience(kinds.includes("team") ? "team" : (kinds[0] || "team"));
+      setPriceCurrency(priceCurrency);
     })
     .catch(() => {
       document.getElementById("plans").innerHTML =
         '<p class="plans-loading">Couldn\'t load pricing just now, please refresh.</p>';
     });
+
+  fetch("/api/exchange-rate")
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(fxData => {
+      usdGhsRate = Number(fxData.rate || 0);
+      document.getElementById("priceRate").textContent = usdGhsRate
+        ? `· 1 USD = ${usdGhsRate.toFixed(2)} GHS`
+        : "";
+      setPriceCurrency(priceCurrency);
+    }).catch(() => setPriceCurrency(priceCurrency));
 
   // Smooth in-page nav without hijacking anything else.
   document.querySelectorAll('a[href^="#"]').forEach(a => {
@@ -1674,7 +1715,7 @@
     // with a form that would try to register the same email twice.
     if (adaRegisterDone) return;
     const priceLine = draft.price > 0
-      ? `${draft.currency} ${Number(draft.price).toLocaleString()}/month`
+      ? `${displayPlanPrice(draft)}/month (display estimate)`
       : "Free";
     const box = document.getElementById("adaRegSlot");
     box.innerHTML = "";

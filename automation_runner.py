@@ -51,6 +51,17 @@ def main() -> None:
         except Exception as exc:
             print(f"renewal reminder company={row['company_id']} failed unexpectedly: {exc}")
 
+    # Client maintenance check-ins (e.g. a solar installer's 6-month/
+    # quarterly/yearly follow-up). Same idempotent shape as the renewal
+    # reminders above: each client is stamped with the due date it was
+    # reminded about, so this only emails once per cycle.
+    for row in server.db.due_maintenance_reminders():
+        try:
+            result = server.send_maintenance_reminder(row)
+            print(f"maintenance reminder client={row['id']}: {result}")
+        except Exception as exc:
+            print(f"maintenance reminder client={row['id']} failed unexpectedly: {exc}")
+
 
 if __name__ == "__main__":
     main()

@@ -332,6 +332,28 @@ def init_db() -> None:
                 paid_at TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL, updated_at REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS platform_expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'Software',
+                cost_type TEXT NOT NULL DEFAULT 'fixed',
+                amount_subunit INTEGER NOT NULL DEFAULT 0,
+                currency TEXT NOT NULL DEFAULT 'USD',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS platform_finance_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                reporting_currency TEXT NOT NULL DEFAULT 'USD',
+                monthly_budget_subunit INTEGER NOT NULL DEFAULT 0,
+                usd_ghs_rate REAL,
+                fx_provider TEXT NOT NULL DEFAULT '',
+                fx_updated_at REAL
+            );
+            INSERT OR IGNORE INTO platform_finance_settings (id) VALUES (1);
+
             -- Pricing tiers. Editable from the Command Center (Plans), not
             -- hardcoded - see list_plans/create_plan/update_plan. Exactly one
             -- row has is_default=1; that's what a newly registered company
@@ -493,6 +515,36 @@ def init_db() -> None:
                 canceled_at REAL
             );
 
+            -- A company's own end-customers (e.g. a solar installer's
+            -- homeowners/businesses) - distinct from crm_contacts, which is
+            -- Buinee's internal CRM about tenant companies, and from
+            -- reminders, which is a personal one-off note. Exists so a
+            -- recurring maintenance check-in can be tracked per customer
+            -- instead of a manual folder-per-client process.
+            -- next_maintenance_due/maintenance_reminder_sent_for follow the
+            -- same shape as crm_subscriptions.renewal_date/reminder_sent_for
+            -- (see due_subscription_reminders): a date to compare against
+            -- and a dedupe stamp keyed on that date, so completing a
+            -- maintenance visit and advancing next_maintenance_due
+            -- naturally allows reminding again next cycle.
+            CREATE TABLE IF NOT EXISTS company_clients (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id             INTEGER NOT NULL REFERENCES companies(id),
+                created_by             INTEGER NOT NULL REFERENCES users(id),
+                name                   TEXT NOT NULL,
+                contact                TEXT NOT NULL DEFAULT '',
+                email                  TEXT NOT NULL DEFAULT '',
+                notes                  TEXT NOT NULL DEFAULT '',
+                install_date           TEXT NOT NULL DEFAULT '',
+                maintenance_interval_days INTEGER NOT NULL DEFAULT 180,
+                last_maintenance_date  TEXT NOT NULL DEFAULT '',
+                next_maintenance_due   TEXT NOT NULL DEFAULT '',
+                maintenance_reminder_sent_for TEXT NOT NULL DEFAULT '',
+                status                 TEXT NOT NULL DEFAULT 'active',
+                created_at             REAL NOT NULL,
+                updated_at             REAL NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS user_instructions (
                 user_id     INTEGER PRIMARY KEY REFERENCES users(id),
                 briefing    TEXT NOT NULL DEFAULT '',
@@ -567,6 +619,8 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_automation_runs_user ON automation_runs(user_id, started_at);
             CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(status, due_at);
             CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(company_id, created_by, status, due_at);
+            CREATE INDEX IF NOT EXISTS idx_company_clients_company ON company_clients(company_id, status, name);
+            CREATE INDEX IF NOT EXISTS idx_company_clients_due ON company_clients(status, next_maintenance_due);
             CREATE INDEX IF NOT EXISTS idx_reference_documents_user ON reference_documents(user_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_team_messages_company ON team_messages(company_id, id);
             CREATE INDEX IF NOT EXISTS idx_team_message_files_message ON team_message_files(message_id);
@@ -598,6 +652,7 @@ def init_db() -> None:
         _migrate_team_message_recipient(conn)
         _migrate_crm_profile_fields(conn)
         _migrate_crm_task_assignee(conn)
+        _migrate_company_client_email(conn)
         _migrate_user_terms_acceptance(conn)
         _migrate_user_onboarding(conn)
         _migrate_platform_admin_roles(conn)
@@ -979,6 +1034,12 @@ def _migrate_crm_task_assignee(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(crm_tasks)").fetchall()}
     if "assigned_user_id" not in cols:
         conn.execute("ALTER TABLE crm_tasks ADD COLUMN assigned_user_id INTEGER REFERENCES users(id)")
+
+
+def _migrate_company_client_email(conn: sqlite3.Connection) -> None:
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(company_clients)").fetchall()}
+    if "email" not in cols:
+        conn.execute("ALTER TABLE company_clients ADD COLUMN email TEXT NOT NULL DEFAULT ''")
 
 
 def _migrate_user_terms_acceptance(conn: sqlite3.Connection) -> None:
@@ -3954,6 +4015,98 @@ def list_payments(company_id: int | None = None, limit: int = 200) -> list[dict]
     return [dict(row) for row in rows]
 
 
+def list_platform_expenses() -> list[dict]:
+    with _cursor() as conn:
+        rows = conn.execute(
+            "SELECT * FROM platform_expenses ORDER BY category, name, id"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def save_platform_expense(expense_id: int | None, name: str, category: str,
+                          cost_type: str, amount_subunit: int, currency: str,
+                          notes: str = "") -> dict:
+    name = name.strip()
+    category = category.strip() or "Software"
+    cost_type = cost_type.strip().lower()
+    currency = currency.strip().upper()
+    if not name:
+        raise AuthError("Expense name is required.")
+    if cost_type not in ("fixed", "usage"):
+        raise AuthError("Cost type must be fixed or usage.")
+    if currency not in ("USD", "GHS") or amount_subunit < 0:
+        raise AuthError("Use a valid USD or GHS monthly amount.")
+    now = time.time()
+    with _cursor() as conn:
+        if expense_id:
+            found = conn.execute(
+                "SELECT id FROM platform_expenses WHERE id=?", (expense_id,)
+            ).fetchone()
+            if not found:
+                raise AuthError("Expense not found.")
+            conn.execute(
+                """UPDATE platform_expenses
+                   SET name=?, category=?, cost_type=?, amount_subunit=?,
+                       currency=?, notes=?, updated_at=? WHERE id=?""",
+                (name, category, cost_type, amount_subunit, currency,
+                 notes.strip(), now, expense_id),
+            )
+        else:
+            cur = conn.execute(
+                """INSERT INTO platform_expenses
+                   (name, category, cost_type, amount_subunit, currency, notes,
+                    created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (name, category, cost_type, amount_subunit, currency,
+                 notes.strip(), now, now),
+            )
+            expense_id = int(cur.lastrowid)
+        row = conn.execute(
+            "SELECT * FROM platform_expenses WHERE id=?", (expense_id,)
+        ).fetchone()
+    return dict(row)
+
+
+def delete_platform_expense(expense_id: int) -> None:
+    with _cursor() as conn:
+        cur = conn.execute("DELETE FROM platform_expenses WHERE id=?", (expense_id,))
+        if not cur.rowcount:
+            raise AuthError("Expense not found.")
+
+
+def get_platform_finance_settings() -> dict:
+    with _cursor() as conn:
+        conn.execute("INSERT OR IGNORE INTO platform_finance_settings (id) VALUES (1)")
+        row = conn.execute(
+            "SELECT * FROM platform_finance_settings WHERE id=1"
+        ).fetchone()
+    return dict(row)
+
+
+def update_platform_finance_settings(reporting_currency: str,
+                                     monthly_budget_subunit: int) -> dict:
+    reporting_currency = reporting_currency.strip().upper()
+    if reporting_currency not in ("USD", "GHS") or monthly_budget_subunit < 0:
+        raise AuthError("Use a valid reporting currency and monthly budget.")
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE platform_finance_settings
+               SET reporting_currency=?, monthly_budget_subunit=? WHERE id=1""",
+            (reporting_currency, monthly_budget_subunit),
+        )
+    return get_platform_finance_settings()
+
+
+def cache_usd_ghs_rate(rate: float, provider: str, updated_at: float | None = None) -> None:
+    if rate <= 0:
+        return
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE platform_finance_settings
+               SET usd_ghs_rate=?, fx_provider=?, fx_updated_at=? WHERE id=1""",
+            (rate, provider.strip(), updated_at or time.time()),
+        )
+
+
 def get_payment(reference: str) -> dict | None:
     with _cursor() as conn:
         row = conn.execute("SELECT * FROM payments WHERE reference=?", (reference,)).fetchone()
@@ -4481,6 +4634,234 @@ def finish_reminder(reminder_id: int, *, email_sent: bool, error: str = "") -> d
             (int(email_sent), error[:1000], time.time(), reminder_id),
         )
     return get_reminder(reminder_id)
+
+
+def _advance_maintenance_due(base_date: str, interval_days: int) -> str:
+    """base_date is YYYY-MM-DD; returns base_date + interval_days, also as
+    YYYY-MM-DD. Shared by create/update (from install_date) and
+    mark_maintenance_done (from the visit date actually performed)."""
+    try:
+        base = datetime.strptime(base_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise AuthError("Date must be in YYYY-MM-DD format.")
+    return (base + timedelta(days=interval_days)).isoformat()
+
+
+def create_company_client(
+    company_id: int,
+    created_by: int,
+    *,
+    name: str,
+    contact: str = "",
+    email: str = "",
+    notes: str = "",
+    install_date: str = "",
+    maintenance_interval_days: int = 180,
+) -> dict:
+    """A company's own end-customer - see the company_clients comment in
+    init_db(). next_maintenance_due is seeded from install_date so a brand
+    new client already has a first check-in on the calendar; it only stays
+    blank if no install_date was given yet.
+
+    email is separate from the freeform contact field (which is often a
+    phone number or WhatsApp) because it's the one thing that has to be an
+    actual address - it's what notify_client_maintenance_done in server.py
+    sends the client's own maintenance-done confirmation to."""
+    name = name.strip()
+    if not name:
+        raise AuthError("Client name is required.")
+    if len(name) > 200:
+        raise AuthError("Client name is too long.")
+    email = email.strip()
+    if email and "@" not in email:
+        raise AuthError("That doesn't look like an email address.")
+    if maintenance_interval_days <= 0:
+        raise AuthError("Maintenance interval must be a positive number of days.")
+    install_date = install_date.strip()
+    next_due = _advance_maintenance_due(install_date, maintenance_interval_days) if install_date else ""
+    now = time.time()
+    with _cursor() as conn:
+        cur = conn.execute(
+            """INSERT INTO company_clients
+               (company_id, created_by, name, contact, email, notes, install_date,
+                maintenance_interval_days, next_maintenance_due, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (company_id, created_by, name, contact.strip(), email, notes.strip(), install_date,
+             maintenance_interval_days, next_due, now, now),
+        )
+        client_id = cur.lastrowid
+    return get_company_client(client_id)
+
+
+def get_company_client(client_id: int) -> dict | None:
+    with _cursor() as conn:
+        row = conn.execute("SELECT * FROM company_clients WHERE id = ?", (client_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def list_company_clients(company_id: int, *, status: str | None = "active") -> list[dict]:
+    """Company-wide, not per-user like list_reminders - a client record is
+    shared business data everyone at the company should see, not a personal
+    note. status=None returns every status (active and archived)."""
+    with _cursor() as conn:
+        if status is None:
+            rows = conn.execute(
+                "SELECT * FROM company_clients WHERE company_id = ? ORDER BY name",
+                (company_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM company_clients WHERE company_id = ? AND status = ? ORDER BY name",
+                (company_id, status),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_company_client(
+    company_id: int,
+    client_id: int,
+    *,
+    name: str | None = None,
+    contact: str | None = None,
+    email: str | None = None,
+    notes: str | None = None,
+    install_date: str | None = None,
+    maintenance_interval_days: int | None = None,
+) -> dict:
+    """Edits the client record. If there's no logged maintenance visit yet,
+    changing install_date and/or the interval also recomputes
+    next_maintenance_due - once a real visit has been logged, the due date
+    advances from that visit (mark_maintenance_done), not from install_date,
+    so it's deliberately left alone past that point."""
+    client = get_company_client(client_id)
+    if not client or client["company_id"] != company_id:
+        raise AuthError("No such client.")
+
+    fields: dict = {}
+    if name is not None:
+        name = name.strip()
+        if not name:
+            raise AuthError("Client name is required.")
+        fields["name"] = name
+    if contact is not None:
+        fields["contact"] = contact.strip()
+    if email is not None:
+        email = email.strip()
+        if email and "@" not in email:
+            raise AuthError("That doesn't look like an email address.")
+        fields["email"] = email
+    if notes is not None:
+        fields["notes"] = notes.strip()
+    if maintenance_interval_days is not None:
+        if maintenance_interval_days <= 0:
+            raise AuthError("Maintenance interval must be a positive number of days.")
+        fields["maintenance_interval_days"] = maintenance_interval_days
+    if install_date is not None:
+        fields["install_date"] = install_date.strip()
+
+    if not client["last_maintenance_date"]:
+        interval = fields.get("maintenance_interval_days", client["maintenance_interval_days"])
+        base_date = fields.get("install_date", client["install_date"])
+        if base_date:
+            fields["next_maintenance_due"] = _advance_maintenance_due(base_date, interval)
+
+    if not fields:
+        return client
+
+    fields["updated_at"] = time.time()
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    with _cursor() as conn:
+        conn.execute(
+            f"UPDATE company_clients SET {set_clause} WHERE id = ?",
+            (*fields.values(), client_id),
+        )
+    return get_company_client(client_id)
+
+
+def set_company_client_status(company_id: int, client_id: int, status: str) -> dict:
+    """active/archived - archiving stops it appearing in the default
+    list_company_clients view and in due_maintenance_reminders, without
+    deleting its history."""
+    if status not in ("active", "archived"):
+        raise AuthError("Invalid client status.")
+    client = get_company_client(client_id)
+    if not client or client["company_id"] != company_id:
+        raise AuthError("No such client.")
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE company_clients SET status = ?, updated_at = ? WHERE id = ?",
+            (status, time.time(), client_id),
+        )
+    return get_company_client(client_id)
+
+
+def mark_maintenance_done(company_id: int, client_id: int, *, done_on: str | None = None) -> dict:
+    """Logs a completed maintenance visit and advances the cycle.
+    maintenance_reminder_sent_for is not explicitly reset here - it doesn't
+    need to be. next_maintenance_due moves to a new date, so
+    due_maintenance_reminders' "sent_for != next_maintenance_due" check
+    matches again once that new date comes due, exactly mirroring how
+    mark_subscription_reminded/due_subscription_reminders let a new billing
+    cycle remind again without clearing anything."""
+    client = get_company_client(client_id)
+    if not client or client["company_id"] != company_id:
+        raise AuthError("No such client.")
+    done_on = (done_on or datetime.now(timezone.utc).date().isoformat()).strip()
+    next_due = _advance_maintenance_due(done_on, client["maintenance_interval_days"])
+    with _cursor() as conn:
+        conn.execute(
+            """UPDATE company_clients
+               SET last_maintenance_date = ?, next_maintenance_due = ?, updated_at = ?
+               WHERE id = ?""",
+            (done_on, next_due, time.time(), client_id),
+        )
+    return get_company_client(client_id)
+
+
+MAINTENANCE_REMINDER_DAYS_AHEAD = 7
+
+
+def due_maintenance_reminders(days_ahead: int = MAINTENANCE_REMINDER_DAYS_AHEAD, limit: int = 50) -> list[dict]:
+    """Active clients whose next maintenance visit is due within days_ahead,
+    or already overdue, that haven't already been reminded about this exact
+    due date.
+
+    Deliberately does NOT exclude past-due rows the way
+    due_subscription_reminders excludes past renewal_dates. There, a past
+    date means the webhook already moved it on and reminding would be wrong.
+    Here, a past next_maintenance_due means the visit is genuinely late - a
+    missed cron tick or a busy week shouldn't make the reminder silently
+    disappear. It keeps surfacing until mark_maintenance_done logs the visit
+    and advances the date."""
+    horizon = (datetime.now(timezone.utc).date() + timedelta(days=days_ahead)).isoformat()
+    with _cursor() as conn:
+        rows = conn.execute(
+            """SELECT cc.*, c.name AS company_name
+               FROM company_clients cc
+               JOIN companies c ON c.id = cc.company_id
+               WHERE cc.status = 'active'
+                 AND cc.next_maintenance_due != ''
+                 AND cc.next_maintenance_due <= ?
+                 AND cc.maintenance_reminder_sent_for != cc.next_maintenance_due
+               ORDER BY cc.next_maintenance_due
+               LIMIT ?""",
+            (horizon, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_maintenance_reminded(client_id: int) -> None:
+    """Stamps the due date this client has now been reminded about, so the
+    next cron tick skips it until next_maintenance_due actually advances
+    (via mark_maintenance_done)."""
+    client = get_company_client(client_id)
+    if not client:
+        return
+    with _cursor() as conn:
+        conn.execute(
+            "UPDATE company_clients SET maintenance_reminder_sent_for = ?, updated_at = ? WHERE id = ?",
+            (client["next_maintenance_due"], time.time(), client_id),
+        )
 
 
 def platform_stats() -> dict:
