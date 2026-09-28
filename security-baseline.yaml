@@ -1,0 +1,293 @@
+schema_version: "2.1"
+baseline_version: "0.1.0"
+record_digest: null
+project:
+  id: "PRJ-BUINEE-001"
+  name: "Buinee (buinee.app)"
+  purpose: "Multi-tenant AI-agent workspace platform for Ghana-based SMBs (mailbox triage, documents, customer records, approvals), with a public marketing site, self-service registration/billing, and a platform admin console. This baseline is scoped to the active landing-page redesign work (new /pricing and /case-studies pages, extended CMS schema, new reference image assets) plus infrastructure findings surfaced while reviewing that scope; it does not re-audit the existing registration, billing, or dashboard surfaces."
+  owner: "site-owner"
+risk:
+  tier: "MEDIUM"
+  mode: "STANDARD"
+  rationale:
+    - "Production system with real registered companies, recurring billing (Paystack), and admin-privileged workflows in the same codebase/process, even though this review's in-scope change does not touch those directly."
+    - "In-scope change (landing redesign) adds new public routes and new CMS schema entries into server.py and reuses the existing owner-gated admin write path; no new authentication, payment, or data-collection logic is introduced."
+    - "A concrete pre-existing misconfiguration was found while scoping this review (THR-001): internal design/security documents are not blocked from public static-file serving once committed to the docroot."
+  likely_production_tier: null
+lifecycle:
+  status: "REVIEW_REQUIRED"
+  production_posture: "ELIGIBLE_WHEN_APPROVED"
+  spike_expires_at: null
+  development_lock: "LOCKED"
+  deployment_lock: "LOCKED"
+classification_levels: [PUBLIC, INTERNAL, CONFIDENTIAL, SENSITIVE, RESTRICTED]
+assets:
+  - id: "AST-001"
+    name: "Public marketing/CMS copy (index, pricing, case studies, etc.)"
+    classification: "PUBLIC"
+    owner: "site-owner"
+    retention: "Indefinite; admin-editable, overwritten in place with no version history"
+  - id: "AST-002"
+    name: "Internal design & security review documents (.opskeep/)"
+    classification: "INTERNAL"
+    owner: "site-owner"
+    retention: "Indefinite, kept in repo history"
+  - id: "AST-003"
+    name: "cPanel/Passenger deployment access and git remote credentials"
+    classification: "RESTRICTED"
+    owner: "site-owner"
+    retention: "Held by the hosting account owner; not stored in this repo"
+  - id: "AST-004"
+    name: "Platform admin session (owner role)"
+    classification: "CONFIDENTIAL"
+    owner: "site-owner"
+    retention: "Existing session-cookie lifetime; the underlying auth system is out of scope for this review"
+components:
+  - id: "CMP-001"
+    name: "Public landing site (index.html plus the new /pricing, /case-studies pages)"
+    exposure: "INTERNET"
+    provider: "cPanel/LiteSpeed (Namecheap Stellar Plus)"
+  - id: "CMP-002"
+    name: "server.py WSGI application (routing, CMS token rendering, admin APIs)"
+    exposure: "INTERNET"
+    provider: "cPanel Python Selector / Phusion Passenger"
+  - id: "CMP-003"
+    name: "Admin Site Contents CMS (admin-site-contents.html plus /api/admin/site-content*)"
+    exposure: "INTERNET"
+    provider: "server.py, gated to the owner admin role"
+  - id: "CMP-004"
+    name: "LiteSpeed static file serving of the app's docroot"
+    exposure: "INTERNET"
+    provider: "cPanel/LiteSpeed"
+trust_boundaries:
+  - id: "TB-001"
+    name: "Internet to public marketing pages"
+    from: "PUBLIC_INTERNET"
+    to: ["CMP-001", "CMP-002"]
+  - id: "TB-002"
+    name: "Internet directly to docroot static files, bypassing server.py entirely"
+    from: "PUBLIC_INTERNET"
+    to: ["CMP-004"]
+  - id: "TB-003"
+    name: "Authenticated owner-role admin to the CMS write API"
+    from: "ID-001"
+    to: ["CMP-003", "CMP-002"]
+data_flows:
+  - id: "FLW-001"
+    name: "Owner edits marketing copy for a SITE_CONTENT_SCHEMA page"
+    origin: "Owner-role admin"
+    processing: "Owner-role auth check, then values are allowlisted to that page's schema keys, stored, and HTML-escaped on every render via render_site_content"
+    destination: "Public page"
+    classification: "PUBLIC"
+    retention: "Indefinite / overwrite"
+    boundaries: ["TB-003", "TB-001"]
+  - id: "FLW-002"
+    name: "Visitor requests any file under the docroot"
+    origin: "Anonymous visitor"
+    processing: "LiteSpeed serves the file directly if not denied by .htaccess; server.py is never invoked for this path"
+    destination: "Visitor's browser"
+    classification: "INTERNAL"
+    retention: "N/A"
+    boundaries: ["TB-002"]
+identities:
+  - id: "ID-001"
+    name: "Platform owner-role admin"
+    type: "HUMAN"
+    authentication: "Existing admin session cookie plus role check (_admin_role_request('owner'))"
+    resources: ["CMP-003"]
+    permissions: ["Edit any SITE_CONTENT_SCHEMA page's copy"]
+    forbidden_actions: ["Write outside the allowlisted schema keys for the target page"]
+    human_approval: "N/A - pre-existing control, not modified by this review's scope"
+  - id: "ID-002"
+    name: "Anonymous site visitor"
+    type: "HUMAN"
+    authentication: "None (public)"
+    resources: ["CMP-001", "CMP-004"]
+    permissions: ["Read public pages and any non-denied docroot static file"]
+    forbidden_actions: ["Write any data"]
+    human_approval: "N/A"
+threats:
+  - id: "THR-001"
+    component_ids: ["CMP-004"]
+    scenario: "Internal design/security review documents (.opskeep/project-gate/*, including an interactive dashboard.html and the full decision/risk record) become publicly downloadable, because the existing .htaccess dot-file rule only blocks a file whose OWN name starts with a dot, not files inside a dot-prefixed directory. .opskeep/ is already committed to main and will reach the production docroot on the next deploy."
+    likelihood: "HIGH"
+    impact: "MEDIUM"
+    control_ids: ["CTL-INFRA-001"]
+    residual_risk: "LOW"
+    owner: "site-owner"
+    status: "OPEN"
+  - id: "THR-002"
+    component_ids: ["CMP-003", "CMP-002"]
+    scenario: "Hand-editing server.py to add the two new CMS-editable pages (pricing, case_studies) introduces a mistake that bypasses or weakens the existing owner-only write check, e.g. a copy-pasted handler that skips _admin_role_request, or a STATIC_PAGES/SITE_CONTENT_SCHEMA key collision with an existing page."
+    likelihood: "MEDIUM"
+    impact: "HIGH"
+    control_ids: ["CTL-AUTHZ-001"]
+    residual_risk: "LOW"
+    owner: "developer"
+    status: "OPEN"
+  - id: "THR-003"
+    component_ids: ["CMP-004"]
+    scenario: "Large, unoptimized reference image assets (currently multi-MB raw PNGs) and any future ad hoc files dropped at the project root are served publicly by default with no review, since anything not explicitly denied in .htaccess is reachable."
+    likelihood: "MEDIUM"
+    impact: "LOW"
+    control_ids: ["CTL-INFRA-002"]
+    residual_risk: "LOW"
+    owner: "developer"
+    status: "OPEN"
+  - id: "THR-004"
+    component_ids: ["CMP-002", "CMP-004"]
+    scenario: "The cPanel Python app (Passenger) loses its registration or crashes, observed twice already during this project's work, and LiteSpeed silently falls back to serving raw static files for every path, including the literal .html shells of authenticated pages (dashboard.html, admin*.html) at their own filenames, with no alert raised to anyone."
+    likelihood: "MEDIUM"
+    impact: "MEDIUM"
+    control_ids: ["CTL-MON-001"]
+    residual_risk: "LOW"
+    owner: "site-owner"
+    status: "OPEN"
+controls:
+  - id: "CTL-GOV-001"
+    domain: "GOVERNANCE"
+    requirement: "No implementation, scaffolding, or deployment of the landing-redesign build proceeds until the owner explicitly approves this baseline version"
+    status: "PLANNED"
+    owner: "site-owner"
+    acceptance: "Owner approval recorded in security-baseline.yaml's approval block with a matching digest"
+    evidence_ids: []
+  - id: "CTL-INFRA-001"
+    domain: "INFRASTRUCTURE"
+    requirement: "Deny all public HTTP access to .opskeep/ (and any other internal-tooling directory) at the web-server level, not just by filename. Use the same nested-.htaccess pattern already used for storage/ (storage/.htaccess with Require all denied / Deny from all)"
+    status: "REQUIRED"
+    owner: "developer"
+    acceptance: "A direct request to https://buinee.app/.opskeep/project-gate/state.json (or any file under it) returns 403/404, verified after deploy"
+    evidence_ids: []
+  - id: "CTL-AUTHZ-001"
+    domain: "AUTHORIZATION"
+    requirement: "The /pricing and /case-studies CMS schema entries reuse the existing generic _admin_role_request('owner') plus SITE_CONTENT_SCHEMA-driven _handle_admin_site_content_save handler unmodified; no new bespoke save endpoint is written for these pages"
+    status: "REQUIRED"
+    owner: "developer"
+    acceptance: "Code review confirms no new /api/admin/* handler was added for these two pages, and the existing handler's allowlist naturally covers the new schema keys"
+    evidence_ids: []
+  - id: "CTL-INFRA-002"
+    domain: "INFRASTRUCTURE"
+    requirement: "Reference/source image assets not meant to be served as-is, or that are oversized, are compressed to web-appropriate sizes/formats before the redesign ships; any project files not intended for public serving are kept out of the docroot or explicitly denied"
+    status: "PLANNED"
+    owner: "developer"
+    acceptance: "Shipped image payload sizes are reviewed before merge; no non-page file is reachable over HTTP that wasn't deliberately made so"
+    evidence_ids: []
+  - id: "CTL-MON-001"
+    domain: "MONITORING"
+    requirement: "An uptime/health check monitors that server.py itself is responding, not just the docroot, e.g. polling /api/plans or another JSON endpoint and alerting when it returns the LiteSpeed-static-fallback shape observed this session, so a Passenger outage is caught without waiting for a user report"
+    status: "PLANNED"
+    owner: "site-owner"
+    acceptance: "A monitoring signal fires and reaches the owner within an agreed window of a simulated Passenger stop"
+    evidence_ids: []
+  - id: "CTL-INPUT-001"
+    domain: "DATA"
+    requirement: "New SITE_CONTENT_SCHEMA fields for pricing/case-studies keep using the existing render_site_content/html.escape substitution path exactly as-is; no raw/unescaped rendering is introduced for the new pages"
+    status: "IMPLEMENTED"
+    owner: "developer"
+    acceptance: "Pre-existing behavior: render_site_content escapes every value through _render_cms_value regardless of page, so extending SITE_CONTENT_SCHEMA does not change that code path"
+    evidence_ids: []
+gates:
+  - id: "GATE-001"
+    name: "Baseline approval gate"
+    stage: "PRE_IMPLEMENTATION"
+    blocking: true
+    control_ids: ["CTL-GOV-001"]
+    required_evidence: ["EVD-001"]
+    status: "NOT_YET_BUILT"
+    evidence_ids: []
+  - id: "GATE-002"
+    name: "Docroot exposure fix verified before merge"
+    stage: "PULL_REQUEST"
+    blocking: true
+    control_ids: ["CTL-INFRA-001"]
+    required_evidence: ["EVD-002"]
+    status: "NOT_YET_BUILT"
+    evidence_ids: []
+  - id: "GATE-003"
+    name: "New admin-write surface code review"
+    stage: "PULL_REQUEST"
+    blocking: true
+    control_ids: ["CTL-AUTHZ-001", "CTL-INPUT-001"]
+    required_evidence: ["EVD-003"]
+    status: "NOT_YET_BUILT"
+    evidence_ids: []
+  - id: "GATE-004"
+    name: "Production health monitoring configured"
+    stage: "PRE_DEPLOY"
+    blocking: false
+    control_ids: ["CTL-MON-001"]
+    required_evidence: ["EVD-004"]
+    status: "NOT_YET_BUILT"
+    evidence_ids: []
+decisions:
+  - id: "DEC-001"
+    question: "Who/what will run the Passenger-down health check (external uptime service, cPanel's own monitoring, or a simple cron+curl), and where should the alert go?"
+    owner: "site-owner"
+    required_decision: "Monitoring provider and alert destination"
+    blocks_approval: false
+    status: "OPEN"
+  - id: "DEC-002"
+    question: "Beyond the .htaccess deny rule (CTL-INFRA-001), should .opskeep/ (and similar internal-tooling directories) also be excluded from what gets pulled onto the live server at all, e.g. via a deploy-time exclusion, as defense in depth?"
+    owner: "site-owner"
+    required_decision: "htaccess-only vs also excluding from the production deploy"
+    blocks_approval: false
+    status: "OPEN"
+evidence:
+  - id: "EVD-001"
+    type: "OWNER_APPROVAL"
+    status: "NOT_YET_BUILT"
+    observed_at: null
+    observer: null
+    location: null
+  - id: "EVD-002"
+    type: "CONFIG_INSPECTION"
+    status: "NOT_YET_BUILT"
+    observed_at: null
+    observer: null
+    location: null
+  - id: "EVD-003"
+    type: "MANUAL_REVIEW"
+    status: "NOT_YET_BUILT"
+    observed_at: null
+    observer: null
+    location: null
+  - id: "EVD-004"
+    type: "MANUAL_REVIEW"
+    status: "NOT_YET_BUILT"
+    observed_at: null
+    observer: null
+    location: null
+monitoring:
+  handoff:
+    provider: "NONE"
+    owner: "site-owner"
+    configuration_status: "NOT_CONFIGURED"
+    baseline_version: "0.1.0"
+    record_digest: null
+    environments: ["production"]
+    handed_off_at: null
+    acknowledged_at: null
+  signals:
+    - id: "MON-001"
+      name: "Passenger/WSGI app liveness (JSON API responds, not LiteSpeed static fallback)"
+      source: "External uptime check against /api/plans or an equivalent JSON endpoint"
+      severity: "HIGH"
+      threshold: "Non-JSON or error response for 5+ minutes"
+      route: "site-owner"
+      runbook: "SECURITY.md#reporting-and-response"
+      status: "PLANNED"
+recovery:
+  owner: "site-owner"
+  backup: {status: "NOT_APPLICABLE", reason: "Site source is git-versioned; the SQLite database (storage/ledgerline.db) already sits on the account's persistent disk per README, and its backup strategy is pre-existing and out of this review's scope", details: ""}
+  restore: {status: "PLANNED", details: "Re-pull the last known-good commit via cPanel Git Version Control and restart the Python app from Setup Python App if server.py changed"}
+  rollback: {status: "PLANNED", details: "git revert the offending commit(s) on main, pull on the server, restart the Python app only if server.py changed"}
+  incident_response: {status: "PLANNED", details: "If .opskeep/ or other internal docs are found publicly exposed: add the deny rule, redeploy, then review the exposed documents for anything beyond internal reasoning before closing (none of the current documents contain secrets or customer data)"}
+approval:
+  decision: "PENDING"
+  approver: null
+  approved_at: null
+  baseline_version: null
+  record_digest: null
+  scope: []
+  expires_at: null
+changes: []
