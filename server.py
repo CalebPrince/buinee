@@ -222,6 +222,7 @@ STATIC_PAGES = {
     "/payment/failed": "payment-failed.html",
     "/contact": "contact.html",
     "/pricing": "pricing.html",
+    "/get-started": "get-started.html",
     "/case-studies": "case-studies.html",
     "/privacy": "legal.html",
     "/terms": "legal.html",
@@ -263,6 +264,11 @@ STATIC_ASSETS = {
     "/assets/images/linkedin.svg": "assets/images/linkedin.svg",
     "/assets/images/youtube.svg": "assets/images/youtube.svg",
     "/assets/images/x.svg": "assets/images/x.svg",
+    "/assets/images/gmail.svg": "assets/images/gmail.svg",
+    "/assets/images/outlook.svg": "assets/images/outlook.svg",
+    "/assets/images/google-drive.svg": "assets/images/google-drive.svg",
+    "/assets/images/google-calendar.svg": "assets/images/google-calendar.svg",
+    "/assets/images/muse-logo.png": "assets/images/muse-logo.png",
 }
 
 LEGACY_PAGE_REDIRECTS = {
@@ -3413,6 +3419,7 @@ class RouteHandlerMixin:
             "/api/demo": self._handle_demo,
             "/api/demo/register": self._handle_demo_register,
             "/api/demo/contact": self._handle_demo_contact,
+            "/api/consultation": self._handle_consultation_request,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
             "/api/tools/connect-key": self._handle_tool_connect_key,
@@ -3711,6 +3718,44 @@ class RouteHandlerMixin:
         except Exception as exc:
             print(f"  ! could not save offline contact: {exc}")
             return self._json({"error": "Could not save your details. Please try again."}, 500)
+
+        return self._json({"ok": True})
+
+    def _handle_consultation_request(self):
+        """Custom Agent's "Book a Consultation" step in get-started.html -
+        no plan, no payment, just a lead for a person to follow up on. Reuses
+        the same landing_chat_sessions/Command Center inbox pipeline as the
+        offline-chat contact form above, rather than a new table, since both
+        are "a visitor left their details, flag it for a human" records."""
+        if rate_limited(f"consult:{client_ip(self)}"):
+            return self._json({"error": "Please wait a moment and try again."}, 429)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+
+        name = str(req.get("name") or "").strip()[:120]
+        email = str(req.get("email") or "").strip()[:200]
+        business_type = str(req.get("business_type") or "").strip()[:120]
+        message = str(req.get("message") or "").strip()[:2000]
+        if not name or not email:
+            return self._json({"error": "Add your name and business email."}, 400)
+
+        lines = [f"[Custom Agent consultation request: {name}, {email}"]
+        if business_type:
+            lines[0] += f", {business_type}"
+        lines[0] += "]"
+        if message:
+            lines.append(f"Visitor: {message}")
+
+        try:
+            db.save_landing_chat_session(
+                f"consult:{secrets.token_hex(16)}", "\n".join(lines),
+                contact_name=name, contact_email=email, should_flag=True,
+            )
+        except Exception as exc:
+            print(f"  ! could not save consultation request: {exc}")
+            return self._json({"error": "Could not save your request. Please try again."}, 500)
 
         return self._json({"ok": True})
 
