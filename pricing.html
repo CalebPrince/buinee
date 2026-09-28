@@ -495,6 +495,10 @@
   .plans-loading { font-size: 14.5px; color: var(--ink-3); }
 
   /* plans page: header row (headline + billing toggle) and card icon badges */
+  /* Same rounded-corner overlap the homepage hero uses: the section right
+     after the dark hero photo gets rounded top corners and rides up over
+     it slightly, so it reads as a card sitting on top of the photo. */
+  #plans { border-radius: 24px 24px 0 0; margin-top: -24px; position: relative; z-index: 2; background: var(--paper); }
   .plans-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 34px; flex-wrap: wrap; }
   .billing-toggle { display: flex; align-items: center; gap: 12px; flex: none; }
   .billing-toggle .aud-toggle-inner { display: inline-flex; gap: 3px; padding: 4px; background: var(--surface-2); border-radius: 999px; border: 1px solid var(--line); }
