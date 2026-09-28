@@ -660,6 +660,7 @@ def init_db() -> None:
         _migrate_session_activity(conn)
         _migrate_platform_settings(conn)
         _migrate_landing_chat_contact_name(conn)
+        _migrate_marketing_plans(conn)
 
 
 # Demo pricing - deliberately placeholder numbers, meant to be edited from the
@@ -710,6 +711,41 @@ def _seed_individual_plans(conn: sqlite3.Connection) -> None:
     ).fetchone()["n"]
     if n == 0:
         _insert_seed_plans(conn, _INDIVIDUAL_SEEDS, "individual")
+
+
+# The two paid tiers walked through by get-started.html that don't already
+# exist under any name - separate from the older _TEAM_SEEDS/_INDIVIDUAL_SEEDS
+# demo tiers above, which predate the marketing redesign and may still be in
+# use by existing companies. Prices are GHS (the currency of record),
+# matching the reference design's GHS figures - the USD shown on the
+# pricing page is a display-only conversion, never what Paystack charges.
+# The marketing page's free tier isn't seeded again here: "Solo Free" from
+# _INDIVIDUAL_SEEDS is already exactly that plan (individual, GHS 0, 1 user),
+# so get-started.html's Free path registers against that existing plan by
+# name instead of creating a second, differently-shaped "Free".
+_MARKETING_PLAN_SEEDS = (
+    # name, price, user_limit, audience, sort_order, chat_enabled, chat_limit, mailbox_limit
+    ("Bring Your Own Token (BYOT)", 450, 2, "team", 21, 1, None, 1),
+    ("Managed Ops", 1380, 5, "team", 22, 1, None, 3),
+)
+
+
+def _migrate_marketing_plans(conn: sqlite3.Connection) -> None:
+    """Seed the BYOT and Managed Ops tiers once, by name, so an owner who
+    reprices or renames one from the Plans page keeps their edit on every
+    later restart. Custom Agent isn't here - it has no fixed price and is
+    booked as a consultation, never registered as a plan."""
+    now = time.time()
+    for name, price, user_limit, audience, sort_order, chat_enabled, chat_limit, mailbox_limit in _MARKETING_PLAN_SEEDS:
+        exists = conn.execute("SELECT 1 FROM plans WHERE name = ?", (name,)).fetchone()
+        if exists:
+            continue
+        conn.execute(
+            """INSERT INTO plans (name, price, currency, user_limit, sort_order, is_default,
+                                   chat_enabled, chat_monthly_limit, audience, mailbox_limit, created_at)
+               VALUES (?, ?, 'GHS', ?, ?, 0, ?, ?, ?, ?, ?)""",
+            (name, price, user_limit, sort_order, chat_enabled, chat_limit, audience, mailbox_limit, now),
+        )
 
 
 def _migrate_plan_chat_gating(conn: sqlite3.Connection) -> None:

@@ -1,0 +1,775 @@
+<meta charset="utf-8">
+<title>Get started, Buinee</title>
+<meta name="description" content="Set up Buinee for your business in a few guided steps.">
+<style>
+  :root {
+    --paper: #ffffff; --surface: #f8f9fa; --surface-2: #eef1ef;
+    --line: #e3e7e4; --line-strong: #cfd6d2;
+    --ink: #0b1210; --ink-2: #3a453f; --ink-3: #5c6b64; --ink-4: #8b978f;
+    --teal: #08c875; --teal-deep: #07985c; --teal-soft: #e5fff2;
+    --bad: #c0392b; --bad-soft: #fdecea;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(11,18,16,.05), 0 14px 34px rgba(11,18,16,.07);
+    --shadow-lg: 0 30px 80px rgba(11,18,16,.16);
+    --sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    --serif: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3 { margin: 0; font-weight: 800; letter-spacing: -.02em; }
+  p { margin: 0; }
+  a { color: inherit; }
+  button, input, select, textarea { font-family: inherit; font-size: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 22px; border-radius: 10px; font-size: 14.5px; font-weight: 700;
+    text-decoration: none; border: 1px solid transparent; cursor: pointer;
+    transition: background .14s, border-color .14s, transform .1s;
+  }
+  .btn svg { width: 16px; height: 16px; }
+  .btn.primary { background: linear-gradient(135deg, #0ce787, #2af0a0); color: #04130c; }
+  .btn.primary:hover { filter: brightness(0.97); }
+  .btn.primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost { border-color: var(--line-strong); color: var(--ink); background: var(--paper); }
+  .btn.ghost:hover { border-color: var(--teal); color: var(--teal-deep); }
+  .btn.block { width: 100%; }
+
+  /* -------- shell: dark step sidebar + white step card -------- */
+  .gs-shell { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+  .gs-side {
+    background: #02090b; color: #eef4f1; padding: 34px 30px; display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+  }
+  /* .gs-side is a column flexbox, which stretches children across the
+     cross axis by default - without this, the logo's width:auto gets
+     overridden by that stretch and the image renders squashed to the
+     sidebar's full width instead of its own 3:1 aspect ratio. */
+  .gs-logo { height: 30px; width: auto; display: block; margin-bottom: 40px; position: relative; z-index: 2; align-self: flex-start; flex: none; }
+  .gs-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; position: relative; z-index: 2; }
+  .gs-step { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; font-size: 13.5px; font-weight: 600; color: rgba(238,244,241,.5); }
+  .gs-step .n {
+    width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    background: rgba(255,255,255,.08); color: rgba(238,244,241,.6); font-size: 12px; font-weight: 700;
+  }
+  .gs-step.done .n { background: var(--teal); color: #04130c; }
+  .gs-step.done .n svg { width: 13px; height: 13px; }
+  .gs-step.active { color: #fff; }
+  .gs-step.active .n { background: #fff; color: #04130c; }
+  .gs-side-photo {
+    position: absolute; inset: 0; z-index: 1;
+    background-image: linear-gradient(180deg, rgba(0,7,9,.55) 0%, rgba(0,7,9,.86) 60%, #02090b 100%), url('/assets/images/hero-image1.png');
+    background-size: cover; background-position: 78% 20%;
+    opacity: 0; transition: opacity .3s ease; pointer-events: none;
+  }
+  .gs-side.at-start .gs-side-photo { opacity: 1; }
+  .gs-quote {
+    position: absolute; left: 30px; right: 30px; bottom: 34px; z-index: 2;
+    font-size: 15px; font-weight: 700; color: #fff; opacity: 0; transition: opacity .3s ease;
+  }
+  .gs-side.at-start .gs-quote { opacity: 1; }
+
+  /* Full-bleed split screen, matching the reference: the dark sidebar and
+     this white panel each fill their column edge to edge, top to bottom -
+     no floating card, no page background showing around it. */
+  .gs-main { background: var(--paper); display: flex; align-items: center; justify-content: center; padding: 56px 48px; min-height: 100vh; }
+  .gs-card { width: 100%; max-width: 560px; }
+  .gs-progress { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-bottom: 22px; }
+  .gs-progress span { display: block; height: 100%; background: var(--teal); border-radius: 999px; transition: width .3s ease; }
+  .gs-step-label { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--teal-deep); margin-bottom: 10px; }
+  .gs-h2 { font-size: 25px; margin-bottom: 6px; }
+  .gs-sub { font-size: 14.5px; color: var(--ink-2); margin-bottom: 26px; }
+  .gs-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
+  .gs-foot .btn.block { flex: 1; }
+
+  /* plan cards (step 1) */
+  .gs-plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
+  .gs-plan-card {
+    border: 1.5px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 8px; position: relative; background: var(--paper);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .gs-plan-card:hover { border-color: var(--line-strong); }
+  .gs-plan-card.selected { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+  .gs-plan-card .check {
+    position: absolute; top: 14px; right: 14px; width: 20px; height: 20px; border-radius: 50%;
+    border: 1.5px solid var(--line-strong); display: grid; place-items: center; color: transparent;
+  }
+  .gs-plan-card.selected .check { background: var(--teal); border-color: var(--teal); color: #fff; }
+  .gs-plan-card .check svg { width: 12px; height: 12px; }
+  .gs-plan-card .ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-deep); }
+  .gs-plan-card .ic svg { width: 17px; height: 17px; }
+  .gs-plan-card b { font-size: 14.5px; }
+  .gs-plan-card .price { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .gs-plan-card .note { font-size: 12px; color: var(--ink-3); }
+
+  /* forms */
+  .gs-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .gs-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .gs-field label { font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+  .gs-field input, .gs-field select, .gs-field textarea {
+    padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line-strong);
+    background: var(--paper); color: var(--ink); width: 100%;
+  }
+  .gs-field textarea { resize: vertical; min-height: 88px; }
+  .gs-phone { display: flex; gap: 8px; }
+  .gs-phone .code { width: 76px; flex: none; text-align: center; }
+  .gs-hint { font-size: 11.5px; color: var(--ink-3); margin-top: -8px; margin-bottom: 14px; }
+  .gs-err { font-size: 12.5px; color: var(--bad); background: var(--bad-soft); border-radius: 8px; padding: 9px 12px; margin-bottom: 14px; display: none; }
+  .gs-err.show { display: block; }
+
+  /* workflow / tool select cards */
+  .gs-card-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 6px; }
+  .gs-pick {
+    border: 1.5px solid var(--line); border-radius: 13px; padding: 14px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 10px; position: relative; background: var(--paper);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .gs-pick:hover { border-color: var(--line-strong); }
+  .gs-pick.selected { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+  .gs-pick .top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .gs-pick .ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; }
+  .gs-pick .ic svg { width: 16px; height: 16px; }
+  .gs-pick .chk { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line-strong); display: grid; place-items: center; color: transparent; flex: none; }
+  .gs-pick.selected .chk { background: var(--teal); border-color: var(--teal); color: #fff; }
+  .gs-pick .chk svg { width: 11px; height: 11px; }
+  .gs-pick span.label { font-size: 13px; font-weight: 700; }
+  .ic-blue { background: #dbeafe; color: #2563eb; }
+  .ic-purple { background: #ede9fe; color: #7c3aed; }
+  .ic-pink { background: #fce7f3; color: #db2777; }
+  .ic-green { background: var(--teal-soft); color: var(--teal-deep); }
+  .ic-orange { background: #ffedd5; color: #c2410c; }
+  .ic-yellow { background: #fef9c3; color: #a16207; }
+
+  /* connect-tools rows */
+  .gs-tool-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 6px; }
+  .gs-tool {
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; background: var(--paper); transition: border-color .15s;
+  }
+  .gs-tool:hover { border-color: var(--line-strong); }
+  .gs-tool.selected { border-color: var(--teal); background: var(--teal-soft); }
+  .gs-tool .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); flex: none; }
+  .gs-tool .ic img, .gs-tool .ic svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .gs-tool .meta { display: flex; flex-direction: column; gap: 1px; }
+  .gs-tool .meta b { font-size: 13px; }
+  .gs-tool .meta span { font-size: 11.5px; color: var(--ink-3); }
+  .gs-tool .meta span.on { color: var(--teal-deep); font-weight: 700; }
+
+  /* review */
+  .gs-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .gs-review-box { border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: var(--surface); }
+  .gs-review-box b.t { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 10px; }
+  .gs-review-plan { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .gs-review-plan .ic { width: 34px; height: 34px; border-radius: 9px; background: var(--teal-soft); color: var(--teal-deep); display: grid; place-items: center; }
+  .gs-review-plan .ic svg { width: 17px; height: 17px; }
+  .gs-review-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .gs-review-list li { font-size: 13.5px; display: flex; gap: 8px; align-items: flex-start; color: var(--ink-2); }
+  .gs-review-list li svg { width: 15px; height: 15px; margin-top: 2px; color: var(--teal); flex: none; }
+  .gs-review-detail { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .gs-review-detail svg { width: 15px; height: 15px; color: var(--ink-3); flex: none; }
+
+  /* activate / payment */
+  .gs-pay-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .gs-pay-tab { flex: 1; padding: 10px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--paper); text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .gs-pay-tab.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .gs-plan-summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin-bottom: 18px; }
+  .gs-plan-summary .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--teal-soft); color: var(--teal-deep); display: grid; place-items: center; flex: none; }
+  .gs-plan-summary b { display: block; font-size: 14.5px; }
+  .gs-plan-summary span { font-size: 12.5px; color: var(--ink-3); }
+  .gs-secure { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-3); justify-content: center; margin-top: 12px; }
+  .gs-secure svg { width: 14px; height: 14px; }
+
+  /* connect muse (BYOT) */
+  .gs-muse-badge { display: inline-flex; align-items: center; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 18px; }
+  .gs-muse-badge img { height: 18px; width: auto; display: block; }
+
+  /* success screen */
+  .gs-success { text-align: center; padding: 20px 10px 6px; }
+  .gs-success .badge { width: 84px; height: 84px; border-radius: 50%; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; margin: 0 auto 22px; }
+  .gs-success .badge svg { width: 40px; height: 40px; }
+  .gs-success h2 { font-size: 26px; margin-bottom: 10px; }
+  .gs-success p { color: var(--ink-2); font-size: 14.5px; max-width: 40ch; margin: 0 auto 22px; }
+  .gs-next-box { text-align: left; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface); margin-bottom: 22px; }
+  .gs-next-box b { display: block; font-size: 13px; margin-bottom: 10px; }
+  .gs-next-box ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+
+  /* custom agent view */
+  .gs-custom { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+  .gs-custom-photo {
+    background-image: linear-gradient(180deg, rgba(0,7,9,.4), rgba(0,7,9,.86)), url('/assets/images/pricing-hero.png');
+    background-size: cover; background-position: center; color: #fff; padding: 40px; display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  .gs-custom-photo img { height: 28px; width: auto; margin-bottom: auto; align-self: flex-start; flex: none; }
+  .gs-custom-photo h2 { font-size: 30px; margin-bottom: 8px; }
+  .gs-custom-photo p { color: rgba(238,244,241,.8); max-width: 34ch; }
+  .gs-custom-form { display: flex; align-items: center; justify-content: center; padding: 40px 28px; }
+
+  @media (max-width: 900px) {
+    .gs-shell, .gs-custom { grid-template-columns: 1fr; }
+    .gs-side { display: none; }
+    .gs-plan-grid, .gs-card-grid, .gs-tool-grid, .gs-grid2, .gs-review-grid { grid-template-columns: 1fr 1fr; }
+    .gs-custom-photo { display: none; }
+    .gs-main { padding: 30px 16px; }
+  }
+  @media (max-width: 520px) {
+    .gs-plan-grid, .gs-card-grid, .gs-tool-grid, .gs-grid2, .gs-review-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div id="app"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const ICONS = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    plane: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-11 11M22 2l-7 20-4-9-9-4 20-7Z"/></svg>',
+    laptop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M2 20h20"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>',
+    crown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 6 4 3 6-6 6 6 4-3-2 13H4L2 6Z"/></svg>',
+    invoice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5M9 13h6M9 17h6"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+    social: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m22 3-10 7L2 3"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-3.8 7A8.5 8.5 0 0 1 4 15l-2 6 6-2a8.5 8.5 0 0 1 13-7.5Z"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>',
+    data: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+    custom: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>',
+    users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    website: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z"/></svg>',
+  };
+
+  const PLANS = {
+    free:    { key: "free",    name: "Free",                         planName: "Solo Free",                 usd: "$0",       ghs: "GHS 0 / month",     icon: ICONS.plane,  users: "1 user" },
+    byot:    { key: "byot",    name: "Bring Your Own Token (BYOT)",  planName: "Bring Your Own Token (BYOT)", usd: "$29",     ghs: "GHS 450 / month",   icon: ICONS.laptop, users: "Up to 2 users" },
+    managed: { key: "managed", name: "Managed Ops",                  planName: "Managed Ops",               usd: "$89",      ghs: "GHS 1,380 / month", icon: ICONS.layers, users: "Up to 5 users" },
+    custom:  { key: "custom",  name: "Custom Agent",                 planName: null,                        usd: "From $299", ghs: "From GHS 4,650 / month", icon: ICONS.crown, users: "Unlimited users" },
+  };
+
+  const WORKFLOWS = [
+    { id: "invoices",  label: "Invoices & payments",   icon: ICONS.invoice, cls: "ic-blue" },
+    { id: "reports",   label: "Reports & documents",   icon: ICONS.doc,     cls: "ic-purple" },
+    { id: "social",    label: "Social media management", icon: ICONS.social, cls: "ic-pink" },
+    { id: "enquiries", label: "Customer enquiries",    icon: ICONS.chat,    cls: "ic-green" },
+    { id: "followups", label: "Email & follow-ups",    icon: ICONS.mail,    cls: "ic-orange" },
+    { id: "data",      label: "Documents & data entry", icon: ICONS.data,   cls: "ic-blue" },
+    { id: "scheduling", label: "Scheduling & reminders", icon: ICONS.calendar, cls: "ic-yellow" },
+    { id: "custom",    label: "Something custom",      icon: ICONS.custom,  cls: "ic-purple" },
+  ];
+
+  const CHANNELS = [
+    { id: "whatsapp", label: "WhatsApp",  icon: ICONS.chat, cls: "ic-green" },
+    { id: "instagram", label: "Instagram", icon: ICONS.social, cls: "ic-pink" },
+    { id: "facebook", label: "Facebook",  icon: ICONS.social, cls: "ic-blue" },
+  ];
+
+  const TOOLS = [
+    { id: "whatsapp", label: "WhatsApp", img: "/assets/images/whatsapp.svg" },
+    { id: "instagram", label: "Instagram", img: "/assets/images/instagram.svg" },
+    { id: "facebook", label: "Facebook", img: "/assets/images/facebook.svg" },
+    { id: "gmail", label: "Gmail", img: "/assets/images/gmail.svg" },
+    { id: "outlook", label: "Outlook", img: "/assets/images/outlook.svg" },
+    { id: "drive", label: "Google Drive", img: "/assets/images/google-drive.svg" },
+    { id: "calendar", label: "Google Calendar", img: "/assets/images/google-calendar.svg" },
+    // These four are generic, unbranded categories rather than one named
+    // product, so a generic icon is correct here - there's no single "real
+    // logo" for "a CRM" the way there is for Gmail or Google Drive.
+    { id: "accounting", label: "Accounting software", icon: ICONS.invoice },
+    { id: "crm", label: "CRM", icon: ICONS.users },
+    { id: "website", label: "Website / APIs", icon: ICONS.website },
+    { id: "other", label: "Other tools", icon: ICONS.custom },
+  ];
+
+  function qs(name) {
+    return new URLSearchParams(location.search).get(name) || "";
+  }
+
+  function esc(s) {
+    const d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  // ------------------------------------------------------------ state
+  const initialPlan = qs("plan");
+  const S = {
+    plan: PLANS[initialPlan] ? initialPlan : "managed",
+    step: 0,
+    billing: "monthly",
+    business: { company: "", name: "", type: "", teamSize: "", country: "Ghana", email: "", whatsapp: "", password: "" },
+    workflows: [],
+    channels: [],
+    tools: [],
+    muse: { mode: "token", token: "" },
+    submitting: false,
+    error: "",
+  };
+
+  function flowFor(planKey) {
+    if (planKey === "free") return ["plan", "business", "channels", "activate"];
+    if (planKey === "byot") return ["plan", "muse", "business", "workflows", "review", "activate"];
+    return ["plan", "business", "workflows", "tools", "review", "activate"]; // managed
+  }
+
+  function stepTitle(id) {
+    return {
+      plan: "Choose your plan",
+      business: "Tell us about your business",
+      muse: "Connect your Muse account",
+      workflows: "What would you like Buinee to handle?",
+      channels: "Choose your social channels",
+      tools: "What does your business already use?",
+      review: "Review your setup",
+      activate: S.plan === "free" ? "Create your account" : "Complete your subscription",
+    }[id];
+  }
+
+  const app = document.getElementById("app");
+
+  function render() {
+    if (S.plan === "custom") return renderCustom();
+    return renderWizard();
+  }
+
+  // -------------------------------------------------------- wizard shell
+  function renderWizard() {
+    const flow = flowFor(S.plan);
+    const stepId = flow[S.step];
+    const atStart = S.step === 0;
+    const total = flow.length;
+
+    const stepsHtml = flow.map((id, i) => {
+      const done = i < S.step;
+      const active = i === S.step;
+      return `<li class="gs-step ${done ? "done" : ""} ${active ? "active" : ""}">
+        <span class="n">${done ? ICONS.check : i + 1}</span>
+        <span>${esc(stepTitle(id))}</span>
+      </li>`;
+    }).join("");
+
+    app.innerHTML = `
+      <div class="gs-shell">
+        <aside class="gs-side ${atStart ? "at-start" : ""}" id="gsSide">
+          <img class="gs-logo" src="/assets/images/buinee-logo.png" alt="Buinee">
+          <ol class="gs-steps">${stepsHtml}</ol>
+          <div class="gs-side-photo"></div>
+          <p class="gs-quote">&ldquo;Set up in minutes. We'll handle the rest.&rdquo;</p>
+        </aside>
+        <main class="gs-main">
+          <div class="gs-card">
+            <div class="gs-progress"><span style="width:${((S.step + 1) / total) * 100}%"></span></div>
+            <div class="gs-step-label">Step ${S.step + 1} of ${total}</div>
+            <div id="gsStepBody"></div>
+          </div>
+        </main>
+      </div>`;
+
+    renderStepBody(stepId);
+  }
+
+  function stepShell(heading, sub, bodyHtml, opts) {
+    opts = opts || {};
+    const backLabel = opts.backLabel || "Back";
+    const nextLabel = opts.nextLabel || "Continue";
+    return `
+      <h2 class="gs-h2">${esc(heading)}</h2>
+      <p class="gs-sub">${esc(sub)}</p>
+      ${S.error ? `<div class="gs-err show">${esc(S.error)}</div>` : ""}
+      ${bodyHtml}
+      <div class="gs-foot">
+        ${S.step > 0 ? `<button type="button" class="btn ghost" id="gsBack">${ICONS.back} ${esc(backLabel)}</button>` : `<span></span>`}
+        <button type="button" class="btn primary block" id="gsNext" ${opts.nextDisabled ? "disabled" : ""}>${opts.submitting ? "Please wait…" : esc(nextLabel)} ${opts.submitting ? "" : ICONS.arrow}</button>
+      </div>`;
+  }
+
+  function renderStepBody(stepId) {
+    const body = document.getElementById("gsStepBody");
+    if (stepId === "plan") body.innerHTML = renderPlanStep();
+    else if (stepId === "business") body.innerHTML = renderBusinessStep();
+    else if (stepId === "muse") body.innerHTML = renderMuseStep();
+    else if (stepId === "workflows") body.innerHTML = renderPickStep(WORKFLOWS, S.workflows, "workflows");
+    else if (stepId === "channels") body.innerHTML = renderPickStep(CHANNELS, S.channels, "channels");
+    else if (stepId === "tools") body.innerHTML = renderToolsStep();
+    else if (stepId === "review") body.innerHTML = renderReviewStep();
+    else if (stepId === "activate") body.innerHTML = renderActivateStep();
+    wireStepEvents(stepId);
+  }
+
+  // ---- step: choose plan ----
+  function renderPlanStep() {
+    const cards = Object.values(PLANS).map(p => `
+      <div class="gs-plan-card ${S.plan === p.key ? "selected" : ""}" data-plan="${p.key}">
+        <span class="check">${ICONS.check}</span>
+        <span class="ic">${p.icon}</span>
+        <b>${esc(p.name)}</b>
+        <span class="price">${esc(p.usd)} / month</span>
+        <span class="note">${esc(p.users)}</span>
+      </div>`).join("");
+    return stepShell("You're almost there!", "Which plan would you like to get started with?",
+      `<div class="gs-plan-grid">${cards}</div>`, { backLabel: "Back to pricing" });
+  }
+
+  // ---- step: business details ----
+  function renderBusinessStep() {
+    const b = S.business;
+    const solo = S.plan === "free";
+    return stepShell("Tell us about your business", "This helps us set up Buinee for your specific needs.", `
+      <div class="gs-grid2">
+        <div class="gs-field"><label>${solo ? "Workspace name (optional)" : "Business name"}</label>
+          <input id="fCompany" value="${esc(b.company)}" placeholder="e.g. GreenLeaf Stores"></div>
+        <div class="gs-field"><label>Your full name</label>
+          <input id="fName" value="${esc(b.name)}" placeholder="e.g. Ama Serwaa"></div>
+      </div>
+      ${solo ? "" : `<div class="gs-grid2">
+        <div class="gs-field"><label>Business type</label>
+          <select id="fType">${["", "Retail & Shops", "Restaurants & Cafés", "Health & Clinics", "Schools & Institutions", "Churches", "Hotels & Travel", "Professional Services", "Other"].map(o => `<option ${b.type === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+        <div class="gs-field"><label>Team size</label>
+          <select id="fTeamSize">${["", "Just me", "2-5 people", "6-15 people", "16-50 people", "50+ people"].map(o => `<option ${b.teamSize === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+      </div>`}
+      <div class="gs-grid2">
+        <div class="gs-field"><label>Country</label>
+          <select id="fCountry">${["Ghana", "Nigeria", "Kenya", "South Africa", "United Kingdom", "United States", "Other"].map(o => `<option ${b.country === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+        <div class="gs-field"><label>Email address</label>
+          <input id="fEmail" type="email" value="${esc(b.email)}" placeholder="you@business.com"></div>
+      </div>
+      <div class="gs-field"><label>WhatsApp number (optional)</label>
+        <div class="gs-phone"><input class="code" value="+233" disabled><input id="fWhatsapp" value="${esc(b.whatsapp)}" placeholder="20 123 4567"></div>
+      </div>
+      <div class="gs-field"><label>Create a password</label>
+        <input id="fPassword" type="password" value="${esc(b.password)}" placeholder="At least 12 characters" autocomplete="new-password"></div>
+      <p class="gs-hint">You'll use this to sign in to your Buinee dashboard.</p>
+    `);
+  }
+
+  // ---- step: connect muse (BYOT) ----
+  function renderMuseStep() {
+    const m = S.muse;
+    return stepShell("Connect your Muse account", "We'll use your existing Muse account and API tokens.", `
+      <div class="gs-muse-badge"><img src="/assets/images/muse-logo.png" alt="Muse"></div>
+      <div class="gs-pay-tabs">
+        <div class="gs-pay-tab ${m.mode === "token" ? "active" : ""}" data-mode="token">API Token</div>
+        <div class="gs-pay-tab ${m.mode === "signin" ? "active" : ""}" data-mode="signin">Sign in with Muse</div>
+      </div>
+      ${m.mode === "token" ? `
+        <div class="gs-field"><label>Muse API token</label>
+          <input id="fMuseToken" value="${esc(m.token)}" placeholder="Enter your Muse API token"></div>
+        <p class="gs-hint">Your token is encrypted and stored securely. We only use it to run your workflows. You can skip this and add it later from your dashboard.</p>
+      ` : `<p class="gs-hint">You'll be asked to sign in to Muse right after your Buinee account is created.</p>`}
+    `);
+  }
+
+  // ---- step: workflows / channels (shared card-grid picker) ----
+  function renderPickStep(list, selected, field) {
+    const cards = list.map(w => `
+      <div class="gs-pick ${selected.includes(w.id) ? "selected" : ""}" data-id="${w.id}" data-field="${field}">
+        <div class="top"><span class="ic ${w.cls}">${w.icon}</span><span class="chk">${ICONS.check}</span></div>
+        <span class="label">${esc(w.label)}</span>
+      </div>`).join("");
+    const sub = field === "channels"
+      ? "Pick the channels Buinee should watch for you. You can add more later."
+      : "Choose the areas you want help with. You can always add more later.";
+    return stepShell(stepTitle(field === "channels" ? "channels" : "workflows"), sub,
+      `<div class="gs-card-grid">${cards}</div>`);
+  }
+
+  // ---- step: connect tools (managed only) ----
+  function renderToolsStep() {
+    const rows = TOOLS.map(t => `
+      <div class="gs-tool ${S.tools.includes(t.id) ? "selected" : ""}" data-id="${t.id}">
+        <span class="ic">${t.img ? `<img src="${t.img}" alt="">` : t.icon}</span>
+        <span class="meta"><b>${esc(t.label)}</b><span class="${S.tools.includes(t.id) ? "on" : ""}">${S.tools.includes(t.id) ? "Selected" : "Connect"}</span></span>
+      </div>`).join("");
+    return stepShell("What does your business already use?", "Select the tools you want Buinee to work with. You can skip for now, and connect them securely from your dashboard after your account is created.",
+      `<div class="gs-tool-grid">${rows}</div>`);
+  }
+
+  // ---- step: review ----
+  function renderReviewStep() {
+    const plan = PLANS[S.plan];
+    const b = S.business;
+    const picks = (S.plan === "free" ? S.channels : S.workflows);
+    const pickList = (S.plan === "free" ? CHANNELS : WORKFLOWS).filter(w => picks.includes(w.id));
+    return stepShell("Review your setup", "Here's what we'll set up for you. You can go back and make changes.", `
+      <div class="gs-review-grid">
+        <div class="gs-review-box">
+          <b class="t">Plan</b>
+          <div class="gs-review-plan"><span class="ic">${plan.icon}</span><div><b>${esc(plan.name)}</b><div style="font-size:12.5px;color:var(--ink-3)">${esc(plan.usd)} / month</div></div></div>
+          <div style="margin-top:14px">
+            <b class="t">Business details</b>
+            <div class="gs-review-detail">${ICONS.doc} ${esc(b.company || b.name || "—")}</div>
+            ${b.type ? `<div class="gs-review-detail">${ICONS.data} ${esc(b.type)}</div>` : ""}
+            <div class="gs-review-detail">${ICONS.mail} ${esc(b.country)}${b.teamSize ? " · " + esc(b.teamSize) : ""}</div>
+          </div>
+        </div>
+        <div class="gs-review-box">
+          <b class="t">${S.plan === "free" ? "Selected channels" : "Selected workflows"}</b>
+          <ul class="gs-review-list">${pickList.map(w => `<li>${ICONS.check}${esc(w.label)}</li>`).join("") || "<li>None selected</li>"}</ul>
+          ${S.plan === "managed" ? `<div style="margin-top:14px"><b class="t">Tools to connect</b>
+            <ul class="gs-review-list">${TOOLS.filter(t => S.tools.includes(t.id)).map(t => `<li>${ICONS.check}${esc(t.label)}</li>`).join("") || "<li>None selected yet</li>"}</ul></div>` : ""}
+        </div>
+      </div>
+    `, { nextLabel: S.plan === "free" ? "Continue" : "Continue to Payment" });
+  }
+
+  // ---- step: activate (payment or free account creation) ----
+  function renderActivateStep() {
+    const plan = PLANS[S.plan];
+    if (S.plan === "free") {
+      return stepShell("Create your account", "You're one click away from your Buinee workspace.", `
+        <div class="gs-plan-summary"><span class="ic">${plan.icon}</span><div><b>${esc(plan.name)}</b><span>${esc(plan.ghs)}</span></div></div>
+      `, { nextLabel: S.submitting ? "Creating your workspace…" : "Create my workspace", submitting: S.submitting, nextDisabled: S.submitting });
+    }
+    return stepShell("Complete your subscription", "You'll be taken to Paystack's secure page to finish payment.", `
+      <div class="gs-plan-summary"><span class="ic">${plan.icon}</span><div><b>${esc(plan.name)}</b><span>${esc(plan.usd)} / month · ${esc(plan.ghs)}</span></div></div>
+      <div class="gs-secure">${ICONS.lock} Secure payment powered by Paystack. You can cancel anytime.</div>
+    `, { nextLabel: S.submitting ? "Starting payment…" : "Pay with Paystack", submitting: S.submitting, nextDisabled: S.submitting });
+  }
+
+  // -------------------------------------------------------- custom agent
+  function renderCustom() {
+    const b = S.business;
+    if (S.customDone) {
+      app.innerHTML = `
+        <div class="gs-shell">
+          <main class="gs-main" style="grid-column:1/-1">
+            <div class="gs-card">
+              <div class="gs-success">
+                <div class="badge">${ICONS.check}</div>
+                <h2>Thanks, we've got it</h2>
+                <p>Someone from our team will reach out shortly to talk through your requirements and schedule a call.</p>
+                <a class="btn ghost" href="/pricing">${ICONS.back} Back to pricing</a>
+              </div>
+            </div>
+          </main>
+        </div>`;
+      return;
+    }
+    app.innerHTML = `
+      <div class="gs-custom">
+        <div class="gs-custom-photo">
+          <img src="/assets/images/buinee-logo.png" alt="Buinee">
+          <h2>Custom solutions for your unique business.</h2>
+          <p>Tailored AI agents and integrations, scoped around exactly how your operations run.</p>
+        </div>
+        <div class="gs-custom-form">
+          <div class="gs-card" style="box-shadow:none;border:0;max-width:480px">
+            <h2 class="gs-h2">Book a consultation</h2>
+            <p class="gs-sub">Tell us about your requirements and we'll schedule a call to discuss your custom solution.</p>
+            ${S.error ? `<div class="gs-err show">${esc(S.error)}</div>` : ""}
+            <div class="gs-grid2">
+              <div class="gs-field"><label>Your name</label><input id="fName" value="${esc(b.name)}" placeholder="e.g. Ama Serwaa"></div>
+              <div class="gs-field"><label>Business email</label><input id="fEmail" type="email" value="${esc(b.email)}" placeholder="you@business.com"></div>
+            </div>
+            <div class="gs-field"><label>Business type</label>
+              <select id="fType">${["", "Retail & Shops", "Restaurants & Cafés", "Health & Clinics", "Schools & Institutions", "Churches", "Hotels & Travel", "Professional Services", "Other"].map(o => `<option ${b.type === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+            <div class="gs-field"><label>Message (optional)</label>
+              <textarea id="fMessage" placeholder="Tell us a bit about what you need...">${esc(b.message || "")}</textarea></div>
+            <div class="gs-foot">
+              <a class="btn ghost" href="/pricing">${ICONS.back} Back</a>
+              <button type="button" class="btn primary block" id="gsBookBtn" ${S.submitting ? "disabled" : ""}>${S.submitting ? "Sending…" : "Book a Consultation"} ${S.submitting ? "" : ICONS.arrow}</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("fName").addEventListener("input", e => S.business.name = e.target.value);
+    document.getElementById("fEmail").addEventListener("input", e => S.business.email = e.target.value);
+    document.getElementById("fType").addEventListener("change", e => S.business.type = e.target.value);
+    document.getElementById("fMessage").addEventListener("input", e => S.business.message = e.target.value);
+    document.getElementById("gsBookBtn").addEventListener("click", submitConsultation);
+  }
+
+  async function submitConsultation() {
+    const b = S.business;
+    if (!b.name || b.name.trim().length < 2 || !b.email.trim()) {
+      S.error = "Add your name and business email.";
+      return render();
+    }
+    S.error = "";
+    S.submitting = true;
+    render();
+    try {
+      const res = await fetch("/api/consultation", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: b.name, email: b.email, business_type: b.type, message: b.message || "" }),
+      });
+      const data = await res.json();
+      S.submitting = false;
+      if (!res.ok) { S.error = data.error || "Something went wrong."; return render(); }
+      S.customDone = true;
+      render();
+    } catch {
+      S.submitting = false;
+      S.error = "Could not reach the server.";
+      render();
+    }
+  }
+
+  // -------------------------------------------------------------- events
+  function wireStepEvents(stepId) {
+    const back = document.getElementById("gsBack");
+    if (back) back.addEventListener("click", () => {
+      S.error = "";
+      if (S.step === 0) { location.href = "/pricing"; return; }
+      S.step -= 1;
+      render();
+    });
+
+    if (stepId === "plan") {
+      document.querySelectorAll(".gs-plan-card").forEach(card => {
+        card.addEventListener("click", () => { S.plan = card.dataset.plan; S.step = 0; render(); });
+      });
+    }
+
+    if (stepId === "business") {
+      document.getElementById("fCompany").addEventListener("input", e => S.business.company = e.target.value);
+      document.getElementById("fName").addEventListener("input", e => S.business.name = e.target.value);
+      const typeEl = document.getElementById("fType");
+      if (typeEl) typeEl.addEventListener("change", e => S.business.type = e.target.value);
+      const teamEl = document.getElementById("fTeamSize");
+      if (teamEl) teamEl.addEventListener("change", e => S.business.teamSize = e.target.value);
+      document.getElementById("fCountry").addEventListener("change", e => S.business.country = e.target.value);
+      document.getElementById("fEmail").addEventListener("input", e => S.business.email = e.target.value);
+      document.getElementById("fWhatsapp").addEventListener("input", e => S.business.whatsapp = e.target.value);
+      document.getElementById("fPassword").addEventListener("input", e => S.business.password = e.target.value);
+    }
+
+    if (stepId === "muse") {
+      document.querySelectorAll(".gs-pay-tab").forEach(tab => {
+        tab.addEventListener("click", () => { S.muse.mode = tab.dataset.mode; render(); });
+      });
+      const tokenEl = document.getElementById("fMuseToken");
+      if (tokenEl) tokenEl.addEventListener("input", e => S.muse.token = e.target.value);
+    }
+
+    if (stepId === "workflows" || stepId === "channels") {
+      document.querySelectorAll(".gs-pick").forEach(card => {
+        card.addEventListener("click", () => {
+          const field = card.dataset.field, id = card.dataset.id;
+          const arr = S[field];
+          const i = arr.indexOf(id);
+          if (i === -1) arr.push(id); else arr.splice(i, 1);
+          renderStepBody(stepId);
+        });
+      });
+    }
+
+    if (stepId === "tools") {
+      document.querySelectorAll(".gs-tool").forEach(row => {
+        row.addEventListener("click", () => {
+          const id = row.dataset.id;
+          const i = S.tools.indexOf(id);
+          if (i === -1) S.tools.push(id); else S.tools.splice(i, 1);
+          renderStepBody(stepId);
+        });
+      });
+    }
+
+    const next = document.getElementById("gsNext");
+    if (next) next.addEventListener("click", () => onNext(stepId));
+  }
+
+  function validateStep(stepId) {
+    if (stepId === "business") {
+      const b = S.business;
+      if (!b.name || b.name.trim().length < 2) return "Add your full name.";
+      if (S.plan !== "free" && (!b.company || b.company.trim().length < 2)) return "Add your business name.";
+      if (!b.email.trim() || !b.email.includes("@")) return "Add a valid email address.";
+      if (!b.password || b.password.length < 12) return "Choose a password with at least 12 characters.";
+    }
+    return "";
+  }
+
+  function onNext(stepId) {
+    const err = validateStep(stepId);
+    if (err) { S.error = err; return renderStepBody(stepId); }
+    S.error = "";
+
+    if (stepId === "activate") return submitActivation();
+
+    const flow = flowFor(S.plan);
+    S.step = Math.min(S.step + 1, flow.length - 1);
+    render();
+  }
+
+  async function submitActivation() {
+    S.submitting = true;
+    renderStepBody("activate");
+    const b = S.business;
+    const plan = PLANS[S.plan];
+    try {
+      const plansRes = await fetch("/api/plans");
+      const plansData = await plansRes.json();
+      const realPlan = (plansData.plans || []).find(p => p.name === plan.planName);
+      if (!realPlan) {
+        S.submitting = false;
+        S.error = "That plan isn't available right now. Please contact us to get set up.";
+        return renderStepBody("activate");
+      }
+      const res = await fetch("/api/register", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: b.company || b.name,
+          name: b.name,
+          email: b.email,
+          password: b.password,
+          role: "finance_supervisor",
+          plan_id: realPlan.id,
+          terms_accepted: true,
+        }),
+      });
+      const data = await res.json();
+      S.submitting = false;
+      if (!res.ok) { S.error = data.error || "Something went wrong."; return renderStepBody("activate"); }
+      if (data.payment_required && data.authorization_url) {
+        location.href = data.authorization_url;
+        return;
+      }
+      // Free plan, or a plan with no price - no payment needed.
+      renderSuccess();
+    } catch {
+      S.submitting = false;
+      S.error = "Could not reach the server.";
+      renderStepBody("activate");
+    }
+  }
+
+  function renderSuccess() {
+    app.innerHTML = `
+      <div class="gs-shell">
+        <main class="gs-main" style="grid-column:1/-1">
+          <div class="gs-card" style="max-width:520px">
+            <div class="gs-success">
+              <div class="badge">${ICONS.check}</div>
+              <h2>Welcome to Buinee!</h2>
+              <p>Your account is active and your workspace is being set up. We'll start connecting your tools and configuring your workflows.</p>
+              <div class="gs-next-box">
+                <b>What happens next?</b>
+                <ol>
+                  <li>We connect your selected tools</li>
+                  <li>Set up your workflows</li>
+                  <li>Notify you when everything is ready</li>
+                </ol>
+              </div>
+              <a class="btn primary block" href="/dashboard">Go to Dashboard ${ICONS.arrow}</a>
+            </div>
+          </div>
+        </main>
+      </div>`;
+  }
+
+  render();
+})();
+</script>

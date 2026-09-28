@@ -222,6 +222,7 @@ STATIC_PAGES = {
     "/payment/failed": "payment-failed.html",
     "/contact": "contact.html",
     "/pricing": "pricing.html",
+    "/get-started": "get-started.html",
     "/case-studies": "case-studies.html",
     "/privacy": "legal.html",
     "/terms": "legal.html",
@@ -253,6 +254,7 @@ STATIC_PAGES = {
 STATIC_ASSETS = {
     "/assets/images/buinee-logo.png": "assets/images/buinee-logo.png",
     "/assets/images/hero-image1.png": "assets/images/hero-image1.png",
+    "/assets/images/pricing-hero.png": "assets/images/pricing-hero.png",
     "/assets/images/buinee-ad.png": "assets/images/buinee-ad.png",
     "/assets/images/landing-page-reference.png": "assets/images/landing-page-reference.png",
     "/assets/images/black-african-industries.png": "assets/images/black-african-industries.png",
@@ -262,6 +264,11 @@ STATIC_ASSETS = {
     "/assets/images/linkedin.svg": "assets/images/linkedin.svg",
     "/assets/images/youtube.svg": "assets/images/youtube.svg",
     "/assets/images/x.svg": "assets/images/x.svg",
+    "/assets/images/gmail.svg": "assets/images/gmail.svg",
+    "/assets/images/outlook.svg": "assets/images/outlook.svg",
+    "/assets/images/google-drive.svg": "assets/images/google-drive.svg",
+    "/assets/images/google-calendar.svg": "assets/images/google-calendar.svg",
+    "/assets/images/muse-logo.png": "assets/images/muse-logo.png",
 }
 
 LEGACY_PAGE_REDIRECTS = {
@@ -695,13 +702,115 @@ SITE_CONTENT_SCHEMA = {
     "pricing": [
         {"key": "pricing_eyebrow", "label": "Pricing eyebrow", "type": "text", "default": "Pricing"},
         {"key": "pricing_headline", "label": "Pricing headline", "type": "text",
-         "default": "Simple pricing for real businesses."},
+         "default": "Choose the plan that fits your business."},
         {"key": "pricing_subtext", "label": "Pricing subtext", "type": "paragraph",
-         "default": "Every plan gets the same connected workspace for messages, documents, tasks and "
-                     "business records. What changes is how many people it covers and which advanced "
-                     "features are included."},
-        {"key": "pricing_aud_individual", "label": "Pricing toggle: individual", "type": "text", "default": "Just me"},
-        {"key": "pricing_aud_team", "label": "Pricing toggle: team", "type": "text", "default": "My team"},
+         "default": "Start free, bring your own Muse token, or let us handle everything. Flexible plans "
+                     "for individuals, teams and businesses of any size."},
+        {"key": "pricing_badge1", "label": "Pricing hero badge 1", "type": "text", "default": "No long contracts"},
+        {"key": "pricing_badge2", "label": "Pricing hero badge 2", "type": "text", "default": "Secure & reliable"},
+        {"key": "pricing_badge3", "label": "Pricing hero badge 3", "type": "text", "default": "Local & global support"},
+
+        {"key": "pricing_plans_eyebrow", "label": "Plans section eyebrow", "type": "text", "default": "Pricing plans"},
+        {"key": "pricing_plans_headline", "label": "Plans section headline", "type": "text",
+         "default": "From free tools to fully managed AI operations."},
+        {"key": "pricing_plans_subtext", "label": "Plans section subtext", "type": "paragraph",
+         "default": "Get the power of Muse for your business, with the setup, integrations and ongoing "
+                     "support handled by Buinee.app."},
+        {"key": "pricing_toggle_monthly", "label": "Billing toggle: monthly", "type": "text", "default": "Monthly"},
+        {"key": "pricing_toggle_yearly", "label": "Billing toggle: yearly", "type": "text", "default": "Yearly"},
+        {"key": "pricing_toggle_save", "label": "Billing toggle: savings badge", "type": "text", "default": "Save 20%"},
+        {"key": "pricing_period_label", "label": "Price period label", "type": "text", "default": "/ month"},
+
+        {"key": "pricing1_tag", "label": "Plan 1 badge (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "pricing1_name", "label": "Plan 1 name", "type": "text", "default": "Free"},
+        {"key": "pricing1_desc", "label": "Plan 1 description", "type": "text",
+         "default": "Get started and try the essentials."},
+        {"key": "pricing1_price_usd", "label": "Plan 1 price (USD)", "type": "text", "default": "$0"},
+        {"key": "pricing1_price_ghs", "label": "Plan 1 price (GHS, shown under the USD price)", "type": "text",
+         "default": "GHS 0 / month"},
+        {"key": "pricing1_price_usd_yearly", "label": "Plan 1 price (USD, billed yearly)", "type": "text", "default": "$0"},
+        {"key": "pricing1_price_ghs_yearly", "label": "Plan 1 price (GHS, billed yearly)", "type": "text",
+         "default": "GHS 0 / month"},
+        {"key": "pricing1_cta_label", "label": "Plan 1 button label", "type": "text", "default": "Get Started"},
+        {"key": "pricing1_features_pre", "label": "Plan 1 feature list (before the social apps row)", "type": "bullets",
+         "default": "1 user\nCore business tools"},
+        {"key": "pricing1_features_post", "label": "Plan 1 feature list (after the social apps row)", "type": "bullets",
+         "default": "Basic automation\nLimited custom integrations\nCommunity support"},
+
+        {"key": "pricing2_tag", "label": "Plan 2 badge (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "pricing2_name", "label": "Plan 2 name", "type": "text", "default": "Bring Your Own Token (BYOT)"},
+        {"key": "pricing2_desc", "label": "Plan 2 description", "type": "text",
+         "default": "Use your own Muse account and tokens."},
+        {"key": "pricing2_price_usd", "label": "Plan 2 price (USD)", "type": "text", "default": "$29"},
+        {"key": "pricing2_price_ghs", "label": "Plan 2 price (GHS, shown under the USD price)", "type": "text",
+         "default": "GHS 450 / month"},
+        {"key": "pricing2_price_usd_yearly", "label": "Plan 2 price (USD, billed yearly)", "type": "text", "default": "$23"},
+        {"key": "pricing2_price_ghs_yearly", "label": "Plan 2 price (GHS, billed yearly)", "type": "text",
+         "default": "GHS 360 / month"},
+        {"key": "pricing2_cta_label", "label": "Plan 2 button label", "type": "text", "default": "Get Started"},
+        {"key": "pricing2_features", "label": "Plan 2 feature list", "type": "bullets",
+         "default": "Up to 2 users\nEverything in Free\nPre-built workflow templates\nStandard integrations\n"
+                     "Use your own Muse API tokens\nBasic automation\nEmail support"},
+
+        {"key": "pricing3_tag", "label": "Plan 3 badge (leave blank to hide)", "type": "text", "default": "Most Popular"},
+        {"key": "pricing3_name", "label": "Plan 3 name", "type": "text", "default": "Managed Ops"},
+        {"key": "pricing3_desc", "label": "Plan 3 description", "type": "text",
+         "default": "Let Buinee handle the infrastructure."},
+        {"key": "pricing3_price_usd", "label": "Plan 3 price (USD)", "type": "text", "default": "$89"},
+        {"key": "pricing3_price_ghs", "label": "Plan 3 price (GHS, shown under the USD price)", "type": "text",
+         "default": "GHS 1,380 / month"},
+        {"key": "pricing3_price_usd_yearly", "label": "Plan 3 price (USD, billed yearly)", "type": "text", "default": "$71"},
+        {"key": "pricing3_price_ghs_yearly", "label": "Plan 3 price (GHS, billed yearly)", "type": "text",
+         "default": "GHS 1,104 / month"},
+        {"key": "pricing3_cta_label", "label": "Plan 3 button label", "type": "text", "default": "Get Started"},
+        {"key": "pricing3_features", "label": "Plan 3 feature list", "type": "bullets",
+         "default": "Up to 5 users\nEverything in BYOT\nManaged Muse infrastructure\nAdvanced automations\n"
+                     "Custom integrations (more)\nWorkflow optimization\nOngoing maintenance\nPriority support"},
+
+        {"key": "pricing4_tag", "label": "Plan 4 badge (leave blank to hide)", "type": "text", "default": ""},
+        {"key": "pricing4_name", "label": "Plan 4 name", "type": "text", "default": "Custom Agent"},
+        {"key": "pricing4_desc", "label": "Plan 4 description", "type": "text",
+         "default": "A tailored solution for your unique operations."},
+        {"key": "pricing4_price_usd", "label": "Plan 4 price (USD)", "type": "text", "default": "From $299"},
+        {"key": "pricing4_price_ghs", "label": "Plan 4 price (GHS, shown under the USD price)", "type": "text",
+         "default": "From GHS 4,650 / month"},
+        {"key": "pricing4_price_usd_yearly", "label": "Plan 4 price (USD, billed yearly)", "type": "text",
+         "default": "From $239"},
+        {"key": "pricing4_price_ghs_yearly", "label": "Plan 4 price (GHS, billed yearly)", "type": "text",
+         "default": "From GHS 3,720 / month"},
+        {"key": "pricing4_cta_label", "label": "Plan 4 button label", "type": "text", "default": "Contact Sales"},
+        {"key": "pricing4_features", "label": "Plan 4 feature list", "type": "bullets",
+         "default": "Unlimited users\nEverything in Managed Ops\nCustom workflows\nAdvanced integrations "
+                     "(API, legacy systems, internal tools)\nDedicated account manager\nProactive maintenance\n"
+                     "SLA & onboarding\n24/7 support"},
+
+        {"key": "pricing_compare_eyebrow", "label": "Compare table heading", "type": "text", "default": "Compare plans"},
+        {"key": "pricing_compare_subtext", "label": "Compare table subtext", "type": "text",
+         "default": "See what's included in each plan."},
+
+        {"key": "pricing_faq_headline", "label": "FAQ headline", "type": "text", "default": "Frequently asked questions"},
+        {"key": "pricing_faq_subtext", "label": "FAQ subtext", "type": "text",
+         "default": "Everything you need to know about our pricing."},
+        {"key": "pricing_faq_link", "label": "\"View all questions\" button label", "type": "text",
+         "default": "View all questions"},
+        {"key": "pricing_faq_items", "label": "FAQ questions and answers", "type": "qa_list",
+         "default": "Q: Is the Free plan really free?\n"
+                     "A: Yes. You get 1 user, core tools, social media apps and limited custom "
+                     "integrations, no card required.\n"
+                     "Q: Can I change my plan later?\n"
+                     "A: Yes. You can upgrade or downgrade at any time.\n"
+                     "Q: Do I need a Muse account for the BYOT plan?\n"
+                     "A: Yes. You'll need a paid Muse account or API tokens. We provide the integration.\n"
+                     "Q: What payment methods do you accept?\n"
+                     "A: We accept cards, mobile money (MTN, Telecel, AirtelTigo), and bank transfers."},
+
+        {"key": "pricing_cta_eyebrow", "label": "Closing CTA eyebrow", "type": "text", "default": "Ready to get started?"},
+        {"key": "pricing_cta_headline", "label": "Closing CTA headline", "type": "text",
+         "default": "Let Buinee handle the busywork."},
+        {"key": "pricing_cta_subtext", "label": "Closing CTA subtext", "type": "paragraph",
+         "default": "Start free or choose a plan and put Muse to work for your business."},
+        {"key": "pricing_cta_primary", "label": "Closing CTA button", "type": "text", "default": "Get Started"},
+        {"key": "pricing_cta_fine", "label": "Closing CTA fine print", "type": "text", "default": "No long contracts"},
     ],
     "case_studies": [
         {"key": "case_studies_eyebrow", "label": "Case studies eyebrow", "type": "text", "default": "Case studies"},
@@ -762,8 +871,8 @@ def _render_cms_value(field_type: str, value: str) -> str:
             items.append((question, " ".join(answer).strip()))
         return "".join(
             f'<details class="faq-item"><summary>{html.escape(q)}'
-            f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-            f'<path d="m6 9 6 6 6-6"/></svg></summary>'
+            f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+            f'<path d="M12 5v14M5 12h14"/></svg></summary>'
             f'<div class="faq-a">{html.escape(a)}</div></details>'
             for q, a in items if q
         )
@@ -3310,6 +3419,7 @@ class RouteHandlerMixin:
             "/api/demo": self._handle_demo,
             "/api/demo/register": self._handle_demo_register,
             "/api/demo/contact": self._handle_demo_contact,
+            "/api/consultation": self._handle_consultation_request,
             "/api/mailbox/connect-imap": self._handle_mailbox_connect_imap,
             "/api/mailbox/disconnect": self._handle_mailbox_disconnect,
             "/api/tools/connect-key": self._handle_tool_connect_key,
@@ -3608,6 +3718,44 @@ class RouteHandlerMixin:
         except Exception as exc:
             print(f"  ! could not save offline contact: {exc}")
             return self._json({"error": "Could not save your details. Please try again."}, 500)
+
+        return self._json({"ok": True})
+
+    def _handle_consultation_request(self):
+        """Custom Agent's "Book a Consultation" step in get-started.html -
+        no plan, no payment, just a lead for a person to follow up on. Reuses
+        the same landing_chat_sessions/Command Center inbox pipeline as the
+        offline-chat contact form above, rather than a new table, since both
+        are "a visitor left their details, flag it for a human" records."""
+        if rate_limited(f"consult:{client_ip(self)}"):
+            return self._json({"error": "Please wait a moment and try again."}, 429)
+        try:
+            req = self._body()
+        except Exception:
+            return self._json({"error": "Bad request."}, 400)
+
+        name = str(req.get("name") or "").strip()[:120]
+        email = str(req.get("email") or "").strip()[:200]
+        business_type = str(req.get("business_type") or "").strip()[:120]
+        message = str(req.get("message") or "").strip()[:2000]
+        if not name or not email:
+            return self._json({"error": "Add your name and business email."}, 400)
+
+        lines = [f"[Custom Agent consultation request: {name}, {email}"]
+        if business_type:
+            lines[0] += f", {business_type}"
+        lines[0] += "]"
+        if message:
+            lines.append(f"Visitor: {message}")
+
+        try:
+            db.save_landing_chat_session(
+                f"consult:{secrets.token_hex(16)}", "\n".join(lines),
+                contact_name=name, contact_email=email, should_flag=True,
+            )
+        except Exception as exc:
+            print(f"  ! could not save consultation request: {exc}")
+            return self._json({"error": "Could not save your request. Please try again."}, 500)
 
         return self._json({"ok": True})
 
