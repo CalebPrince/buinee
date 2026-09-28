@@ -1,12 +1,15 @@
 # Security
 
-Status: REVIEW_REQUIRED
+Status: APPROVED
 Baseline version: 0.1.0
 Canonical record: `security-baseline.yaml`
 Owner: site-owner
+Approved by: Prince Caleb (site-owner), 2026-09-28
 Last reviewed: 2026-09-28
 
-This file is the human-readable view. `security-baseline.yaml` is authoritative for approval, scope, locks, controls, gates, and evidence. Nothing here is APPROVED or VERIFIED unless that file and its linked evidence say so.
+This file is the human-readable view. `security-baseline.yaml` is authoritative for approval, scope, locks, controls, gates, and evidence. Nothing here is APPROVED or VERIFIED beyond what that file and its linked evidence say.
+
+**Approval scope:** the landing-page redesign implementation (new `/pricing`/`/case-studies` routes, `SITE_CONTENT_SCHEMA` extension, reference image assets) per `DESIGN.md`. Development is `UNLOCKED`. Production **deployment stays `LOCKED`** until `CTL-INFRA-001` and `CTL-AUTHZ-001` are actually implemented and their gates (`GATE-002`, `GATE-003`) pass — approving the design authorizes building it, not shipping it unchecked.
 
 ## Posture and scope
 

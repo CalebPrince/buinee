@@ -1,6 +1,6 @@
 schema_version: "2.1"
 baseline_version: "0.1.0"
-record_digest: null
+record_digest: "da05bf5bcd63b439e43960829e09c5769a6f76d1750c0755f72dcaff0d7184f1"
 project:
   id: "PRJ-BUINEE-001"
   name: "Buinee (buinee.app)"
@@ -15,10 +15,10 @@ risk:
     - "A concrete pre-existing misconfiguration was found while scoping this review (THR-001): internal design/security documents are not blocked from public static-file serving once committed to the docroot."
   likely_production_tier: null
 lifecycle:
-  status: "REVIEW_REQUIRED"
+  status: "APPROVED"
   production_posture: "ELIGIBLE_WHEN_APPROVED"
   spike_expires_at: null
-  development_lock: "LOCKED"
+  development_lock: "UNLOCKED"
   deployment_lock: "LOCKED"
 classification_levels: [PUBLIC, INTERNAL, CONFIDENTIAL, SENSITIVE, RESTRICTED]
 assets:
@@ -283,11 +283,13 @@ recovery:
   rollback: {status: "PLANNED", details: "git revert the offending commit(s) on main, pull on the server, restart the Python app only if server.py changed"}
   incident_response: {status: "PLANNED", details: "If .opskeep/ or other internal docs are found publicly exposed: add the deny rule, redeploy, then review the exposed documents for anything beyond internal reasoning before closing (none of the current documents contain secrets or customer data)"}
 approval:
-  decision: "PENDING"
-  approver: null
-  approved_at: null
-  baseline_version: null
-  record_digest: null
-  scope: []
+  decision: "APPROVED"
+  approver: "Prince Caleb (site-owner)"
+  approved_at: "2026-09-28"
+  baseline_version: "0.1.0"
+  record_digest: "da05bf5bcd63b439e43960829e09c5769a6f76d1750c0755f72dcaff0d7184f1"
+  scope:
+    - "Landing-page redesign implementation (new /pricing and /case-studies routes, SITE_CONTENT_SCHEMA extension, reference image assets) per DESIGN.md"
+    - "Development unlocked; production deployment stays LOCKED until CTL-INFRA-001 and CTL-AUTHZ-001 are implemented and GATE-002/GATE-003 pass"
   expires_at: null
 changes: []
