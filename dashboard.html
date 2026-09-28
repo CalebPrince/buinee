@@ -156,6 +156,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   height:70px;flex:none;background:rgba(255,255,255,.86);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
   display:flex;align-items:center;padding:0 14px 0 47px;
+  position:relative;z-index:50;
 }
 .search{
   position:relative;width:400px;height:40px;
@@ -195,7 +196,59 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .who-txt{text-align:left}
 .who-txt b{display:block;font-size:13px;font-weight:600;color:var(--ink);line-height:1.25}
 .who-txt span{display:block;font-size:12px;color:var(--ink-3);line-height:1.25}
-.who-chev{width:16px;height:16px;stroke:var(--ink-4);margin-left:2px;flex:none}
+.who-chev{width:16px;height:16px;stroke:var(--ink-4);margin-left:2px;flex:none;transition:transform .15s}
+.tb-dd{position:relative}
+.tb-dd.open .who-chev{transform:rotate(180deg)}
+
+.tb-panel{
+  position:absolute;top:calc(100% + 10px);right:0;width:320px;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);
+  opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .14s,transform .14s,visibility .14s;
+  z-index:60;overflow:hidden;
+}
+.tb-dd.open .tb-panel{opacity:1;visibility:visible;transform:translateY(0)}
+
+.tb-panel-head{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line-2)}
+.tb-panel-head b{font-size:14px;font-weight:700;color:var(--ink)}
+.tb-panel-head a{margin-left:auto;font-size:12px;font-weight:600;color:var(--teal-deep)}
+.tb-panel-head a:hover{text-decoration:underline}
+
+.notif-list{max-height:360px;overflow-y:auto;scrollbar-width:none}
+.notif-list::-webkit-scrollbar{width:0;height:0;display:none}
+.notif-row{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line-2);transition:background .12s}
+.notif-row:last-child{border-bottom:0}
+.notif-row:hover{background:var(--surface)}
+.notif-row.unread{background:var(--teal-soft)}
+.notif-row.unread:hover{background:#dcf7ea}
+.notif-ico{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center}
+.notif-ico svg{width:16px;height:16px;stroke-width:1.9}
+.notif-ico.is-brand{background:transparent!important}
+.notif-ico.is-brand img{width:20px;height:20px;display:block;margin:auto}
+.notif-body{min-width:0;flex:1}
+.notif-body p{font-size:13px;color:var(--ink);line-height:18px}
+.notif-body span{font-size:11.5px;color:var(--ink-4);margin-top:3px;display:block}
+.notif-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex:none;margin-top:6px}
+.tb-panel-foot{padding:10px 16px;text-align:center;border-top:1px solid var(--line-2)}
+.tb-panel-foot a{font-size:12.5px;font-weight:600;color:var(--teal-deep)}
+.tb-panel-foot a:hover{text-decoration:underline}
+.notif-empty{padding:28px 16px;text-align:center;color:var(--ink-4);font-size:13px}
+
+.tb-panel-profile{width:260px}
+.pp-head{display:flex;align-items:center;gap:11px;padding:16px}
+.pp-head .who-av{width:40px;height:40px;font-size:14px}
+.pp-head b{display:block;font-size:13.5px;font-weight:700;color:var(--ink)}
+.pp-head span{display:block;font-size:12px;color:var(--ink-3);margin-top:1px}
+.pp-list{padding:6px;border-top:1px solid var(--line-2)}
+.pp-list a, .pp-list button{
+  width:100%;display:flex;align-items:center;gap:11px;padding:10px 10px;border-radius:9px;
+  font-size:13px;font-weight:500;color:var(--ink-2);text-align:left;transition:background .12s;
+}
+.pp-list a:hover, .pp-list button:hover{background:var(--surface)}
+.pp-list svg{width:17px;height:17px;stroke:var(--ink-4);flex:none}
+.pp-list hr{border:0;border-top:1px solid var(--line-2);margin:6px 4px}
+.pp-list .danger{color:#b0362c}
+.pp-list .danger svg{stroke:#b0362c}
+.pp-list .danger:hover{background:#fdecea}
 
 .content{padding:22px 14px 40px 32px;flex:1}
 
@@ -523,6 +576,159 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .tpl-step b{display:block;font-size:13px;font-weight:600;color:var(--ink);line-height:18px}
 .tpl-step span{display:block;font-size:12px;color:var(--ink-3);line-height:16px;margin-top:1px}
 
+/* ============================ TEMPLATE DETAIL PAGE ============================ */
+.tdp-page{margin-top:6px;display:flex;align-items:flex-start;gap:28px}
+.tdp-main{flex:1;min-width:0}
+.tdp-back{
+  display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+  color:var(--ink-2);margin-bottom:22px;transition:color .13s;
+}
+.tdp-back:hover{color:var(--teal-deep)}
+.tdp-back svg{width:16px;height:16px;stroke:currentColor}
+
+.tdp-head{display:flex;align-items:flex-start;gap:20px;margin-bottom:6px}
+.tdp-head .ico{width:76px;height:76px;border-radius:16px;flex:none;display:grid;place-items:center}
+.tdp-head .ico svg{width:36px;height:36px;stroke-width:1.6}
+.tdp-head-main{flex:1;min-width:0}
+.tdp-head-top{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+.tdp-head-top h1{font-size:26px;font-weight:800;letter-spacing:-.015em;color:var(--ink)}
+.tdp-head-top .badge{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:999px}
+.tdp-head p{font-size:14.5px;color:var(--ink-2);line-height:21px;max-width:56em}
+.tdp-actions{display:flex;gap:8px;flex:none}
+.tdp-actions button{
+  height:38px;padding:0 16px;border-radius:9px;border:1px solid var(--line-strong);background:#fff;
+  font-size:13px;font-weight:600;color:var(--ink-2);display:flex;align-items:center;gap:7px;
+  transition:border-color .13s,color .13s;
+}
+.tdp-actions button:hover{border-color:var(--teal);color:var(--teal-deep)}
+.tdp-actions button svg{width:15px;height:15px;stroke:currentColor}
+.tdp-actions button.icon-only{width:38px;padding:0;justify-content:center}
+
+.tdp-stats{display:flex;flex-wrap:wrap;gap:22px;margin:16px 0 26px;font-size:13px;color:var(--ink-3)}
+.tdp-stats span{display:flex;align-items:center;gap:7px}
+.tdp-stats svg{width:15px;height:15px;stroke:var(--ink-4)}
+.tdp-stats .stars{color:var(--ochre);letter-spacing:1px}
+
+.tdp-tabs{display:flex;gap:26px;border-bottom:1px solid var(--line);margin-bottom:28px;overflow-x:auto;scrollbar-width:none}
+.tdp-tabs::-webkit-scrollbar{display:none}
+.tdp-tabs button{
+  padding:11px 2px;font-size:13.5px;font-weight:600;color:var(--ink-3);white-space:nowrap;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .13s,border-color .13s;
+}
+.tdp-tabs button:hover{color:var(--ink)}
+.tdp-tabs button.on{color:var(--teal-deep);border-color:var(--teal)}
+
+.tdp-panel{
+  background:linear-gradient(135deg,var(--teal-soft) 0%,var(--surface) 65%);
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:32px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,480px);gap:32px;align-items:center;
+  margin-bottom:40px;overflow:hidden;
+}
+.tdp-panel h2{font-size:25px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.2;margin-bottom:12px}
+.tdp-panel > div > p{font-size:14px;color:var(--ink-2);line-height:22px;margin-bottom:18px}
+.tdp-check-list{display:flex;flex-direction:column;gap:10px}
+.tdp-check-list li{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink-2);list-style:none}
+.tdp-check-list svg{width:17px;height:17px;stroke:var(--teal-deep);flex:none}
+.tdp-panel.tdp-panel-image{display:block;padding:0;background:none;border:0}
+.tdp-hero-img{width:100%;height:auto;display:block;border-radius:var(--r)}
+.tdp-hero-media{position:relative;min-height:220px}
+.tdp-hero-fallback{
+  display:none;position:absolute;inset:0;border-radius:12px;background:rgba(255,255,255,.6);
+  border:1px dashed var(--line-strong);flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;text-align:center;padding:20px;color:var(--ink-4);
+}
+.tdp-hero-fallback svg{width:26px;height:26px;stroke:var(--ink-4)}
+.tdp-hero-fallback b{font-size:13px;font-weight:700;color:var(--ink-3)}
+.tdp-hero-fallback span{font-size:12px;line-height:17px;max-width:26em}
+.tdp-hero-fallback code{font-family:var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:4px;color:var(--ink-2)}
+.tdp-hero-media.missing .tdp-hero-img{display:none}
+.tdp-hero-media.missing .tdp-hero-fallback{display:flex}
+
+.tdp-h2{font-size:19px;font-weight:800;color:var(--ink);margin-bottom:18px;letter-spacing:-.005em}
+
+.tdp-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-bottom:44px}
+.tdp-step{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px;position:relative}
+.tdp-step-wrap{position:relative;display:flex;align-items:center}
+.tdp-step-wrap:not(:last-child){margin-right:14px}
+.tdp-step-wrap:not(:last-child)::after{
+  content:"";position:absolute;top:38px;right:-15px;width:14px;height:14px;
+  background:no-repeat center/contain;
+  background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%238b978f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>');
+  z-index:1;
+}
+.tdp-step .ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;margin-bottom:14px}
+.tdp-step .ico svg{width:19px;height:19px;stroke-width:1.8}
+.tdp-step b{display:block;font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:4px}
+.tdp-step span{display:block;font-size:12px;color:var(--ink-3);line-height:17px}
+
+.tdp-included{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px}
+.tdp-inc-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.tdp-inc-card .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:14px}
+.tdp-inc-card .ico svg{width:18px;height:18px;stroke-width:1.8}
+.tdp-inc-card b{display:block;font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:5px}
+.tdp-inc-card span{display:block;font-size:12.5px;color:var(--ink-3);line-height:18px}
+
+.tdp-integrations{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:44px}
+.tdp-integ-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;align-items:center;gap:12px}
+.tdp-integ-card img{width:28px;height:28px;flex:none}
+.tdp-integ-card span{font-size:13px;font-weight:600;color:var(--ink)}
+
+.tdp-reviews-summary{
+  display:flex;align-items:center;gap:28px;background:#fff;border:1px solid var(--line);
+  border-radius:var(--r);padding:22px 26px;margin-bottom:20px;
+}
+.tdp-reviews-score{font-size:38px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.tdp-reviews-summary .stars{color:var(--ochre);font-size:16px;letter-spacing:2px}
+.tdp-reviews-summary .count{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+.tdp-review{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:12px}
+.tdp-review-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tdp-review-av{
+  width:32px;height:32px;border-radius:50%;flex:none;background:linear-gradient(145deg,#0ce787,var(--teal-deep));
+  color:#04130c;display:grid;place-items:center;font-size:12px;font-weight:700;
+}
+.tdp-review-h b{font-size:13.5px;font-weight:700;color:var(--ink)}
+.tdp-review-h .stars{color:var(--ochre);font-size:12px;margin-left:auto}
+.tdp-review p{font-size:13px;color:var(--ink-2);line-height:20px}
+
+.tdp-sidebar{width:320px;flex:none;position:sticky;top:22px}
+.tdp-side-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px;margin-top:16px}
+.tdp-side-card:first-child{margin-top:0}
+.tdp-side-card h4{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin-bottom:16px}
+.tdp-detail-row{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px}
+.tdp-detail-row svg{width:16px;height:16px;stroke:var(--ink-4);flex:none}
+.tdp-detail-row b{color:var(--ink-3);font-weight:500}
+.tdp-detail-row em{font-style:normal;margin-left:auto;color:var(--ink);font-weight:600;text-align:right}
+.tdp-cust-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;font-size:13px;color:var(--ink-2)}
+.tdp-cust-row.link{color:var(--teal-deep);font-weight:600;cursor:pointer}
+.tdp-cust-row.link svg{width:15px;height:15px;stroke:currentColor}
+.tdp-toggle{width:34px;height:19px;border-radius:10px;position:relative;flex:none;border:0}
+.tdp-toggle.on{background:var(--teal)}
+.tdp-toggle:not(.on){background:var(--line-strong)}
+.tdp-toggle::after{content:"";position:absolute;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:left .15s}
+.tdp-toggle.on::after{left:17px}
+.tdp-toggle:not(.on)::after{left:2px}
+.tdp-info-box{
+  background:var(--teal-soft);border-radius:var(--r);padding:14px 16px;font-size:12.5px;
+  color:var(--teal-deep);line-height:18px;margin-top:16px;display:flex;gap:10px;align-items:flex-start;
+}
+.tdp-info-box svg{width:16px;height:16px;stroke:currentColor;flex:none;margin-top:1px}
+
+@media (max-width:1280px){
+  .tdp-page{flex-direction:column}
+  .tdp-sidebar{position:static;width:100%}
+  .tdp-panel{grid-template-columns:1fr}
+  .tdp-steps{grid-template-columns:repeat(3,1fr)}
+  .tdp-included,.tdp-integrations{grid-template-columns:repeat(2,1fr)}
+  .tdp-step-wrap:not(:last-child)::after{display:none}
+}
+@media (max-width:640px){
+  .tdp-steps{grid-template-columns:repeat(2,1fr)}
+  .tdp-included,.tdp-integrations{grid-template-columns:1fr}
+  .tdp-head{flex-direction:column}
+  .tdp-actions{width:100%}
+  .tdp-actions button{flex:1;justify-content:center}
+}
+
 /* Explicit column counts (not auto-fit) so a leftover card never stretches
    to fill a lopsided row on its own - predictable tiers instead. */
 @media (max-width:1600px){
@@ -636,18 +842,24 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
       <input type="search" placeholder="Search anything...(invoices, reports, customers, workflows)" aria-label="Search">
     </div>
     <div class="tb-right">
-      <button class="tb-bell" type="button" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <i></i>
-      </button>
-      <button class="who" type="button">
-        <div class="who-av" id="whoAv">AS</div>
-        <div class="who-txt">
-          <b id="whoName">Ama Serwaa</b>
-          <span id="whoOrg">GreenLeaf Stores</span>
-        </div>
-        <svg class="who-chev" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
+      <div class="tb-dd" id="ddBell">
+        <button class="tb-bell" type="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <i></i>
+        </button>
+        <div class="tb-panel tb-panel-notif" id="notifPanel"></div>
+      </div>
+      <div class="tb-dd" id="ddWho">
+        <button class="who" type="button" aria-haspopup="true" aria-expanded="false">
+          <div class="who-av" id="whoAv">AS</div>
+          <div class="who-txt">
+            <b id="whoName">Ama Serwaa</b>
+            <span id="whoOrg">GreenLeaf Stores</span>
+          </div>
+          <svg class="who-chev" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="tb-panel tb-panel-profile" id="profilePanel"></div>
+      </div>
     </div>
   </header>
 
@@ -750,7 +962,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 
     <!-- ================= NAV TARGET PANES (real data) ================= -->
     <div class="pane" id="pane-templates" data-pane="templates">
-      <div class="tpl-page">
+      <div class="tpl-page" id="tplGridView">
         <div class="tpl-main">
           <div class="tpl-head">
             <div>
@@ -799,6 +1011,8 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 
         <aside class="tpl-drawer" id="tplDrawer"></aside>
       </div>
+
+      <div id="tplDetailView" style="display:none"></div>
     </div>
     <div class="pane" id="pane-invoices" data-pane="invoices">
       <div class="card"><h2>Invoices &amp; Payments</h2><p class="sub">Payment records for your account.</p><div class="rows" id="r-invoices"></div></div>
@@ -851,6 +1065,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   // ------------------------------------------------------------------
   var ICO = {
     doc:   '<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/>',
+    invoice:'<path d="M5 2v20l1.8-1.2L8.6 22l1.8-1.2L12.2 22l1.8-1.2 1.8 1.2L17.6 22l1.8-1.2 1.8 1.2V2l-1.8 1.2L17.6 2l-1.8 1.2L14 2l-1.8 1.2L10.4 2 8.6 3.2 6.8 2z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     chat:  '<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     mail:  '<path d="M3 5h18v14H3z"/><path d="m3 6 9 7 9-7"/>',
@@ -866,6 +1081,10 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
     star:  '<path d="M12 2.5 15 9l6.5 1-4.7 4.6L18 21l-6-3.4L6 21l1.2-6.4L2.5 10l6.5-1z"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     play:  '<path d="M6 4.5v15l13-7.5z"/>',
+    bell:  '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+    logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+    card:  '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>',
+    building:'<path d="M4 22V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v18"/><path d="M15 22V10a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v12"/><path d="M8 6h2M8 10h2M8 14h2M8 18h2"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>',
     rightArrow: '<path d="M5 12h13M13 6l6 6-6 6"/>'
   };
@@ -962,7 +1181,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 
   var TEMPLATES = [
     {
-      id: 'invoice-automation', featured: true, cat: 'invoices', tint: 'teal', badge: 'Popular', icon: 'doc',
+      id: 'invoice-automation', featured: true, cat: 'invoices', tint: 'teal', badge: 'Popular', icon: 'invoice',
       title: 'Invoice Automation', desc: 'Generate and send invoices from your sales data.',
       apps: ['sheets', 'gmail'], more: 2,
       whatsIncluded: [
@@ -975,11 +1194,39 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
       ],
       works: ['sheets', 'gmail', 'quickbooks'], worksMore: 2,
       steps: [
-        { ico: 'bolt', tint: 'teal',  label: 'Trigger', sub: 'New sales record added' },
-        { ico: 'doc',  tint: 'ink',   label: 'Prepare', sub: 'Muse generates invoice draft' },
-        { ico: 'check',tint: 'ochre', label: 'Review',  sub: 'You review and approve' },
-        { ico: 'mail', tint: 'teal',  label: 'Send',    sub: 'Invoice sent to customer' },
-        { ico: 'share',tint: 'good',  label: 'Notify',  sub: 'Update team and track payment' }
+        { ico: 'bolt',   tint: 'teal',  label: 'Trigger', sub: 'New sales record added' },
+        { ico: 'invoice',tint: 'ink',   label: 'Prepare', sub: 'Muse generates invoice draft' },
+        { ico: 'check',  tint: 'ochre', label: 'Review',  sub: 'You review and approve' },
+        { ico: 'mail',   tint: 'teal',  label: 'Send',    sub: 'Invoice sent to customer' },
+        { ico: 'bell',   tint: 'good',  label: 'Notify',  sub: 'Update team and track payment' }
+      ],
+      longDesc: 'Let Buinee prepare professional invoices from your sales records, send them for your review, and automatically deliver them to your customers based on your settings.',
+      rating: 4.8, reviews: 320, businesses: '1.2k', timeSaved: '~6 hrs/week',
+      heroImage: '/assets/images/invoice-hero.png', fullBleedHero: true,
+      howItWorks: [
+        { ico: 'folder',  tint: 'good',  label: 'Connect', sub: 'Link your sales data (Google Sheets, CRM, QuickBooks, etc.).' },
+        { ico: 'invoice', tint: 'ink',   label: 'Prepare', sub: 'Buinee generates professional invoices from your records.' },
+        { ico: 'chat',    tint: 'ochre', label: 'Review',  sub: 'You review and approve the invoices.' },
+        { ico: 'bolt',    tint: 'teal',  label: 'Send',    sub: 'Invoices are sent to your customers automatically or manually.' },
+        { ico: 'check',   tint: 'good',  label: 'Track',   sub: 'Monitor payment status and get notified.' }
+      ],
+      included: [
+        { ico: 'invoice', tint: 'good',  b: 'Invoice generation',    s: 'Create professional invoices from your sales data.' },
+        { ico: 'cog',     tint: 'ink',   b: 'Customizable templates',s: 'Use Buinee templates or your own branding.' },
+        { ico: 'chat',    tint: 'teal',  b: 'Automatic sending',     s: 'Send invoices via email or WhatsApp.' },
+        { ico: 'chart',   tint: 'ochre', b: 'Payment tracking',      s: 'Track paid, pending and overdue invoices.' }
+      ],
+      details: { category: 'Invoices', bestFor: 'Small businesses, Growing teams', setupTime: '5-10 minutes', difficulty: 'Beginner', version: 'v1.2', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Require review before sending', on: true },
+        { label: 'Add your logo and branding', on: true },
+        { label: 'Include tax (VAT)', on: true },
+        { label: 'Send reminders for overdue invoices', on: true }
+      ],
+      reviewsList: [
+        { name: 'Kofi Mensah', init: 'KM', stars: 5, text: 'Cut our invoicing time down to almost nothing. Customers get paid faster too since reminders are automatic.' },
+        { name: 'Abena Owusu', init: 'AO', stars: 5, text: 'Setup took less than 10 minutes and it already matched our branding.' },
+        { name: 'Yaw Boateng', init: 'YB', stars: 4, text: 'Works great with our existing Google Sheets. Would like more currency options.' }
       ]
     },
     {
@@ -999,6 +1246,35 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
         { ico: 'chart', tint: 'teal',  label: 'Compile',  sub: 'Muse builds the report' },
         { ico: 'check', tint: 'ink',   label: 'Review',   sub: 'You approve the summary' },
         { ico: 'mail',  tint: 'good',  label: 'Send',     sub: 'Delivered to your team' }
+      ],
+      longDesc: 'Buinee pulls this week\'s sales from your connected data, compiles it into a clean report, and sends it to your team automatically every Monday.',
+      rating: 4.6, reviews: 140, businesses: '650+', timeSaved: '~2 hrs/week',
+      heroImage: '/assets/images/weekly-sales-hero.png', fullBleedHero: true,
+      heroHeading: 'A sales report that writes itself every week',
+      heroBody: 'No more pulling numbers into a spreadsheet by hand - Buinee compiles this week\'s sales into a clean report and delivers it to your team on schedule.',
+      benefits: ['No more manual spreadsheet work', 'Consistent reporting every week', 'Spot trends before they become problems', 'Everyone sees the same numbers'],
+      howItWorks: [
+        { ico: 'folder', tint: 'good',  label: 'Connect', sub: 'Link your sales data (Google Sheets, POS, etc.).' },
+        { ico: 'chart',  tint: 'ink',   label: 'Compile', sub: 'Buinee builds this week\'s report automatically.' },
+        { ico: 'check',  tint: 'ochre', label: 'Review',  sub: 'You check the numbers before it goes out.' },
+        { ico: 'mail',   tint: 'teal',  label: 'Send',    sub: 'Delivered to your team by email.' },
+        { ico: 'bolt',   tint: 'good',  label: 'Archive', sub: 'A copy is saved to Google Drive.' }
+      ],
+      included: [
+        { ico: 'chart',  tint: 'ochre', b: 'Report generation',   s: 'Compiled from your connected sales data.' },
+        { ico: 'bolt',   tint: 'good',  b: 'Trend highlights',    s: 'Top products and week-over-week changes.' },
+        { ico: 'calendar',tint: 'teal', b: 'Scheduled delivery',  s: 'Sent to your team automatically each week.' },
+        { ico: 'folder', tint: 'ink',   b: 'Drive archiving',     s: 'Every report saved for later reference.' }
+      ],
+      details: { category: 'Reports', bestFor: 'Sales teams, Store managers', setupTime: '5 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Send on a different day', on: false },
+        { label: 'Include trend charts', on: true },
+        { label: 'CC additional recipients', on: false }
+      ],
+      reviewsList: [
+        { name: 'Efua Asante', init: 'EA', stars: 5, text: 'Monday mornings used to mean an hour in spreadsheets. Now the report is already in my inbox.' },
+        { name: 'Kwame Adjei', init: 'KA', stars: 4, text: 'Great for keeping the team aligned. Would like a monthly rollup too.' }
       ]
     },
     {
@@ -1018,6 +1294,35 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
         { ico: 'check', tint: 'ink',   label: 'Review', sub: 'You approve or edit' },
         { ico: 'share', tint: 'teal',  label: 'Publish',sub: 'Posted to your channels' },
         { ico: 'chart', tint: 'ochre', label: 'Track',  sub: 'Engagement reported back' }
+      ],
+      longDesc: 'Buinee turns your business updates into ready-to-post content for Instagram, Facebook and TikTok, complete with captions and hashtags, scheduled for your review.',
+      rating: 4.6, reviews: 95, businesses: '500+', timeSaved: '~4 hrs/week',
+      heroImage: '/assets/images/social-media-hero.png', fullBleedHero: true,
+      heroHeading: 'Content for every channel, without the daily grind',
+      heroBody: 'Buinee drafts on-brand posts from what\'s happening in your business, suggests captions and hashtags, and schedules them across your channels for your review.',
+      benefits: ['Consistent posting schedule', 'On-brand captions every time', 'One place to review before it goes live', 'Performance tracked automatically'],
+      howItWorks: [
+        { ico: 'bolt',  tint: 'good',  label: 'Plan',    sub: 'Buinee drafts posts from your recent activity.' },
+        { ico: 'doc',   tint: 'ink',   label: 'Draft',   sub: 'Captions and hashtags generated for each post.' },
+        { ico: 'check', tint: 'ochre', label: 'Review',  sub: 'You approve or edit before anything goes live.' },
+        { ico: 'share', tint: 'teal',  label: 'Publish', sub: 'Posted to your connected channels on schedule.' },
+        { ico: 'chart', tint: 'good',  label: 'Track',   sub: 'Engagement reported back to your dashboard.' }
+      ],
+      included: [
+        { ico: 'doc',    tint: 'good',  b: 'Post generation',           s: 'Drafts created from your business updates.' },
+        { ico: 'chat',   tint: 'ink',   b: 'Caption & hashtag suggestions', s: 'Written to match your brand voice.' },
+        { ico: 'calendar',tint: 'teal', b: 'Multi-channel scheduling',  s: 'Instagram, Facebook and TikTok in one place.' },
+        { ico: 'chart',  tint: 'ochre', b: 'Performance tracking',      s: 'See what\'s working across channels.' }
+      ],
+      details: { category: 'Social Media', bestFor: 'Retail brands, Service businesses', setupTime: '10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Auto-publish without review', on: false },
+        { label: 'Include hashtags', on: true },
+        { label: 'Watermark your photos', on: true }
+      ],
+      reviewsList: [
+        { name: 'Ama Darko', init: 'AD', stars: 5, text: 'We post consistently now instead of remembering once a week. Captions actually sound like us too.' },
+        { name: 'Nana Yeboah', init: 'NY', stars: 4, text: 'Saves a lot of time. Sometimes the hashtags need a tweak but the drafts are solid.' }
       ]
     },
     {
@@ -1037,18 +1342,377 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
         { ico: 'doc',   tint: 'teal',  label: 'Draft',   sub: 'Muse writes a follow-up' },
         { ico: 'mail',  tint: 'good',  label: 'Send',    sub: 'Sent on your behalf' },
         { ico: 'share', tint: 'ochre', label: 'Log',     sub: 'Saved to customer history' }
+      ],
+      longDesc: 'Buinee watches for enquiries that haven\'t had a reply, drafts a personalized follow-up, and sends it by WhatsApp or email on your behalf.',
+      rating: 4.7, reviews: 210, businesses: '900+', timeSaved: '~5 hrs/week',
+      heroImage: '/assets/images/customer-follow-ups-hero.png', fullBleedHero: true,
+      heroHeading: 'Never let an enquiry go cold again',
+      heroBody: 'Buinee notices when a customer hasn\'t had a reply, drafts a personal follow-up, and sends it for you - or escalates it if it needs a human touch.',
+      benefits: ['Faster response times', 'No enquiry falls through the cracks', 'Personalized, not generic', 'Full history logged per customer'],
+      howItWorks: [
+        { ico: 'clock',  tint: 'ink',   label: 'Detect',   sub: 'An enquiry sits unanswered past your threshold.' },
+        { ico: 'doc',    tint: 'teal',  label: 'Draft',    sub: 'Buinee writes a personalized follow-up.' },
+        { ico: 'check',  tint: 'ochre', label: 'Review',   sub: 'Optional review before it sends.' },
+        { ico: 'mail',   tint: 'good',  label: 'Send',     sub: 'Delivered by WhatsApp or email.' },
+        { ico: 'folder', tint: 'ink',   label: 'Log',      sub: 'Saved to that customer\'s history.' }
+      ],
+      included: [
+        { ico: 'doc',   tint: 'teal',  b: 'Follow-up drafting',   s: 'Personalized to each customer and enquiry.' },
+        { ico: 'chat',  tint: 'good',  b: 'WhatsApp & email sending', s: 'Sent through the channel they used.' },
+        { ico: 'bell',  tint: 'ochre', b: 'Escalation alerts',    s: 'Routed to you when it needs a human.' },
+        { ico: 'folder',tint: 'ink',   b: 'Customer history log', s: 'Every follow-up saved for later.' }
+      ],
+      details: { category: 'Sales & Follow-ups', bestFor: 'Service businesses, Sales teams', setupTime: '5 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Require review before sending', on: true },
+        { label: 'Escalate after 24 hours', on: true },
+        { label: 'Send via WhatsApp only', on: false }
+      ],
+      reviewsList: [
+        { name: 'Adjoa Frimpong', init: 'AF', stars: 5, text: 'We used to lose leads simply from forgetting to follow up. That doesn\'t happen anymore.' },
+        { name: 'Kojo Antwi', init: 'KA', stars: 5, text: 'The messages actually sound like something we\'d write ourselves.' }
       ]
     },
-    { id: 'monthly-financial-summary', cat: 'reports',   tint: 'teal',  badge: null,       icon: 'chart',   title: 'Monthly Financial Summary', desc: 'Create a monthly financial summary from your data.',       apps: ['sheets', 'gmail', 'outlook'], more: 2 },
-    { id: 'expense-report',            cat: 'invoices',  tint: 'ink',   badge: null,       icon: 'mail',    title: 'Expense Report',            desc: 'Extract and organize expense records automatically.',      apps: ['gmail', 'outlook'],   more: 3 },
-    { id: 'social-media-calendar',     cat: 'social',     tint: 'teal',  badge: 'Popular',  icon: 'calendar',title: 'Social Media Calendar',     desc: 'Plan and schedule content for multiple platforms.',        apps: ['instagram', 'facebook', 'tiktok'], more: 1 },
-    { id: 'product-launch-campaign',   cat: 'sales',      tint: 'ochre', badge: null,       icon: 'bolt',    title: 'Product Launch Campaign',   desc: 'Create a full campaign with posts and follow-ups.',        apps: ['instagram', 'outlook'], more: 3 },
-    { id: 'customer-enquiry-handler',  cat: 'service',    tint: 'good',  badge: 'Trending', icon: 'chat',    title: 'Customer Enquiry Handler',  desc: 'Process and respond to enquiries from all channels.',      apps: ['whatsapp', 'instagram', 'facebook'], more: 2 },
-    { id: 'email-followup-sequence',   cat: 'sales',      tint: 'ink',   badge: null,       icon: 'mail',    title: 'Email Follow-up Sequence',  desc: 'Send personalized follow-up emails to leads and customers.', apps: ['gmail', 'outlook'], more: 1 },
-    { id: 'lead-capture-crm',          cat: 'operations', tint: 'teal',  badge: null,       icon: 'user',    title: 'Lead Capture & CRM',        desc: 'Capture enquiries and add to your CRM.',                    apps: ['sheets', 'hubspot', 'slack'], more: 2 },
-    { id: 'document-organizer',        cat: 'documents',  tint: 'ochre', badge: null,       icon: 'folder',  title: 'Document Organizer',        desc: 'Extract, categorize and store documents.',                  apps: ['drive', 'dropbox'],   more: 2 },
-    { id: 'order-processing',          cat: 'operations', tint: 'good',  badge: null,       icon: 'cart',    title: 'Order Processing',          desc: 'Process new orders and notify your team.',                  apps: ['shopify', 'whatsapp', 'dropbox'], more: 2 },
-    { id: 'customer-feedback-report',  cat: 'reports',    tint: 'ink',   badge: null,       icon: 'star',    title: 'Customer Feedback Report',  desc: 'Collect and summarize customer feedback.',                  apps: ['gmail', 'forms'],     more: 1 }
+    {
+      id: 'monthly-financial-summary', cat: 'reports', tint: 'teal', badge: null, icon: 'chart',
+      title: 'Monthly Financial Summary', desc: 'Create a monthly financial summary from your data.',
+      apps: ['sheets', 'gmail', 'outlook'], more: 2,
+      longDesc: 'Buinee compiles a full month of financial activity into one clear summary and delivers it to your inbox, so you always know where the business stands.',
+      rating: 4.5, reviews: 80, businesses: '400+', timeSaved: '~4 hrs/month',
+      heroImage: '/assets/images/monthly-financial-summary-hero.png', fullBleedHero: true,
+      heroHeading: 'Your month in numbers, without the spreadsheet marathon',
+      heroBody: 'At the end of each month, Buinee compiles your income, expenses and cash position into one clear summary - ready to review or share with your accountant.',
+      benefits: ['One clear summary each month', 'No manual data pulling', 'Consistent format every time', 'Shareable with your team or accountant'],
+      howItWorks: [
+        { ico: 'folder', tint: 'good',  label: 'Connect', sub: 'Link your sales, expense and bank data.' },
+        { ico: 'chart',  tint: 'ink',   label: 'Compile', sub: 'Buinee builds the monthly summary.' },
+        { ico: 'check',  tint: 'ochre', label: 'Review',  sub: 'You check the figures before it goes out.' },
+        { ico: 'mail',   tint: 'teal',  label: 'Send',    sub: 'Delivered to your inbox each month.' },
+        { ico: 'bolt',   tint: 'good',  label: 'Archive', sub: 'Saved for tax time and record-keeping.' }
+      ],
+      included: [
+        { ico: 'chart', tint: 'teal',  b: 'Financial summary generation', s: 'Income, expenses and net position.' },
+        { ico: 'bolt',  tint: 'good',  b: 'Income & expense breakdown',   s: 'Broken down by category automatically.' },
+        { ico: 'calendar',tint: 'ochre',b: 'Scheduled monthly delivery',  s: 'Arrives the same day every month.' },
+        { ico: 'doc',   tint: 'ink',   b: 'Shareable PDF export',         s: 'Ready to send to your accountant.' }
+      ],
+      details: { category: 'Reports', bestFor: 'Small businesses, Finance teams', setupTime: '10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Include expense breakdown', on: true },
+        { label: 'Export as PDF', on: true },
+        { label: 'Share with accountant automatically', on: false }
+      ],
+      reviewsList: [
+        { name: 'Abigail Sarpong', init: 'AS', stars: 5, text: 'I finally see the full picture every month instead of piecing it together myself.' },
+        { name: 'Emmanuel Tetteh', init: 'ET', stars: 4, text: 'Good summary. I\'d like a comparison to the previous month built in.' }
+      ]
+    },
+    {
+      id: 'expense-report', cat: 'invoices', tint: 'ink', badge: null, icon: 'mail',
+      title: 'Expense Report', desc: 'Extract and organize expense records automatically.',
+      apps: ['gmail', 'outlook'], more: 3,
+      longDesc: 'Buinee scans your receipts and expense emails, extracts the details, and organizes them into a ready-to-review expense report.',
+      rating: 4.6, reviews: 60, businesses: '300+', timeSaved: '~2 hrs/week',
+      heroImage: '/assets/images/expense-report-hero.png', fullBleedHero: true,
+      heroHeading: 'Expense tracking without the shoebox of receipts',
+      heroBody: 'Forward a receipt or let Buinee read it from your inbox - it extracts the amount, vendor and category, and keeps a running report ready for approval.',
+      benefits: ['No manual data entry', 'Categorized automatically', 'Easy to review and approve', 'Ready for tax season'],
+      howItWorks: [
+        { ico: 'mail',   tint: 'ink',   label: 'Capture',   sub: 'Receipts come in by email or upload.' },
+        { ico: 'doc',    tint: 'teal',  label: 'Extract',   sub: 'Buinee reads the amount, vendor and date.' },
+        { ico: 'folder', tint: 'good',  label: 'Categorize',sub: 'Sorted into your expense categories.' },
+        { ico: 'check',  tint: 'ochre', label: 'Review',    sub: 'You approve before it\'s filed.' },
+        { ico: 'chart',  tint: 'good',  label: 'Report',    sub: 'Added to your running expense report.' }
+      ],
+      included: [
+        { ico: 'mail',   tint: 'ink',  b: 'Receipt scanning',        s: 'Reads receipts from email or upload.' },
+        { ico: 'folder', tint: 'good', b: 'Automatic categorization',s: 'Sorted by vendor and expense type.' },
+        { ico: 'check',  tint: 'teal', b: 'Approval workflow',       s: 'Review before an expense is filed.' },
+        { ico: 'chart',  tint: 'ochre',b: 'Exportable reports',      s: 'Ready for your accountant or tax filing.' }
+      ],
+      details: { category: 'Invoices', bestFor: 'Small businesses, Field teams', setupTime: '5-10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Require approval before filing', on: true },
+        { label: 'Auto-categorize by vendor', on: true },
+        { label: 'Flag expenses over a limit', on: false }
+      ],
+      reviewsList: [
+        { name: 'Comfort Amoah', init: 'CA', stars: 5, text: 'Our field team just forwards receipts now instead of keeping a paper file.' },
+        { name: 'Isaac Gyamfi', init: 'IG', stars: 4, text: 'Categorization is mostly spot on. The odd one still needs correcting manually.' }
+      ]
+    },
+    {
+      id: 'social-media-calendar', cat: 'social', tint: 'teal', badge: 'Popular', icon: 'calendar',
+      title: 'Social Media Calendar', desc: 'Plan and schedule content for multiple platforms.',
+      apps: ['instagram', 'facebook', 'tiktok'], more: 1,
+      longDesc: 'Buinee plans and schedules content across Instagram, Facebook and TikTok on one shared calendar, so your whole team knows what\'s going out and when.',
+      rating: 4.7, reviews: 130, businesses: '700+', timeSaved: '~3 hrs/week',
+      heroImage: '/assets/images/social-media-calendar-hero.png', fullBleedHero: true,
+      heroHeading: 'One calendar for every platform you post to',
+      heroBody: 'Plan weeks of content ahead of time on a single shared calendar, with every post scheduled across your channels and visible to your whole team.',
+      benefits: ['Plan weeks ahead in one view', 'No double-booked posts', 'Team members see the same schedule', 'Easy to reschedule or swap content'],
+      howItWorks: [
+        { ico: 'calendar',tint: 'teal', label: 'Plan',    sub: 'Lay out content across the weeks ahead.' },
+        { ico: 'bolt',   tint: 'good',  label: 'Schedule',sub: 'Assigned to a date and channel.' },
+        { ico: 'check',  tint: 'ochre', label: 'Review',  sub: 'Your team reviews the upcoming schedule.' },
+        { ico: 'share',  tint: 'ink',   label: 'Publish', sub: 'Posted automatically on schedule.' },
+        { ico: 'chart',  tint: 'good',  label: 'Track',   sub: 'Performance shown alongside the calendar.' }
+      ],
+      included: [
+        { ico: 'calendar',tint: 'teal', b: 'Shared content calendar', s: 'One view for the whole team.' },
+        { ico: 'bolt',   tint: 'good',  b: 'Multi-platform scheduling', s: 'Instagram, Facebook and TikTok together.' },
+        { ico: 'doc',    tint: 'ink',   b: 'Drag-and-drop rescheduling', s: 'Move posts without starting over.' },
+        { ico: 'chat',   tint: 'ochre', b: 'Team collaboration',      s: 'Comment and approve in one place.' }
+      ],
+      details: { category: 'Social Media', bestFor: 'Marketing teams, Agencies', setupTime: '10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Require review before publishing', on: true },
+        { label: 'Notify team on changes', on: true },
+        { label: 'Auto-fill best posting times', on: false }
+      ],
+      reviewsList: [
+        { name: 'Linda Appiah', init: 'LA', stars: 5, text: 'Everyone on the team can see what\'s scheduled now instead of asking me.' },
+        { name: 'Kwabena Owusu', init: 'KO', stars: 4, text: 'Rescheduling is much easier than our old spreadsheet calendar.' }
+      ]
+    },
+    {
+      id: 'product-launch-campaign', cat: 'sales', tint: 'ochre', badge: null, icon: 'bolt',
+      title: 'Product Launch Campaign', desc: 'Create a full campaign with posts and follow-ups.',
+      apps: ['instagram', 'outlook'], more: 3,
+      longDesc: 'Buinee puts together a full launch campaign, posts and follow-ups included, so your next product launch doesn\'t fall behind on marketing.',
+      rating: 4.5, reviews: 45, businesses: '200+', timeSaved: '~6 hrs/campaign',
+      heroImage: '/assets/images/product-launch-campaign-hero.png', fullBleedHero: true,
+      heroHeading: 'A full launch campaign, ready before you say go',
+      heroBody: 'Tell Buinee what\'s launching and it drafts the announcement posts, the follow-up sequence, and a launch-day checklist - all ready for your review.',
+      benefits: ['Posts and follow-ups in one campaign', 'Consistent messaging across channels', 'Ready days before launch', 'Easy to adjust as plans change'],
+      howItWorks: [
+        { ico: 'doc',    tint: 'ochre', label: 'Brief',    sub: 'Tell Buinee what\'s launching.' },
+        { ico: 'bolt',   tint: 'teal',  label: 'Draft',    sub: 'Posts and follow-ups drafted together.' },
+        { ico: 'check',  tint: 'ink',   label: 'Review',   sub: 'You approve the full campaign.' },
+        { ico: 'calendar',tint: 'good', label: 'Schedule', sub: 'Set across your channels and dates.' },
+        { ico: 'share',  tint: 'ochre', label: 'Launch',   sub: 'Goes live on launch day.' }
+      ],
+      included: [
+        { ico: 'doc',   tint: 'ochre', b: 'Campaign post drafts', s: 'Announcement content for every channel.' },
+        { ico: 'mail',  tint: 'teal',  b: 'Follow-up sequence',   s: 'Keeps momentum after launch day.' },
+        { ico: 'calendar',tint: 'good',b: 'Multi-channel scheduling', s: 'Timed across your connected channels.' },
+        { ico: 'check', tint: 'ink',   b: 'Launch-day checklist', s: 'Nothing forgotten on the big day.' }
+      ],
+      details: { category: 'Sales & Follow-ups', bestFor: 'Retail brands, Product teams', setupTime: '15 minutes', difficulty: 'Intermediate', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Include follow-up sequence', on: true },
+        { label: 'Auto-schedule posts', on: false },
+        { label: 'Notify team on launch day', on: true }
+      ],
+      reviewsList: [
+        { name: 'Akosua Mensah', init: 'AM', stars: 5, text: 'Took the stress out of our last product launch. Everything was ready ahead of time.' },
+        { name: 'Yaw Boateng', init: 'YB', stars: 4, text: 'Solid starting point for a campaign. We still tweak the tone a bit for our brand.' }
+      ]
+    },
+    {
+      id: 'customer-enquiry-handler', cat: 'service', tint: 'good', badge: 'Trending', icon: 'chat',
+      title: 'Customer Enquiry Handler', desc: 'Process and respond to enquiries from all channels.',
+      apps: ['whatsapp', 'instagram', 'facebook'], more: 2,
+      longDesc: 'Buinee reads enquiries from WhatsApp, Instagram and Facebook, drafts a reply, and routes anything it\'s unsure about to your team.',
+      rating: 4.8, reviews: 260, businesses: '1.1k', timeSaved: '~7 hrs/week',
+      heroImage: '/assets/images/customer-enquiry-handler-hero.png', fullBleedHero: true,
+      heroHeading: 'Every enquiry answered, from every channel',
+      heroBody: 'WhatsApp, Instagram, Facebook - Buinee reads enquiries from all of them in one place, drafts a reply, and only pulls you in when it\'s genuinely unsure.',
+      benefits: ['One inbox for every channel', 'Fast, consistent replies', 'Escalates what it\'s unsure about', 'Nothing goes unanswered'],
+      howItWorks: [
+        { ico: 'chat',  tint: 'good',  label: 'Receive',  sub: 'Enquiries arrive from any connected channel.' },
+        { ico: 'doc',   tint: 'ink',   label: 'Draft',    sub: 'Buinee drafts a reply based on your business info.' },
+        { ico: 'check', tint: 'ochre', label: 'Review',   sub: 'Optional review before it sends.' },
+        { ico: 'mail',  tint: 'teal',  label: 'Reply',    sub: 'Sent back through the same channel.' },
+        { ico: 'bell',  tint: 'good',  label: 'Escalate', sub: 'Routed to your team if it\'s unsure.' }
+      ],
+      included: [
+        { ico: 'chat',   tint: 'good',  b: 'Multi-channel inbox',   s: 'WhatsApp, Instagram and Facebook together.' },
+        { ico: 'doc',    tint: 'ink',   b: 'Auto-drafted replies',  s: 'Written from your business information.' },
+        { ico: 'bell',   tint: 'ochre', b: 'Escalation rules',      s: 'Uncertain enquiries routed to your team.' },
+        { ico: 'chart',  tint: 'teal',  b: 'Response time tracking',s: 'See how fast enquiries are handled.' }
+      ],
+      details: { category: 'Customer Service', bestFor: 'Retail, Service businesses', setupTime: '10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Require review before replying', on: true },
+        { label: 'Auto-reply outside business hours', on: false },
+        { label: 'Escalate low-confidence replies', on: true }
+      ],
+      reviewsList: [
+        { name: 'Comfort Amoah', init: 'CA', stars: 5, text: 'We reply within minutes now, even outside working hours. Customers have noticed.' },
+        { name: 'Kojo Antwi', init: 'KA', stars: 5, text: 'It knows when to hand off to a person, which is exactly what we needed.' }
+      ]
+    },
+    {
+      id: 'email-followup-sequence', cat: 'sales', tint: 'ink', badge: null, icon: 'mail',
+      title: 'Email Follow-up Sequence', desc: 'Send personalized follow-up emails to leads and customers.',
+      apps: ['gmail', 'outlook'], more: 1,
+      longDesc: 'Buinee sends a personalized sequence of follow-up emails to leads and customers, so no one goes quiet after the first conversation.',
+      rating: 4.5, reviews: 70, businesses: '350+', timeSaved: '~3 hrs/week',
+      heroImage: '/assets/images/email-followup-sequence-hero.png', fullBleedHero: true,
+      heroHeading: 'Follow-ups that keep going, even when you\'re busy',
+      heroBody: 'Buinee sends a sequence of personalized follow-up emails over days or weeks, and stops automatically the moment someone replies.',
+      benefits: ['Personalized, not templated', 'Sequenced over days or weeks', 'Stops automatically once they reply', 'Logged to customer history'],
+      howItWorks: [
+        { ico: 'bolt',   tint: 'ink',   label: 'Trigger', sub: 'A lead or customer needs following up.' },
+        { ico: 'doc',    tint: 'teal',  label: 'Draft',   sub: 'Buinee writes each message in the sequence.' },
+        { ico: 'mail',   tint: 'good',  label: 'Send',    sub: 'Delivered on your set schedule.' },
+        { ico: 'clock',  tint: 'ochre', label: 'Wait',    sub: 'Pauses between messages, or stops on reply.' },
+        { ico: 'folder', tint: 'ink',   label: 'Log',     sub: 'Every message saved to their history.' }
+      ],
+      included: [
+        { ico: 'mail',   tint: 'ink',  b: 'Multi-step sequences',   s: 'Spread over the days or weeks you choose.' },
+        { ico: 'doc',    tint: 'teal', b: 'Personalization by customer', s: 'Each message tailored, not templated.' },
+        { ico: 'check',  tint: 'good', b: 'Auto-stop on reply',     s: 'Sequence ends the moment they respond.' },
+        { ico: 'chart',  tint: 'ochre',b: 'Delivery tracking',      s: 'See what\'s been sent and what\'s next.' }
+      ],
+      details: { category: 'Sales & Follow-ups', bestFor: 'Sales teams, Freelancers', setupTime: '5 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Stop sequence on reply', on: true },
+        { label: 'Require review before first send', on: true },
+        { label: 'Send from your own email', on: false }
+      ],
+      reviewsList: [
+        { name: 'Abigail Sarpong', init: 'AS', stars: 4, text: 'Good for leads that go quiet. I\'d like a bit more control over the timing between emails.' },
+        { name: 'Emmanuel Tetteh', init: 'ET', stars: 5, text: 'Simple to set up and it stops the moment someone replies, which is exactly right.' }
+      ]
+    },
+    {
+      id: 'lead-capture-crm', cat: 'operations', tint: 'teal', badge: null, icon: 'user',
+      title: 'Lead Capture & CRM', desc: 'Capture enquiries and add to your CRM.',
+      apps: ['sheets', 'hubspot', 'slack'], more: 2,
+      longDesc: 'Buinee captures enquiries from your channels and logs them straight into your CRM, so no lead sits in a chat thread and gets forgotten.',
+      rating: 4.6, reviews: 55, businesses: '300+', timeSaved: '~4 hrs/week',
+      heroImage: '/assets/images/lead-capture-crm-hero.png', fullBleedHero: true,
+      heroHeading: 'Every enquiry becomes a lead, automatically',
+      heroBody: 'Buinee reads new enquiries as they come in, pulls out the contact details, and logs them into your CRM before they get lost in a chat thread.',
+      benefits: ['Nothing gets lost in chat', 'Structured lead records', 'Synced to your CRM in real time', 'Easy to follow up on later'],
+      howItWorks: [
+        { ico: 'chat',  tint: 'teal',  label: 'Capture', sub: 'An enquiry comes in from chat or a form.' },
+        { ico: 'doc',   tint: 'ink',   label: 'Extract', sub: 'Contact details pulled out automatically.' },
+        { ico: 'bolt',  tint: 'good',  label: 'Sync',    sub: 'Logged into your CRM as a new lead.' },
+        { ico: 'bell',  tint: 'ochre', label: 'Notify',  sub: 'Your sales team is alerted.' },
+        { ico: 'chart', tint: 'teal',  label: 'Track',   sub: 'Follow-ups tracked against the lead.' }
+      ],
+      included: [
+        { ico: 'chat',   tint: 'teal', b: 'Lead capture from chat & forms', s: 'Every channel feeds the same pipeline.' },
+        { ico: 'bolt',   tint: 'good', b: 'CRM sync',              s: 'New leads appear in your CRM in real time.' },
+        { ico: 'check',  tint: 'ochre',b: 'Duplicate detection',   s: 'Avoids logging the same lead twice.' },
+        { ico: 'bell',   tint: 'ink',  b: 'Notification to sales team', s: 'Alerted the moment a lead comes in.' }
+      ],
+      details: { category: 'Operations', bestFor: 'Sales teams, Growing teams', setupTime: '10 minutes', difficulty: 'Intermediate', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Sync to CRM automatically', on: true },
+        { label: 'Notify sales team on new lead', on: true },
+        { label: 'Flag possible duplicates', on: true }
+      ],
+      reviewsList: [
+        { name: 'Isaac Gyamfi', init: 'IG', stars: 5, text: 'We stopped losing leads in old WhatsApp threads. Everything lands in the CRM now.' },
+        { name: 'Akosua Mensah', init: 'AM', stars: 4, text: 'Works well. Occasionally flags a duplicate that isn\'t one, but easy to dismiss.' }
+      ]
+    },
+    {
+      id: 'document-organizer', cat: 'documents', tint: 'ochre', badge: null, icon: 'folder',
+      title: 'Document Organizer', desc: 'Extract, categorize and store documents.',
+      apps: ['drive', 'dropbox'], more: 2,
+      longDesc: 'Buinee extracts, categorizes and files your documents automatically, so your Drive and Dropbox stay organized without anyone doing it by hand.',
+      rating: 4.4, reviews: 40, businesses: '200+', timeSaved: '~2 hrs/week',
+      heroImage: '/assets/images/document-organizer-hero.png', fullBleedHero: true,
+      heroHeading: 'A tidy document library, without the tidying',
+      heroBody: 'New documents get read, categorized and filed into the right folder automatically, so your Drive and Dropbox stay organized on their own.',
+      benefits: ['Automatic categorization', 'Consistent folder structure', 'Searchable by content', 'No more misplaced files'],
+      howItWorks: [
+        { ico: 'mail',   tint: 'ochre', label: 'Receive',   sub: 'A new document is uploaded or emailed in.' },
+        { ico: 'doc',    tint: 'teal',  label: 'Extract',   sub: 'Buinee reads what the document contains.' },
+        { ico: 'folder', tint: 'good',  label: 'Categorize',sub: 'Sorted into the right category.' },
+        { ico: 'bolt',   tint: 'ink',   label: 'File',      sub: 'Saved to Drive or Dropbox automatically.' },
+        { ico: 'bell',   tint: 'ochre', label: 'Notify',    sub: 'You\'re told where it landed.' }
+      ],
+      included: [
+        { ico: 'folder', tint: 'ochre', b: 'Automatic categorization', s: 'Documents sorted without manual filing.' },
+        { ico: 'cog',    tint: 'teal',  b: 'Smart filing rules',       s: 'Set once, applied to every new document.' },
+        { ico: 'check',  tint: 'good',  b: 'Duplicate detection',      s: 'Avoids storing the same file twice.' },
+        { ico: 'doc',    tint: 'ink',   b: 'Search by content',        s: 'Find a document by what\'s inside it.' }
+      ],
+      details: { category: 'Documents', bestFor: 'Admin teams, Small businesses', setupTime: '10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Auto-file without review', on: false },
+        { label: 'Detect duplicate documents', on: true },
+        { label: 'Notify on new uploads', on: false }
+      ],
+      reviewsList: [
+        { name: 'Linda Appiah', init: 'LA', stars: 4, text: 'Our Drive is finally organized. Filing rules took a little tuning to get right.' },
+        { name: 'Kwabena Owusu', init: 'KO', stars: 5, text: 'Great for our admin team - documents just end up where they should be.' }
+      ]
+    },
+    {
+      id: 'order-processing', cat: 'operations', tint: 'good', badge: null, icon: 'cart',
+      title: 'Order Processing', desc: 'Process new orders and notify your team.',
+      apps: ['shopify', 'whatsapp', 'dropbox'], more: 2,
+      longDesc: 'Buinee picks up new orders, processes them, and notifies your team, so nothing sits unprocessed while you\'re busy with customers.',
+      rating: 4.6, reviews: 65, businesses: '320+', timeSaved: '~5 hrs/week',
+      heroImage: '/assets/images/order-processing-hero.png', fullBleedHero: true,
+      heroHeading: 'Orders processed the moment they come in',
+      heroBody: 'The moment an order comes in, Buinee processes it, notifies the right person on your team, and keeps the customer updated on status.',
+      benefits: ['No order sits unprocessed', 'Team notified instantly', 'Consistent handling every time', 'Works with your existing store'],
+      howItWorks: [
+        { ico: 'cart',   tint: 'good',  label: 'Receive', sub: 'A new order comes in from your store.' },
+        { ico: 'bolt',   tint: 'teal',  label: 'Process', sub: 'Order details verified and logged.' },
+        { ico: 'bell',   tint: 'ochre', label: 'Notify',  sub: 'Your fulfillment team is alerted.' },
+        { ico: 'check',  tint: 'ink',   label: 'Fulfill', sub: 'Order marked as fulfilled once shipped.' },
+        { ico: 'chart',  tint: 'good',  label: 'Track',   sub: 'Status visible to you and the customer.' }
+      ],
+      included: [
+        { ico: 'cart',  tint: 'good',  b: 'Automatic order processing', s: 'Every order handled the same way.' },
+        { ico: 'bell',  tint: 'ochre', b: 'Team notifications',   s: 'Fulfillment alerted the moment it\'s in.' },
+        { ico: 'chart', tint: 'teal',  b: 'Status tracking',      s: 'From received to fulfilled.' },
+        { ico: 'bolt',  tint: 'ink',   b: 'Store integration',    s: 'Works with your existing storefront.' }
+      ],
+      details: { category: 'Operations', bestFor: 'Retail, E-commerce', setupTime: '15 minutes', difficulty: 'Intermediate', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Notify team on new order', on: true },
+        { label: 'Require review before fulfillment', on: false },
+        { label: 'Send customer confirmation', on: true }
+      ],
+      reviewsList: [
+        { name: 'Nana Yeboah', init: 'NY', stars: 5, text: 'Orders used to pile up when we were busy in-store. Now the team gets pinged right away.' },
+        { name: 'Ama Darko', init: 'AD', stars: 4, text: 'Works well with our storefront. Would like more shipping carrier options.' }
+      ]
+    },
+    {
+      id: 'customer-feedback-report', cat: 'reports', tint: 'ink', badge: null, icon: 'star',
+      title: 'Customer Feedback Report', desc: 'Collect and summarize customer feedback.',
+      apps: ['gmail', 'forms'], more: 1,
+      longDesc: 'Buinee collects feedback from your customers and summarizes it into a clear report, so you know what\'s working and what needs attention.',
+      rating: 4.5, reviews: 50, businesses: '250+', timeSaved: '~2 hrs/week',
+      heroImage: '/assets/images/customer-feedback-report-hero.png', fullBleedHero: true,
+      heroHeading: 'Know what your customers really think',
+      heroBody: 'Buinee gathers feedback from your customers and turns it into a clear, summarized report - what\'s working, what needs attention, and what\'s changed since last time.',
+      benefits: ['Feedback collected automatically', 'Summarized, not raw data', 'Trends highlighted over time', 'Shareable with your team'],
+      howItWorks: [
+        { ico: 'chat',  tint: 'ink',   label: 'Collect', sub: 'Feedback gathered from your customers.' },
+        { ico: 'doc',   tint: 'teal',  label: 'Compile', sub: 'Responses pulled into one place.' },
+        { ico: 'chart', tint: 'good',  label: 'Analyze', sub: 'Buinee summarizes sentiment and trends.' },
+        { ico: 'mail',  tint: 'ochre', label: 'Send',    sub: 'Report delivered to your inbox.' },
+        { ico: 'folder',tint: 'ink',   label: 'Archive', sub: 'Saved so you can track change over time.' }
+      ],
+      included: [
+        { ico: 'chat',  tint: 'ink',  b: 'Feedback collection', s: 'Gathered directly from your customers.' },
+        { ico: 'chart', tint: 'good', b: 'Sentiment summary',   s: 'What\'s positive, what needs attention.' },
+        { ico: 'bolt',  tint: 'teal', b: 'Trend tracking',      s: 'See how sentiment shifts over time.' },
+        { ico: 'calendar',tint: 'ochre',b: 'Scheduled reports',  s: 'Delivered on the cadence you choose.' }
+      ],
+      details: { category: 'Reports', bestFor: 'Service businesses, Retail', setupTime: '10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Send weekly instead of monthly', on: false },
+        { label: 'Include sentiment analysis', on: true },
+        { label: 'Share with team automatically', on: true }
+      ],
+      reviewsList: [
+        { name: 'Kwame Adjei', init: 'KA', stars: 4, text: 'Good overview each month. I\'d like to drill into individual comments more easily.' },
+        { name: 'Efua Asante', init: 'EA', stars: 5, text: 'We caught a recurring complaint early because it showed up clearly in the trend.' }
+      ]
+    }
   ];
 
   // Grid shows the two most popular featured templates plus every non-featured one.
@@ -1081,6 +1745,35 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
         { ico: 'check', tint: 'ochre',label: 'Review',  sub: 'You review and approve' },
         { ico: 'share', tint: 'good', label: 'Complete',sub: 'Sent and logged for you' }
       ]
+    };
+  }
+
+  // Templates without hand-written detail-page copy (everything except
+  // Invoice Automation, which ships a real reference) get plausible,
+  // still-relevant defaults derived from their own title/apps/checklist.
+  function tplFullDetails(t) {
+    if (t.longDesc) return t;
+    var d = tplDetails(t);
+    return {
+      longDesc: t.desc,
+      rating: 4.7, reviews: 120, businesses: '800+', timeSaved: '~3 hrs/week',
+      heroImage: null,
+      heroHeading: 'Automate ' + t.title.toLowerCase() + ' end to end',
+      heroBody: t.desc + ' Muse handles the busywork so your team can focus on what matters.',
+      benefits: ['Saves time on manual work', 'Reduces errors', 'Keeps things consistent', 'Works with your existing tools'],
+      howItWorks: d.steps,
+      included: d.whatsIncluded.slice(0, 4).map(function (line, i) {
+        var icoKeys = ['bolt', 'cog', 'chat', 'chart'];
+        var tints = ['teal', 'ink', 'good', 'ochre'];
+        return { ico: icoKeys[i], tint: tints[i], b: line, s: 'Included with this template.' };
+      }),
+      details: { category: TPL_FILTERS.filter(function (f) { return f.id === t.cat; }).map(function (f) { return f.label; })[0] || t.cat, bestFor: 'Small businesses, Growing teams', setupTime: '5-10 minutes', difficulty: 'Beginner', version: 'v1.0', updated: '15 Sep 2026' },
+      customization: [
+        { label: 'Require review before sending', on: true },
+        { label: 'Add your logo and branding', on: true },
+        { label: 'Send reminders automatically', on: false }
+      ],
+      reviewsList: []
     };
   }
 
@@ -1164,6 +1857,189 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
       }).join('') + '</div>';
   }
 
+  var TDP_TABS = [
+    { id: 'overview',   label: 'Overview' },
+    { id: 'how',        label: 'How it works' },
+    { id: 'included',   label: "What's included" },
+    { id: 'integrations', label: 'Integrations' },
+    { id: 'reviews',    label: 'Reviews' }
+  ];
+
+  function starsHtml(n) {
+    var full = Math.round(n);
+    var out = '';
+    for (var i = 1; i <= 5; i++) out += i <= full ? '★' : '☆';
+    return out;
+  }
+
+  function renderTplDetail(id) {
+    var t = tplById(id);
+    if (!t) return;
+    var d = tplFullDetails(t);
+    var tint = TINT[t.tint];
+    var view = $('#tplDetailView');
+    view.setAttribute('data-open', t.id);
+
+    // A hero image that already bakes in its own heading/copy (like the
+    // supplied Invoice Automation one) is shown full-bleed, on its own.
+    // Every other template gets a text+visual split where the visual slot
+    // is wired to its own expected file (assets/images/<id>-hero.png) with
+    // a graceful onerror fallback - so dropping in a correctly-named image
+    // later makes it appear automatically, no code changes needed here.
+    var heroFile = d.heroImage ? d.heroImage.split('/').pop() : '';
+    var overviewPanel = t.fullBleedHero ?
+      '<section class="tdp-panel tdp-panel-image"><img class="tdp-hero-img" src="' + d.heroImage + '" alt="' + esc(t.title) + '"></section>' :
+      '<section class="tdp-panel">' +
+        '<div>' +
+          '<h2>' + esc(d.heroHeading) + '</h2>' +
+          '<p>' + esc(d.heroBody) + '</p>' +
+          '<ul class="tdp-check-list">' + d.benefits.map(function (b) {
+            return '<li>' + svg(ICO.check, 2.4) + esc(b) + '</li>';
+          }).join('') + '</ul>' +
+        '</div>' +
+        '<div class="tdp-hero-media">' +
+          '<img class="tdp-hero-img" src="' + esc(d.heroImage) + '" alt="' + esc(t.title) + '" ' +
+            'onerror="this.closest(\'.tdp-hero-media\').classList.add(\'missing\')">' +
+          '<div class="tdp-hero-fallback">' + svg(ICO.folder, 1.8) +
+            '<b>Hero image pending</b>' +
+            '<span>Drop <code>' + esc(heroFile) + '</code> into assets/images/ and it\'ll show here.</span>' +
+          '</div>' +
+        '</div>' +
+      '</section>';
+
+    view.innerHTML =
+      '<div class="tdp-page">' +
+        '<div class="tdp-main">' +
+          '<a href="#" class="tdp-back" data-close-detail>' + svg(ICO.rightArrow.replace('M5 12h13M13 6l6 6-6 6', 'M19 12H6M12 5l-7 7 7 7'), 2) + ' Back to templates</a>' +
+          '<div class="tdp-head">' +
+            '<div class="ico" style="background:' + tint.bg + ';color:' + tint.c + '">' + svg(ICO[t.icon]) + '</div>' +
+            '<div class="tdp-head-main">' +
+              '<div class="tdp-head-top">' +
+                '<h1>' + esc(t.title) + '</h1>' +
+                (t.badge ? '<span class="badge" style="background:' + tint.bg + ';color:' + tint.c + '">' + esc(t.badge) + '</span>' : '') +
+              '</div>' +
+              '<p>' + esc(d.longDesc) + '</p>' +
+            '</div>' +
+            '<div class="tdp-actions">' +
+              '<button type="button"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.7 7.6-3.4M8.2 13.3l7.6 3.4"/></svg>Share</button>' +
+              '<button type="button" class="icon-only" aria-label="More options"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="tdp-stats">' +
+            '<span class="stars">' + starsHtml(d.rating) + '</span>' +
+            '<span>' + d.rating.toFixed(1) + ' (' + d.reviews + ' reviews)</span>' +
+            '<span>' + svg(ICO.user, 2) + ' ' + esc(d.businesses) + ' businesses use this</span>' +
+            '<span>' + svg(ICO.clock, 2) + ' Saved ' + esc(d.timeSaved) + '</span>' +
+          '</div>' +
+          '<div class="tdp-tabs" id="tdpTabs">' + TDP_TABS.map(function (tab, i) {
+            return '<button type="button" data-tab="' + tab.id + '" class="' + (i === 0 ? 'on' : '') + '">' + esc(tab.label) + '</button>';
+          }).join('') + '</div>' +
+
+          '<div id="tdp-overview">' + overviewPanel + '</div>' +
+
+          '<div id="tdp-how">' +
+            '<h2 class="tdp-h2">How it works</h2>' +
+            '<div class="tdp-steps">' + d.howItWorks.map(function (s, i) {
+              var st = TINT[s.tint] || tint;
+              return '<div class="tdp-step-wrap"><div class="tdp-step">' +
+                '<div class="ico" style="background:' + st.bg + ';color:' + st.c + '">' + svg(ICO[s.ico]) + '</div>' +
+                '<b>' + (i + 1) + '. ' + esc(s.label) + '</b><span>' + esc(s.sub) + '</span>' +
+              '</div></div>';
+            }).join('') + '</div>' +
+          '</div>' +
+
+          '<div id="tdp-included">' +
+            '<h2 class="tdp-h2">What\'s included</h2>' +
+            '<div class="tdp-included">' + d.included.map(function (c) {
+              var st = TINT[c.tint] || tint;
+              return '<div class="tdp-inc-card">' +
+                '<div class="ico" style="background:' + st.bg + ';color:' + st.c + '">' + svg(ICO[c.ico]) + '</div>' +
+                '<b>' + esc(c.b) + '</b><span>' + esc(c.s) + '</span>' +
+              '</div>';
+            }).join('') + '</div>' +
+          '</div>' +
+
+          '<div id="tdp-integrations">' +
+            '<h2 class="tdp-h2">Integrations</h2>' +
+            '<div class="tdp-integrations">' + t.apps.concat(t.apps.length ? [] : []).map(function (a) {
+              return '<div class="tdp-integ-card"><img src="/assets/images/' + APP[a].file + '" alt="">' +
+                '<span>' + esc(APP[a].name) + '</span></div>';
+            }).join('') + '</div>' +
+          '</div>' +
+
+          '<div id="tdp-reviews">' +
+            '<h2 class="tdp-h2">Reviews</h2>' +
+            '<div class="tdp-reviews-summary">' +
+              '<div class="tdp-reviews-score">' + d.rating.toFixed(1) + '</div>' +
+              '<div><div class="stars">' + starsHtml(d.rating) + '</div><div class="count">' + d.reviews + ' reviews</div></div>' +
+            '</div>' +
+            (d.reviewsList.length ? d.reviewsList.map(function (r) {
+              return '<div class="tdp-review"><div class="tdp-review-h">' +
+                '<div class="tdp-review-av">' + esc(r.init) + '</div><b>' + esc(r.name) + '</b>' +
+                '<span class="stars">' + starsHtml(r.stars) + '</span></div>' +
+                '<p>' + esc(r.text) + '</p></div>';
+            }).join('') : '<div class="empty">No reviews yet.</div>') +
+          '</div>' +
+        '</div>' +
+
+        '<aside class="tdp-sidebar">' +
+          '<button type="button" class="tpl-use">Use this template ' + svg(ICO.rightArrow, 2) + '</button>' +
+          '<button type="button" class="tpl-preview">' + svg(ICO.play, 2) + ' Preview workflow</button>' +
+          '<div class="tdp-side-card">' +
+            '<h4>Works with</h4>' +
+            '<div class="tpl-works">' +
+              (t.works || t.apps).map(function (a) {
+                return '<div><img src="/assets/images/' + APP[a].file + '" alt=""><span>' + esc(APP[a].name) + '</span></div>';
+              }).join('') +
+              (function (m) { return m ? '<div class="more"><span>+' + m + '</span><span>more</span></div>' : ''; })(t.worksMore != null ? t.worksMore : t.more) +
+            '</div>' +
+          '</div>' +
+          '<div class="tdp-side-card">' +
+            '<h4>Template details</h4>' +
+            '<div class="tdp-detail-row">' + svg(ICO.folder, 2) + '<b>Category</b><em>' + esc(d.details.category) + '</em></div>' +
+            '<div class="tdp-detail-row">' + svg(ICO.user, 2) + '<b>Best for</b><em>' + esc(d.details.bestFor) + '</em></div>' +
+            '<div class="tdp-detail-row">' + svg(ICO.clock, 2) + '<b>Setup time</b><em>' + esc(d.details.setupTime) + '</em></div>' +
+            '<div class="tdp-detail-row">' + svg(ICO.bolt, 2) + '<b>Difficulty</b><em>' + esc(d.details.difficulty) + '</em></div>' +
+            '<div class="tdp-detail-row">' + svg(ICO.cog, 2) + '<b>Template version</b><em>' + esc(d.details.version) + '</em></div>' +
+            '<div class="tdp-detail-row">' + svg(ICO.calendar, 2) + '<b>Last updated</b><em>' + esc(d.details.updated) + '</em></div>' +
+          '</div>' +
+          '<div class="tdp-side-card">' +
+            '<h4>Customization options</h4>' +
+            d.customization.map(function (c, i) {
+              return '<div class="tdp-cust-row"><span>' + esc(c.label) + '</span>' +
+                '<button type="button" class="tdp-toggle' + (c.on ? ' on' : '') + '" data-cust="' + i + '" aria-label="' + esc(c.label) + '"></button></div>';
+            }).join('') +
+            '<div class="tdp-cust-row link"><span>Advanced settings</span>' + svg(ICO.rightArrow, 2) + '</div>' +
+          '</div>' +
+          '<div class="tdp-info-box">' + svg(ICO.check, 2) + '<span>You can customize this template after adding it to your workspace.</span></div>' +
+        '</aside>' +
+      '</div>';
+
+    $$('#tdpTabs button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        $$('#tdpTabs button').forEach(function (x) { x.classList.toggle('on', x === b); });
+        var target = $('#tdp-' + b.getAttribute('data-tab'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    $$('.tdp-toggle', view).forEach(function (btn) {
+      btn.addEventListener('click', function () { btn.classList.toggle('on'); });
+    });
+  }
+
+  function openTplDetail(id) {
+    renderTplDetail(id);
+    $('#tplGridView').style.display = 'none';
+    $('#tplDetailView').style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+
+  function closeTplDetail() {
+    $('#tplDetailView').style.display = 'none';
+    $('#tplGridView').style.display = '';
+  }
+
   function initTemplatesPage() {
     renderTplFilters();
     renderTplFeatured();
@@ -1198,6 +2074,11 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
     document.addEventListener('click', function (e) {
       var card = e.target.closest('.tpl-card');
       if (card && card.hasAttribute('data-tpl')) {
+        if (e.target.closest('.tpl-arrow')) {
+          e.preventDefault();
+          openTplDetail(card.getAttribute('data-tpl'));
+          return;
+        }
         renderTplDrawer(card.getAttribute('data-tpl'));
         $$('.tpl-card').forEach(function (c) { c.classList.toggle('active', c === card); });
         return;
@@ -1205,6 +2086,10 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
       if (e.target.closest('.tpl-drawer-close')) {
         $('#tplDrawer').innerHTML = '';
         $('#tplDrawer').removeAttribute('data-active');
+      }
+      if (e.target.closest('[data-close-detail]')) {
+        e.preventDefault();
+        closeTplDetail();
       }
     });
   }
@@ -1267,6 +2152,97 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
     $('#usageList').innerHTML = USAGE.map(function (u) {
       return '<div class="usage-row">' + svg(u.ico) + '<span>' + esc(u.label) + '</span><b>' + esc(u.value) + '</b></div>';
     }).join('');
+  }
+
+  // ------------------------------------------------------------------
+  // Header dropdowns: notifications + profile
+  // ------------------------------------------------------------------
+  var NOTIFICATIONS = [
+    { ico: 'invoice',        tint: 'teal',  read: false, text: 'Invoice INV-2026-0143 was paid by Kofi Mensah.', time: '10 minutes ago' },
+    { app: 'whatsapp',       tint: 'good',  read: false, text: 'New WhatsApp enquiry from Ama Serwaa.',            time: '38 minutes ago' },
+    { app: 'instagram',      tint: 'ochre', read: false, text: 'Instagram post published: "New arrivals this week".', time: '1 hour ago' },
+    { ico: 'chart',          tint: 'teal',  read: true,  text: 'Your weekly sales report is ready.',                time: 'Yesterday' },
+    { app: 'gmail',          tint: 'ink',   read: true,  text: 'Payment reminder emailed for invoice INV-2026-0139.', time: 'Yesterday' }
+  ];
+
+  function notifIcoHtml(n) {
+    if (n.app) return '<img src="/assets/images/' + APP[n.app].file + '" alt="' + APP[n.app].name + '">';
+    return svg(ICO[n.ico]);
+  }
+
+  function renderNotifPanel() {
+    var unread = NOTIFICATIONS.filter(function (n) { return !n.read; }).length;
+    $('#notifPanel').innerHTML =
+      '<div class="tb-panel-head"><b>Notifications</b>' +
+        (unread ? '<a href="#" id="notifMarkRead">Mark all read</a>' : '') +
+      '</div>' +
+      '<div class="notif-list">' +
+      (NOTIFICATIONS.length ? NOTIFICATIONS.map(function (n) {
+        var t = TINT[n.tint];
+        return '<div class="notif-row' + (n.read ? '' : ' unread') + '">' +
+          '<div class="notif-ico' + (n.app ? ' is-brand' : '') + '" style="background:' + t.bg + ';color:' + t.c + '">' + notifIcoHtml(n) + '</div>' +
+          '<div class="notif-body"><p>' + esc(n.text) + '</p><span>' + esc(n.time) + '</span></div>' +
+          (n.read ? '' : '<i class="notif-dot"></i>') +
+        '</div>';
+      }).join('') : '<div class="notif-empty">You\'re all caught up.</div>') +
+      '</div>' +
+      '<div class="tb-panel-foot"><a href="#" data-go="activity">View all activity</a></div>';
+    $('.tb-bell i').style.display = unread ? '' : 'none';
+  }
+
+  function renderProfilePanel() {
+    $('#profilePanel').innerHTML =
+      '<div class="pp-head">' +
+        '<div class="who-av">' + esc($('#whoAv').textContent) + '</div>' +
+        '<div><b>' + esc($('#whoName').textContent) + '</b><span>' + esc($('#whoOrg').textContent) + '</span></div>' +
+      '</div>' +
+      '<div class="pp-list">' +
+        '<a href="#" data-go="settings">' + svg(ICO.user, 1.8) + 'My profile</a>' +
+        '<a href="#" data-go="settings">' + svg(ICO.building, 1.8) + 'Company settings</a>' +
+        '<a href="#" data-go="settings">' + svg(ICO.card, 1.8) + 'Billing &amp; plan</a>' +
+        '<hr>' +
+        '<button type="button" class="danger" id="btnLogout">' + svg(ICO.logout, 1.8) + 'Log out</button>' +
+      '</div>';
+  }
+
+  function initHeaderDropdowns() {
+    renderNotifPanel();
+    renderProfilePanel();
+
+    var ddBell = $('#ddBell'), ddWho = $('#ddWho');
+    function setOpen(dd, open) {
+      dd.classList.toggle('open', open);
+      dd.querySelector('button').setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function closeAll() { setOpen(ddBell, false); setOpen(ddWho, false); }
+
+    $('.tb-bell').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var opening = !ddBell.classList.contains('open');
+      closeAll();
+      setOpen(ddBell, opening);
+      if (opening) {
+        NOTIFICATIONS.forEach(function (n) { n.read = true; });
+        renderNotifPanel();
+      }
+    });
+
+    $('.who').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var opening = !ddWho.classList.contains('open');
+      closeAll();
+      setOpen(ddWho, opening);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.tb-dd')) closeAll();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeAll();
+    });
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#btnLogout')) closeAll();
+    });
   }
 
   // ------------------------------------------------------------------
@@ -1387,6 +2363,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   renderWorkflows();
   renderTasks();
   renderUsage();
+  initHeaderDropdowns();
   initTemplatesPage();
   go(routeFromHash());
 
@@ -1398,6 +2375,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
     if (org) $('#whoOrg').textContent = org;
     var h = $('.hello h1');
     if (h) h.textContent = 'Good morning, ' + me.name.split(' ')[0] + '!';
+    renderProfilePanel();
   });
 
   // Reflect the live date instead of the hardcoded reference date.
