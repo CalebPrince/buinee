@@ -41,7 +41,7 @@
   .btn.block { width: 100%; }
 
   /* -------- shell: dark step sidebar + white step card -------- */
-  .gs-shell { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+  .gs-shell { display: grid; grid-template-columns: minmax(250px, 32vw) 1fr; min-height: 100vh; padding: 8px; gap: 8px; background: #02090b; }
   .gs-side {
     background: #02090b; color: #eef4f1; padding: 34px 30px; display: flex; flex-direction: column;
     position: relative; overflow: hidden;
@@ -52,6 +52,7 @@
      sidebar's full width instead of its own 3:1 aspect ratio. */
   .gs-logo { height: 30px; width: auto; display: block; margin-bottom: 40px; position: relative; z-index: 2; align-self: flex-start; flex: none; }
   .gs-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; position: relative; z-index: 2; }
+  .gs-steps::before { content: ""; position: absolute; left: 20px; top: 23px; bottom: 23px; width: 1px; background: rgba(255,255,255,.2); z-index: -1; }
   .gs-step { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; font-size: 13.5px; font-weight: 600; color: rgba(238,244,241,.5); }
   .gs-step .n {
     width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center;
@@ -60,14 +61,14 @@
   .gs-step.done .n { background: var(--teal); color: #04130c; }
   .gs-step.done .n svg { width: 13px; height: 13px; }
   .gs-step.active { color: #fff; }
-  .gs-step.active .n { background: #fff; color: #04130c; }
+  .gs-step.active .n { background: var(--teal); color: #04130c; }
   .gs-side-photo {
     position: absolute; inset: 0; z-index: 1;
-    background-image: linear-gradient(180deg, rgba(0,7,9,.55) 0%, rgba(0,7,9,.86) 60%, #02090b 100%), url('/assets/images/hero-image1.png');
+    background-image: linear-gradient(180deg, rgba(0,7,9,.42) 0%, rgba(0,7,9,.82) 64%, #02090b 100%), url('/assets/images/Pricing%20Page%20hero.png');
     background-size: cover; background-position: 78% 20%;
-    opacity: 0; transition: opacity .3s ease; pointer-events: none;
+    opacity: .34; transition: opacity .3s ease; pointer-events: none;
   }
-  .gs-side.at-start .gs-side-photo { opacity: 1; }
+  .gs-side.at-start .gs-side-photo { opacity: .82; }
   .gs-quote {
     position: absolute; left: 30px; right: 30px; bottom: 34px; z-index: 2;
     font-size: 15px; font-weight: 700; color: #fff; opacity: 0; transition: opacity .3s ease;
@@ -77,25 +78,26 @@
   /* Full-bleed split screen, matching the reference: the dark sidebar and
      this white panel each fill their column edge to edge, top to bottom -
      no floating card, no page background showing around it. */
-  .gs-main { background: var(--paper); display: flex; align-items: center; justify-content: center; padding: 56px 48px; min-height: 100vh; }
-  .gs-card { width: 100%; max-width: 560px; }
-  .gs-progress { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-bottom: 22px; }
-  .gs-progress span { display: block; height: 100%; background: var(--teal); border-radius: 999px; transition: width .3s ease; }
-  .gs-step-label { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--teal-deep); margin-bottom: 10px; }
+  .gs-main { background: linear-gradient(145deg, #fff 0%, #fbfcfd 58%, #f5f8fa 100%); display: flex; align-items: center; justify-content: center; padding: 38px 42px; min-height: calc(100vh - 16px); border-radius: 13px; overflow: auto; }
+  .gs-card { width: 100%; max-width: 620px; }
+  .gs-progress { height: 5px; display: grid; gap: 4px; margin: 0 0 20px; }
+  .gs-progress span { display: block; height: 100%; background: #e4e9ed; border-radius: 999px; transition: background .25s ease; }
+  .gs-progress span.done { background: linear-gradient(90deg, #13d787, #07985c); }
+  .gs-step-label { font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 600; color: #64748b; margin-bottom: 8px; }
   .gs-h2 { font-size: 25px; margin-bottom: 6px; }
-  .gs-sub { font-size: 14.5px; color: var(--ink-2); margin-bottom: 26px; }
+  .gs-sub { font-size: 14px; color: var(--ink-3); margin-bottom: 20px; }
   .gs-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
   .gs-foot .btn.block { flex: 1; }
 
   /* plan cards (step 1) */
   .gs-plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
   .gs-plan-card {
-    border: 1.5px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer;
+    border: 1.5px solid #dce3e8; border-radius: 11px; padding: 14px; cursor: pointer;
     display: flex; flex-direction: column; gap: 8px; position: relative; background: var(--paper);
     transition: border-color .15s, box-shadow .15s;
   }
   .gs-plan-card:hover { border-color: var(--line-strong); }
-  .gs-plan-card.selected { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+  .gs-plan-card.selected { border-color: var(--teal); box-shadow: none; background: linear-gradient(135deg, #fff, #f0fff8); }
   .gs-plan-card .check {
     position: absolute; top: 14px; right: 14px; width: 20px; height: 20px; border-radius: 50%;
     border: 1.5px solid var(--line-strong); display: grid; place-items: center; color: transparent;
@@ -103,23 +105,34 @@
   .gs-plan-card.selected .check { background: var(--teal); border-color: var(--teal); color: #fff; }
   .gs-plan-card .check svg { width: 12px; height: 12px; }
   .gs-plan-card .ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-deep); }
+  .gs-plan-card .ic.purple { background: #f0e9ff; color: #7c3aed; }
+  .gs-plan-card .ic.blue { background: #e8f2ff; color: #2563eb; }
   .gs-plan-card .ic svg { width: 17px; height: 17px; }
   .gs-plan-card b { font-size: 14.5px; }
   .gs-plan-card .price { font-size: 13px; font-weight: 700; color: var(--ink); }
   .gs-plan-card .note { font-size: 12px; color: var(--ink-3); }
 
   /* forms */
-  .gs-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .gs-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-  .gs-field label { font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+  .gs-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gs-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
+  .gs-field label { font-size: 12px; font-weight: 700; color: var(--ink); }
   .gs-field input, .gs-field select, .gs-field textarea {
-    padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line-strong);
-    background: var(--paper); color: var(--ink); width: 100%;
+    height: 42px; padding: 0 12px; border-radius: 7px; border: 1px solid #d8dee4;
+    background-color: #fbfcfd; color: var(--ink); width: 100%; font-size: 13px;
+    box-shadow: 0 1px 2px rgba(11,18,16,.025); transition: border-color .15s, box-shadow .15s;
   }
-  .gs-field textarea { resize: vertical; min-height: 88px; }
-  .gs-phone { display: flex; gap: 8px; }
-  .gs-phone .code { width: 76px; flex: none; text-align: center; }
-  .gs-hint { font-size: 11.5px; color: var(--ink-3); margin-top: -8px; margin-bottom: 14px; }
+  .gs-field input::placeholder, .gs-field textarea::placeholder { color: #9aa5ae; }
+  .gs-field input:focus, .gs-field select:focus, .gs-field textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(8,200,117,.1); outline: 0; }
+  .gs-field select { appearance: none; padding-right: 42px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235c6b64' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; }
+  .gs-field textarea { resize: vertical; min-height: 88px; height: auto; padding-top: 10px; }
+  .gs-phone { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
+  .gs-phone .code { width: 100%; height: 42px; border-radius: 7px; border: 1px solid #d8dee4; background: #fbfcfd; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .gs-country { position: relative; }
+  .gs-country-flag { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); z-index: 1; line-height: 1; pointer-events: none; }
+  .gs-flag { width: 20px; height: 14px; display: inline-flex; overflow: hidden; border-radius: 2px; box-shadow: 0 0 0 1px rgba(11,18,16,.12); flex: none; }
+  .gs-flag svg { display: block; width: 100%; height: 100%; }
+  .gs-country select { padding-left: 40px; }
+  .gs-hint { font-size: 11.5px; color: var(--ink-3); margin-top: -5px; margin-bottom: 12px; }
   .gs-err { font-size: 12.5px; color: var(--bad); background: var(--bad-soft); border-radius: 8px; padding: 9px 12px; margin-bottom: 14px; display: none; }
   .gs-err.show { display: block; }
 
@@ -133,9 +146,10 @@
   .gs-pick:hover { border-color: var(--line-strong); }
   .gs-pick.selected { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
   .gs-pick .top { display: flex; align-items: flex-start; justify-content: space-between; }
-  .gs-pick .ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; }
+  .gs-pick .ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--surface-2); }
   .gs-pick .ic svg { width: 16px; height: 16px; }
-  .gs-pick .chk { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line-strong); display: grid; place-items: center; color: transparent; flex: none; }
+  .gs-pick .ic img { width: 21px; height: 21px; object-fit: contain; }
+  .gs-pick .chk { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line-strong); display: grid; place-items: center; color: transparent; flex: none; }
   .gs-pick.selected .chk { background: var(--teal); border-color: var(--teal); color: #fff; }
   .gs-pick .chk svg { width: 11px; height: 11px; }
   .gs-pick span.label { font-size: 13px; font-weight: 700; }
@@ -154,8 +168,9 @@
   }
   .gs-tool:hover { border-color: var(--line-strong); }
   .gs-tool.selected { border-color: var(--teal); background: var(--teal-soft); }
-  .gs-tool .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); flex: none; }
-  .gs-tool .ic img, .gs-tool .ic svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .gs-tool .ic { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); flex: none; }
+  .gs-tool .ic img { width: 21px; height: 21px; object-fit: contain; }
+  .gs-tool .ic svg { width: 17px; height: 17px; color: var(--ink-2); }
   .gs-tool .meta { display: flex; flex-direction: column; gap: 1px; }
   .gs-tool .meta b { font-size: 13px; }
   .gs-tool .meta span { font-size: 11.5px; color: var(--ink-3); }
@@ -178,19 +193,54 @@
   .gs-pay-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
   .gs-pay-tab { flex: 1; padding: 10px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--paper); text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; }
   .gs-pay-tab.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .gs-pay-tab { display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .gs-pay-tab svg { width: 15px; height: 15px; }
+  .gs-checkout-note { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--surface); color: var(--ink-2); font-size: 12.5px; margin-top: 12px; }
+  .gs-checkout-note b { color: var(--ink); }
+  .gs-card-preview { display: grid; gap: 10px; margin-top: 2px; }
+  .gs-card-preview label { display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 5px; }
+  .gs-card-display { height: 40px; border: 1px solid #d8dee4; border-radius: 7px; background: #fbfcfd; color: #9aa5ae; display: flex; align-items: center; justify-content: space-between; padding: 0 11px; font-size: 12px; }
+  .gs-card-brands { display: flex; gap: 4px; }
+  .gs-card-brands i { font-style: normal; font-size: 8px; font-weight: 800; padding: 2px 4px; border-radius: 3px; color: #fff; background: #1a4db3; }
+  .gs-card-brands i:nth-child(2) { background: #ed5d2b; }
+  .gs-card-preview .row { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
   .gs-plan-summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin-bottom: 18px; }
   .gs-plan-summary .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--teal-soft); color: var(--teal-deep); display: grid; place-items: center; flex: none; }
   .gs-plan-summary b { display: block; font-size: 14.5px; }
   .gs-plan-summary span { font-size: 12.5px; color: var(--ink-3); }
+  .gs-plan-summary .change-plan { margin-left: auto; border: 1px solid var(--line-strong); border-radius: 7px; background: #fff; color: var(--ink); padding: 7px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+  .gs-plan-summary .change-plan:hover { border-color: var(--teal); color: var(--teal-deep); }
   .gs-secure { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-3); justify-content: center; margin-top: 12px; }
   .gs-secure svg { width: 14px; height: 14px; }
 
   /* connect muse (BYOT) */
-  .gs-muse-badge { display: inline-flex; align-items: center; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 18px; }
-  .gs-muse-badge img { height: 18px; width: auto; display: block; }
+  .gs-muse-badge { display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; min-width: 104px; min-height: 44px; border-radius: 9px; background: #f2f4f6; border: 1px solid #dde3e7; margin-bottom: 18px; overflow: hidden; isolation: isolate; }
+  .gs-muse-badge img { height: 25px; width: auto; max-width: 92px; object-fit: contain; display: block; mix-blend-mode: multiply; transform: scale(1.08); }
 
   /* success screen */
   .gs-success { text-align: center; padding: 20px 10px 6px; }
+  .gs-success { position: relative; }
+  .gs-burst { position: fixed; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; }
+  .gs-burst::before, .gs-burst::after { content: ""; position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border: 3px solid rgba(8,200,117,.72); border-radius: 50%; transform: translate(-50%,-50%) scale(.2); opacity: 0; animation: gs-ring 1.05s cubic-bezier(.16,.8,.26,1) .08s both; }
+  .gs-burst::after { border-color: rgba(74,145,255,.42); animation-delay: .2s; }
+  .gs-burst i { position: absolute; left: 50%; top: 50%; width: 7px; height: 18px; border-radius: 2px; background: var(--c); opacity: 0; transform: translate(-50%,-50%) rotate(var(--r)) scale(.25); animation: gs-burst-piece var(--dur) cubic-bezier(.14,.72,.24,1) var(--delay) both; box-shadow: 0 0 8px color-mix(in srgb, var(--c) 65%, transparent); }
+  .gs-burst i.spark { width: 7px; height: 7px; border-radius: 50%; }
+  .gs-burst i.spark::before, .gs-burst i.spark::after { content: ""; position: absolute; left: 50%; top: 50%; width: 18px; height: 2px; border-radius: 999px; background: var(--c); transform: translate(-50%,-50%); }
+  .gs-burst i.spark::after { transform: translate(-50%,-50%) rotate(90deg); }
+  .gs-success .badge, .gs-success h2, .gs-success p, .gs-next-box, .gs-success .btn { animation: gs-success-in .55s cubic-bezier(.2,.85,.25,1) both; }
+  .gs-success .badge { animation-delay: .2s; }
+  .gs-success h2 { animation-delay: .3s; }
+  .gs-success p { animation-delay: .38s; }
+  .gs-next-box { animation-delay: .46s; }
+  .gs-success .btn { animation-delay: .54s; }
+  @keyframes gs-burst-piece {
+    0% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--r)) scale(.2); }
+    10% { opacity: 1; }
+    72% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) rotate(calc(var(--r) + var(--spin))) scale(1); }
+  }
+  @keyframes gs-ring { 0% { opacity: .9; transform: translate(-50%,-50%) scale(.15); } 100% { opacity: 0; transform: translate(-50%,-50%) scale(14); } }
+  @keyframes gs-success-in { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
   .gs-success .badge { width: 84px; height: 84px; border-radius: 50%; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; margin: 0 auto 22px; }
   .gs-success .badge svg { width: 40px; height: 40px; }
   .gs-success h2 { font-size: 26px; margin-bottom: 10px; }
@@ -198,16 +248,23 @@
   .gs-next-box { text-align: left; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface); margin-bottom: 22px; }
   .gs-next-box b { display: block; font-size: 13px; margin-bottom: 10px; }
   .gs-next-box ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+  @media (prefers-reduced-motion: reduce) {
+    .gs-burst { display: none; }
+    .gs-success .badge, .gs-success h2, .gs-success p, .gs-next-box, .gs-success .btn { animation: none; }
+  }
 
   /* custom agent view */
   .gs-custom { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
   .gs-custom-photo {
-    background-image: linear-gradient(180deg, rgba(0,7,9,.4), rgba(0,7,9,.86)), url('/assets/images/pricing-hero.png');
+    background-image: linear-gradient(180deg, rgba(0,7,9,.3), rgba(0,7,9,.84)), url('/assets/images/Pricing%20Page%20hero.png');
     background-size: cover; background-position: center; color: #fff; padding: 40px; display: flex; flex-direction: column; justify-content: flex-end;
   }
   .gs-custom-photo img { height: 28px; width: auto; margin-bottom: auto; align-self: flex-start; flex: none; }
   .gs-custom-photo h2 { font-size: 30px; margin-bottom: 8px; }
   .gs-custom-photo p { color: rgba(238,244,241,.8); max-width: 34ch; }
+  .gs-custom-points { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 10px; }
+  .gs-custom-points li { display: flex; align-items: center; gap: 9px; font-size: 13px; color: rgba(255,255,255,.9); }
+  .gs-custom-points svg { width: 17px; height: 17px; padding: 3px; border: 1px solid var(--teal); border-radius: 50%; color: var(--teal); }
   .gs-custom-form { display: flex; align-items: center; justify-content: center; padding: 40px 28px; }
 
   @media (max-width: 900px) {
@@ -248,13 +305,16 @@
     folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>',
     users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     website: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z"/></svg>',
+    card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>',
+    bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 10 9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>',
   };
 
   const PLANS = {
-    free:    { key: "free",    name: "Free",                         planName: "Solo Free",                 usd: "$0",       ghs: "GHS 0 / month",     icon: ICONS.plane,  users: "1 user" },
-    byot:    { key: "byot",    name: "Bring Your Own Token (BYOT)",  planName: "Bring Your Own Token (BYOT)", usd: "$29",     ghs: "GHS 450 / month",   icon: ICONS.laptop, users: "Up to 2 users" },
-    managed: { key: "managed", name: "Managed Ops",                  planName: "Managed Ops",               usd: "$89",      ghs: "GHS 1,380 / month", icon: ICONS.layers, users: "Up to 5 users" },
-    custom:  { key: "custom",  name: "Custom Agent",                 planName: null,                        usd: "From $299", ghs: "From GHS 4,650 / month", icon: ICONS.crown, users: "Unlimited users" },
+    free:    { key: "free",    name: "Free",                         planName: "Solo Free",                 usd: "$0",       ghs: "GHS 0 / month",     icon: ICONS.plane,  note: "1 user, core tools" },
+    byot:    { key: "byot",    name: "Bring Your Own Token (BYOT)",  planName: "Bring Your Own Token (BYOT)", usd: "$29",     ghs: "GHS 450 / month",   icon: ICONS.laptop, note: "Use your own Muse account", iconClass: "blue" },
+    managed: { key: "managed", name: "Managed Ops",                  planName: "Managed Ops",               usd: "$89",      ghs: "GHS 1,380 / month", icon: ICONS.layers, note: "We handle everything" },
+    custom:  { key: "custom",  name: "Custom Agent",                 planName: null,                        usd: "From $299", ghs: "From GHS 4,650 / month", icon: ICONS.crown, note: "Tailored for your business", iconClass: "purple" },
   };
 
   const WORKFLOWS = [
@@ -263,15 +323,16 @@
     { id: "social",    label: "Social media management", icon: ICONS.social, cls: "ic-pink" },
     { id: "enquiries", label: "Customer enquiries",    icon: ICONS.chat,    cls: "ic-green" },
     { id: "followups", label: "Email & follow-ups",    icon: ICONS.mail,    cls: "ic-orange" },
-    { id: "data",      label: "Documents & data entry", icon: ICONS.data,   cls: "ic-blue" },
     { id: "scheduling", label: "Scheduling & reminders", icon: ICONS.calendar, cls: "ic-yellow" },
+    { id: "data",      label: "Data entry & extraction", icon: ICONS.data,   cls: "ic-green" },
+    { id: "crm",       label: "CRM & customer management", icon: ICONS.users, cls: "ic-blue" },
     { id: "custom",    label: "Something custom",      icon: ICONS.custom,  cls: "ic-purple" },
   ];
 
   const CHANNELS = [
-    { id: "whatsapp", label: "WhatsApp",  icon: ICONS.chat, cls: "ic-green" },
-    { id: "instagram", label: "Instagram", icon: ICONS.social, cls: "ic-pink" },
-    { id: "facebook", label: "Facebook",  icon: ICONS.social, cls: "ic-blue" },
+    { id: "whatsapp", label: "WhatsApp", img: "/assets/images/whatsapp.svg" },
+    { id: "instagram", label: "Instagram", img: "/assets/images/instagram.svg" },
+    { id: "facebook", label: "Facebook", img: "/assets/images/facebook.svg" },
   ];
 
   const TOOLS = [
@@ -291,6 +352,17 @@
     { id: "other", label: "Other tools", icon: ICONS.custom },
   ];
 
+  const flag = inner => `<span class="gs-flag" aria-hidden="true"><svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg">${inner}</svg></span>`;
+  const COUNTRY_META = {
+    "Ghana": { flag: flag('<path fill="#CE1126" d="M0 0h30v6.67H0z"/><path fill="#FCD116" d="M0 6.67h30v6.66H0z"/><path fill="#006B3F" d="M0 13.33h30V20H0z"/><path fill="#111" d="m15 7.7.76 2.25h2.37l-1.92 1.4.74 2.25L15 12.22l-1.95 1.38.74-2.25-1.92-1.4h2.37z"/>'), code: "+233" },
+    "Nigeria": { flag: flag('<path fill="#008753" d="M0 0h10v20H0zM20 0h10v20H20z"/><path fill="#fff" d="M10 0h10v20H10z"/>'), code: "+234" },
+    "Kenya": { flag: flag('<path fill="#111" d="M0 0h30v6H0z"/><path fill="#fff" d="M0 6h30v2H0zM0 12h30v2H0z"/><path fill="#BB0000" d="M0 8h30v4H0z"/><path fill="#006600" d="M0 14h30v6H0z"/>'), code: "+254" },
+    "South Africa": { flag: flag('<path fill="#DE3831" d="M0 0h30v10H0z"/><path fill="#002395" d="M0 10h30v10H0z"/><path fill="#fff" d="m0 1 14 9L0 19z"/><path fill="#007A4D" d="m0 4 10 6-10 6z"/><path fill="#FFB612" d="m0 6 7 4-7 4z"/><path fill="#111" d="m0 7.5 4.5 2.5L0 12.5z"/>'), code: "+27" },
+    "United Kingdom": { flag: flag('<path fill="#012169" d="M0 0h30v20H0z"/><path stroke="#fff" stroke-width="5" d="m0 0 30 20M30 0 0 20"/><path stroke="#C8102E" stroke-width="2.5" d="m0 0 30 20M30 0 0 20"/><path fill="#fff" d="M12 0h6v20h-6zM0 7h30v6H0z"/><path fill="#C8102E" d="M13.5 0h3v20h-3zM0 8.5h30v3H0z"/>'), code: "+44" },
+    "United States": { flag: flag('<path fill="#fff" d="M0 0h30v20H0z"/><path stroke="#B22234" stroke-width="2" d="M0 1h30M0 5h30M0 9h30M0 13h30M0 17h30"/><path fill="#3C3B6E" d="M0 0h13v10H0z"/><g fill="#fff"><circle cx="2.5" cy="2.5" r=".7"/><circle cx="6.5" cy="2.5" r=".7"/><circle cx="10.5" cy="2.5" r=".7"/><circle cx="4.5" cy="5" r=".7"/><circle cx="8.5" cy="5" r=".7"/><circle cx="2.5" cy="7.5" r=".7"/><circle cx="6.5" cy="7.5" r=".7"/><circle cx="10.5" cy="7.5" r=".7"/></g>'), code: "+1" },
+    "Other": { flag: flag('<rect width="30" height="20" fill="#E7EEF2"/><circle cx="15" cy="10" r="6" fill="none" stroke="#64748B"/><path d="M9 10h12M15 4c3 3 3 9 0 12M15 4c-3 3-3 9 0 12" fill="none" stroke="#64748B"/>'), code: "+" },
+  };
+
   function qs(name) {
     return new URLSearchParams(location.search).get(name) || "";
   }
@@ -308,9 +380,9 @@
     step: 0,
     billing: "monthly",
     business: { company: "", name: "", type: "", teamSize: "", country: "Ghana", email: "", whatsapp: "", password: "" },
-    workflows: [],
+    workflows: ["invoices", "reports", "social", "followups"],
     channels: [],
-    tools: [],
+    tools: ["whatsapp", "instagram", "gmail", "drive"],
     muse: { mode: "token", token: "" },
     submitting: false,
     error: "",
@@ -335,6 +407,10 @@
     }[id];
   }
 
+  function stepNavTitle(id) {
+    return { plan: "Choose Plan", business: "Business Details", muse: "Connect Muse", workflows: "Select Workflows", channels: "Select Channels", tools: "Connect Tools", review: "Review & Confirm", activate: "Activate" }[id];
+  }
+
   const app = document.getElementById("app");
 
   function render() {
@@ -354,7 +430,7 @@
       const active = i === S.step;
       return `<li class="gs-step ${done ? "done" : ""} ${active ? "active" : ""}">
         <span class="n">${done ? ICONS.check : i + 1}</span>
-        <span>${esc(stepTitle(id))}</span>
+        <span>${esc(stepNavTitle(id))}</span>
       </li>`;
     }).join("");
 
@@ -368,8 +444,8 @@
         </aside>
         <main class="gs-main">
           <div class="gs-card">
-            <div class="gs-progress"><span style="width:${((S.step + 1) / total) * 100}%"></span></div>
             <div class="gs-step-label">Step ${S.step + 1} of ${total}</div>
+            <div class="gs-progress" style="grid-template-columns:repeat(${total},1fr)">${flow.map((_, i) => `<span class="${i <= S.step ? "done" : ""}"></span>`).join("")}</div>
             <div id="gsStepBody"></div>
           </div>
         </main>
@@ -411,10 +487,10 @@
     const cards = Object.values(PLANS).map(p => `
       <div class="gs-plan-card ${S.plan === p.key ? "selected" : ""}" data-plan="${p.key}">
         <span class="check">${ICONS.check}</span>
-        <span class="ic">${p.icon}</span>
+        <span class="ic ${p.iconClass || ""}">${p.icon}</span>
         <b>${esc(p.name)}</b>
         <span class="price">${esc(p.usd)} / month</span>
-        <span class="note">${esc(p.users)}</span>
+        <span class="note">${esc(p.note)}</span>
       </div>`).join("");
     return stepShell("You're almost there!", "Which plan would you like to get started with?",
       `<div class="gs-plan-grid">${cards}</div>`, { backLabel: "Back to pricing" });
@@ -424,6 +500,7 @@
   function renderBusinessStep() {
     const b = S.business;
     const solo = S.plan === "free";
+    const country = COUNTRY_META[b.country] || COUNTRY_META.Ghana;
     return stepShell("Tell us about your business", "This helps us set up Buinee for your specific needs.", `
       <div class="gs-grid2">
         <div class="gs-field"><label>${solo ? "Workspace name (optional)" : "Business name"}</label>
@@ -433,18 +510,18 @@
       </div>
       ${solo ? "" : `<div class="gs-grid2">
         <div class="gs-field"><label>Business type</label>
-          <select id="fType">${["", "Retail & Shops", "Restaurants & Cafés", "Health & Clinics", "Schools & Institutions", "Churches", "Hotels & Travel", "Professional Services", "Other"].map(o => `<option ${b.type === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+          <select id="fType">${["", "Retail & Shops", "Restaurants & Cafés", "Health & Clinics", "Schools & Institutions", "Churches", "Hotels & Travel", "Professional Services", "Other"].map(o => `<option value="${esc(o)}" ${b.type === o ? "selected" : ""}>${esc(o || "Select business type")}</option>`).join("")}</select></div>
         <div class="gs-field"><label>Team size</label>
-          <select id="fTeamSize">${["", "Just me", "2-5 people", "6-15 people", "16-50 people", "50+ people"].map(o => `<option ${b.teamSize === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+          <select id="fTeamSize">${["", "Just me", "2-5 people", "6-15 people", "16-50 people", "50+ people"].map(o => `<option value="${esc(o)}" ${b.teamSize === o ? "selected" : ""}>${esc(o || "Select team size")}</option>`).join("")}</select></div>
       </div>`}
       <div class="gs-grid2">
         <div class="gs-field"><label>Country</label>
-          <select id="fCountry">${["Ghana", "Nigeria", "Kenya", "South Africa", "United Kingdom", "United States", "Other"].map(o => `<option ${b.country === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+          <div class="gs-country"><span class="gs-country-flag">${country.flag}</span><select id="fCountry">${Object.keys(COUNTRY_META).map(o => `<option ${b.country === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div></div>
         <div class="gs-field"><label>Email address</label>
           <input id="fEmail" type="email" value="${esc(b.email)}" placeholder="you@business.com"></div>
       </div>
       <div class="gs-field"><label>WhatsApp number (optional)</label>
-        <div class="gs-phone"><input class="code" value="+233" disabled><input id="fWhatsapp" value="${esc(b.whatsapp)}" placeholder="20 123 4567"></div>
+        <div class="gs-phone"><div class="code" aria-label="Country calling code">${country.flag}<span>${country.code}</span></div><input id="fWhatsapp" value="${esc(b.whatsapp)}" placeholder="20 123 4567"></div>
       </div>
       <div class="gs-field"><label>Create a password</label>
         <input id="fPassword" type="password" value="${esc(b.password)}" placeholder="At least 12 characters" autocomplete="new-password"></div>
@@ -473,7 +550,7 @@
   function renderPickStep(list, selected, field) {
     const cards = list.map(w => `
       <div class="gs-pick ${selected.includes(w.id) ? "selected" : ""}" data-id="${w.id}" data-field="${field}">
-        <div class="top"><span class="ic ${w.cls}">${w.icon}</span><span class="chk">${ICONS.check}</span></div>
+        <div class="top"><span class="ic ${w.cls || ""}">${w.img ? `<img src="${w.img}" alt="">` : w.icon}</span><span class="chk">${ICONS.check}</span></div>
         <span class="label">${esc(w.label)}</span>
       </div>`).join("");
     const sub = field === "channels"
@@ -530,10 +607,14 @@
         <div class="gs-plan-summary"><span class="ic">${plan.icon}</span><div><b>${esc(plan.name)}</b><span>${esc(plan.ghs)}</span></div></div>
       `, { nextLabel: S.submitting ? "Creating your workspace…" : "Create my workspace", submitting: S.submitting, nextDisabled: S.submitting });
     }
-    return stepShell("Complete your subscription", "You'll be taken to Paystack's secure page to finish payment.", `
-      <div class="gs-plan-summary"><span class="ic">${plan.icon}</span><div><b>${esc(plan.name)}</b><span>${esc(plan.usd)} / month · ${esc(plan.ghs)}</span></div></div>
-      <div class="gs-secure">${ICONS.lock} Secure payment powered by Paystack. You can cancel anytime.</div>
-    `, { nextLabel: S.submitting ? "Starting payment…" : "Pay with Paystack", submitting: S.submitting, nextDisabled: S.submitting });
+    return stepShell("Complete your subscription", "Confirm your plan, then continue to Paystack to securely complete payment.", `
+      <div class="gs-plan-summary">
+        <span class="ic">${plan.icon}</span>
+        <div><b>${esc(plan.name)}</b><span>${esc(plan.usd)} / month · ${esc(plan.ghs)}</span></div>
+        <button type="button" class="change-plan" id="gsChangePlan">Change plan</button>
+      </div>
+      <div class="gs-secure">${ICONS.lock} Payment is completed securely on Paystack. Buinee does not collect your card or Mobile Money details.</div>
+    `, { nextLabel: S.submitting ? "Opening Paystack…" : "Continue to Paystack", submitting: S.submitting, nextDisabled: S.submitting });
   }
 
   // -------------------------------------------------------- custom agent
@@ -561,6 +642,12 @@
           <img src="/assets/images/buinee-logo.png" alt="Buinee">
           <h2>Custom solutions for your unique business.</h2>
           <p>Tailored AI agents and integrations, scoped around exactly how your operations run.</p>
+          <ul class="gs-custom-points">
+            <li>${ICONS.check} Tailored to your workflows</li>
+            <li>${ICONS.check} Complex integrations</li>
+            <li>${ICONS.check} Dedicated account manager</li>
+            <li>${ICONS.check} Ongoing maintenance</li>
+          </ul>
         </div>
         <div class="gs-custom-form">
           <div class="gs-card" style="box-shadow:none;border:0;max-width:480px">
@@ -639,10 +726,15 @@
       if (typeEl) typeEl.addEventListener("change", e => S.business.type = e.target.value);
       const teamEl = document.getElementById("fTeamSize");
       if (teamEl) teamEl.addEventListener("change", e => S.business.teamSize = e.target.value);
-      document.getElementById("fCountry").addEventListener("change", e => S.business.country = e.target.value);
+      document.getElementById("fCountry").addEventListener("change", e => { S.business.country = e.target.value; renderStepBody("business"); });
       document.getElementById("fEmail").addEventListener("input", e => S.business.email = e.target.value);
       document.getElementById("fWhatsapp").addEventListener("input", e => S.business.whatsapp = e.target.value);
       document.getElementById("fPassword").addEventListener("input", e => S.business.password = e.target.value);
+    }
+
+    if (stepId === "activate") {
+      const changePlan = document.getElementById("gsChangePlan");
+      if (changePlan) changePlan.addEventListener("click", () => { S.error = ""; S.step = 0; render(); });
     }
 
     if (stepId === "muse") {
@@ -747,11 +839,25 @@
   }
 
   function renderSuccess() {
+    const burstColors = ["#08c875", "#22e59a", "#4a91ff", "#ff5576", "#f8c34a", "#8b5cf6", "#16b8c7"];
+    const confetti = Array.from({ length: 56 }, (_, i) => {
+      const angle = ((i * 137.5) + (i % 3) * 11) * Math.PI / 180;
+      const distance = 260 + (i % 7) * 54;
+      const tx = Math.round(Math.cos(angle) * distance);
+      const ty = Math.round(Math.sin(angle) * distance);
+      const color = burstColors[i % burstColors.length];
+      const rotation = (i * 47) % 180;
+      const spin = 320 + (i % 5) * 105;
+      const delay = (i % 9) * .018;
+      const duration = 1.05 + (i % 6) * .09;
+      return `<i class="${i % 4 === 0 ? "spark" : ""}" style="--tx:${tx}px;--ty:${ty}px;--c:${color};--r:${rotation}deg;--spin:${spin}deg;--delay:${delay}s;--dur:${duration}s"></i>`;
+    }).join("");
     app.innerHTML = `
       <div class="gs-shell">
         <main class="gs-main" style="grid-column:1/-1">
           <div class="gs-card" style="max-width:520px">
             <div class="gs-success">
+              <div class="gs-burst" aria-hidden="true">${confetti}</div>
               <div class="badge">${ICONS.check}</div>
               <h2>Welcome to Buinee!</h2>
               <p>Your account is active and your workspace is being set up. We'll start connecting your tools and configuring your workflows.</p>
