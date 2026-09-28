@@ -147,17 +147,17 @@ controls:
   - id: "CTL-GOV-001"
     domain: "GOVERNANCE"
     requirement: "No implementation, scaffolding, or deployment of the landing-redesign build proceeds until the owner explicitly approves this baseline version"
-    status: "PLANNED"
+    status: "VERIFIED"
     owner: "site-owner"
     acceptance: "Owner approval recorded in security-baseline.yaml's approval block with a matching digest"
-    evidence_ids: []
+    evidence_ids: ["EVD-001"]
   - id: "CTL-INFRA-001"
     domain: "INFRASTRUCTURE"
     requirement: "Deny all public HTTP access to .opskeep/ (and any other internal-tooling directory) at the web-server level, not just by filename. Use the same nested-.htaccess pattern already used for storage/ (storage/.htaccess with Require all denied / Deny from all)"
-    status: "IMPLEMENTED"
+    status: "VERIFIED"
     owner: "developer"
     acceptance: "A direct request to https://buinee.app/.opskeep/project-gate/state.json (or any file under it) returns 403/404, verified after deploy"
-    evidence_ids: []
+    evidence_ids: ["EVD-002"]
   - id: "CTL-AUTHZ-001"
     domain: "AUTHORIZATION"
     requirement: "The /pricing and /case-studies CMS schema entries reuse the existing generic _admin_role_request('owner') plus SITE_CONTENT_SCHEMA-driven _handle_admin_site_content_save handler unmodified; no new bespoke save endpoint is written for these pages"
@@ -193,16 +193,16 @@ gates:
     blocking: true
     control_ids: ["CTL-GOV-001"]
     required_evidence: ["EVD-001"]
-    status: "NOT_YET_BUILT"
-    evidence_ids: []
+    status: "VERIFIED"
+    evidence_ids: ["EVD-001"]
   - id: "GATE-002"
     name: "Docroot exposure fix verified before merge"
     stage: "PULL_REQUEST"
     blocking: true
     control_ids: ["CTL-INFRA-001"]
     required_evidence: ["EVD-002"]
-    status: "NOT_YET_BUILT"
-    evidence_ids: []
+    status: "VERIFIED"
+    evidence_ids: ["EVD-002"]
   - id: "GATE-003"
     name: "New admin-write surface code review"
     stage: "PULL_REQUEST"
@@ -235,16 +235,16 @@ decisions:
 evidence:
   - id: "EVD-001"
     type: "OWNER_APPROVAL"
-    status: "NOT_YET_BUILT"
-    observed_at: null
-    observer: null
-    location: null
+    status: "PASSED"
+    observed_at: "2026-09-28"
+    observer: "Prince Caleb (site-owner)"
+    location: "security-baseline.yaml approval block, baseline_version 0.1.0"
   - id: "EVD-002"
     type: "CONFIG_INSPECTION"
-    status: "NOT_YET_BUILT"
-    observed_at: null
-    observer: null
-    location: null
+    status: "PASSED"
+    observed_at: "2026-09-28"
+    observer: "developer"
+    location: "https://buinee.app/.opskeep/project-gate/state.json, /ui/dashboard.html, and /.opskeep/ all returned 403 after deploy of .opskeep/.htaccess"
   - id: "EVD-003"
     type: "MANUAL_REVIEW"
     status: "NOT_YET_BUILT"
