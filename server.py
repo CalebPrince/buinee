@@ -277,6 +277,23 @@ STATIC_ASSETS = {
     "/assets/images/shopify.svg": "assets/images/shopify.svg",
     "/assets/images/slack.svg": "assets/images/slack.svg",
     "/assets/images/google-forms.svg": "assets/images/google-forms.svg",
+    "/assets/images/invoice-hero.png": "assets/images/invoice-hero.png",
+    # Hero images for the remaining template detail pages - not supplied
+    # yet, but pre-registered so dropping a correctly-named file into
+    # assets/images/ is all that's needed (no server change required).
+    "/assets/images/weekly-sales-hero.png": "assets/images/weekly-sales-hero.png",
+    "/assets/images/social-media-hero.png": "assets/images/social-media-hero.png",
+    "/assets/images/customer-follow-ups-hero.png": "assets/images/customer-follow-ups-hero.png",
+    "/assets/images/monthly-financial-summary-hero.png": "assets/images/monthly-financial-summary-hero.png",
+    "/assets/images/expense-report-hero.png": "assets/images/expense-report-hero.png",
+    "/assets/images/social-media-calendar-hero.png": "assets/images/social-media-calendar-hero.png",
+    "/assets/images/product-launch-campaign-hero.png": "assets/images/product-launch-campaign-hero.png",
+    "/assets/images/customer-enquiry-handler-hero.png": "assets/images/customer-enquiry-handler-hero.png",
+    "/assets/images/email-followup-sequence-hero.png": "assets/images/email-followup-sequence-hero.png",
+    "/assets/images/lead-capture-crm-hero.png": "assets/images/lead-capture-crm-hero.png",
+    "/assets/images/document-organizer-hero.png": "assets/images/document-organizer-hero.png",
+    "/assets/images/order-processing-hero.png": "assets/images/order-processing-hero.png",
+    "/assets/images/customer-feedback-report-hero.png": "assets/images/customer-feedback-report-hero.png",
 }
 
 LEGACY_PAGE_REDIRECTS = {

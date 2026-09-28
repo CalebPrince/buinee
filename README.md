@@ -1,23 +1,39 @@
 # Buinee
 
-A multi-tenant back-office approval workspace: prepare a voucher from an
-invoice, get it approved, issue the letter — with real roles, a real
-approval trail, and a signature recorded in the system rather than printed
-and scanned. Vouchers are the first document type built on this, not the
-only thing it's for — the role/approval-trail model (Preparer → Approver →
-Supervisor, visibility running downward only) is deliberately generic, not
-finance-specific.
+**Live at [buinee.app](https://buinee.app).**
 
-This is the product pivot from two earlier bespoke, single-client builds —
-see [Where this came from](#where-this-came-from) below. Nothing here talks
-to those projects; it's a fresh codebase that reuses their proven logic
-(`voucher.py`, `providers.py`) and lessons.
+Buinee is an AI "operations layer" for small and growing African
+businesses: one dashboard that generates and sends invoices, compiles
+sales/financial reports, drafts and schedules social media content,
+captures and answers customer enquiries across WhatsApp/Instagram/
+Facebook, runs email follow-up sequences, keeps a lead/CRM pipeline, files
+documents, and processes orders — each as a pre-built, customizable
+**template** (a named automation with its own "how it works" steps,
+integrations, and settings) rather than a general-purpose workflow builder
+you configure from scratch. The pitch is Muse, the AI assistant baked into
+every template: it drafts the invoice, writes the reply, compiles the
+report — a person reviews and approves rather than doing the manual work.
+Pricing runs Free → Bring Your Own Token → Managed Ops → Custom Agent (see
+[Pricing tiers](#pricing-tiers)), and the whole product is denominated in
+GHS/Ghanaian business context (WhatsApp + mobile money as first-class
+channels, VAT/NHIL/GETFL-aware invoicing) rather than a generic global SaaS
+reskin.
 
-**Status as of 2026-07-21: landing page + full auth (register/join/approve/
-login) are built and browser-tested. The voucher preparation and approval
-loop (manual entry, not AI extraction yet) is built and browser-tested —
-see [Vouchers](#vouchers) below. Invoice upload/AI extraction and the
-payment letter are still not built.**
+**This codebase is mid-pivot.** Everything below "Auth model" was written
+for an earlier product concept — a multi-tenant back-office **voucher
+approval workspace** (prepare a voucher from an invoice, get it approved,
+issue a signed payment letter, Preparer → Approver → Supervisor) — and
+describes `dashboard.html`, `admin.html` and the auth/voucher backend as
+they existed for *that* product. The live marketing site (`index.html`,
+`pricing.html`) and `dashboard.html` have since been rebuilt for the
+automation-templates product described above; the backend sections further
+down (Auth model, Command Center, Vouchers, Mailbox integration, Pricing
+tiers as originally written) have **not** been re-verified against that
+rebuild and may describe routes/behavior that no longer matches the
+front-end, or that still work exactly as documented — treat them as
+unverified history, not current fact, until someone checks. See
+[`dashboard.html`'s app shell](#dashboardhtmls-app-shell) below for what's
+actually current.
 
 ---
 
@@ -360,180 +376,100 @@ are fully separate front doors.
 
 ## `dashboard.html`'s app shell
 
-Rebuilt to match the sidebar-rail + topbar layout used across the other
-Prince Caleb agent dashboards (`outlook-agent`/`excel-agent`'s
-Clerk/Gridwise consoles) — same skeleton, Buinee's own teal/ochre
-tokens instead of their slate/amber or emerald/iris ones. Nine views,
-switched client-side with no page reload:
+The current app shell (this is the up-to-date section — see the note at
+the top of this file). Same visual system as the marketing site
+(`index.html`/`pricing.html`): teal `#08c875` accent, Arial type, pill
+buttons, a fixed near-black sidebar with the real `buinee-logo.png`
+wordmark. Eleven nav destinations, switched client-side with no page
+reload and each carrying its own URL hash (`#templates`, `#workflows`, …)
+so a reload or a shared link lands back on the same view instead of always
+resetting to the dashboard:
 
-- **Overview** — greeting, KPI tiles, and card(s) for "My vouchers" (and
-  "Awaiting your approval" for Approver/Supervisor). Every
-  number shown is real, drawn from `/api/vouchers`, never an invented demo
-  stat — the reference dashboards are sales prototypes and use fabricated
-  activity/metrics; this is a real product, so nothing here is illustrative.
-  The inbox card is live and renders the latest ten headers, unread first.
-  Semantic-only metrics such as emails triaged and replies drafted remain
-  "—" and explicitly say that their workflow is not enabled yet.
-- **Needs your attention** — a role-aware queue before the KPI tiles on every
-  login. Supervisors see pending access and submitted vouchers; approvers see
-  vouchers awaiting review; preparers see returned vouchers; mailbox users see
-  unread inbox mail; team-plan users see unread team messages. Counts refresh
-  every 30 seconds and link directly
-  to the relevant work area. Opening Team chat marks its incoming-message count
-  seen for that conversation and user. Team chat sends a presence heartbeat with
-  the notification refresh: members active within 75 seconds show a green dot;
-  offline members show a red dot and an explicit note that they will see the
-  new-message alert when they return. Unread counts also appear beside the exact
-  group or direct conversation, and the browser tab shows the total open count.
-  Signing out clears presence immediately; an abandoned tab falls back to the
-  75-second activity timeout.
-- **Vouchers** — prepare, submit, approve/reject. See
-  [Vouchers](#vouchers) below.
-- **Flagged** — every voucher visible to this person where `voucher.py`'s
-  `review()` found something arithmetically or procedurally worth a second
-  look (a fallback FX rate, a net payable that doesn't reconcile, etc.) -
-  real data already computed for the Vouchers view, just filtered and
-  surfaced on its own page. Nav item carries a live count badge.
-- **To fix** — the broader actionable exception queue: rejected vouchers,
-  deterministic voucher review notes, issues from user-triggered email
-  analysis, and structured issues saved by read-only automation runs. It
-  never treats an unread header as an issue and deduplicates an email reviewed
-  by both Triage and an automation. Its nav badge and Overview KPI are live.
-- **Triage** — a live split-pane work queue based on the connected mailbox:
-  All/Unread filters, unread count, sender, subject, received time and a
-  detail desk. Triage requests a safe, length-limited plain-text body while
-  the Overview remains header-only; neither view changes mailbox state.
-  A person can run Ada's structured analysis in that same detail desk to get
-  a summary, category, priority, next action, concrete issues, and an editable
-  reply draft when a reply is genuinely needed. Results stay in the browser
-  session and consume the same plan allowance as Ask Ada.
-- **Ask Ada** — an authenticated version of the landing page's demo agent. A
-  general assistant for the person's finance/back-office work - any business
-  question, not a voucher-lookup tool - grounded in their real, role-scoped
-  vouchers for factual claims (`build_voucher_digest`/`build_chat_system` in
-  `server.py`, `/api/chat`). Can also take an attached document: a paperclip
-  button reads a text file client-side (`.txt`/`.md`/`.csv`, capped at 20k
-  chars) and sends it through `providers.py`'s existing `split_docs`/`docs`
-  plumbing, tagged server-side as "attached" - never trusted as reference
-  material, since there's no template library feature to draw from yet.
-  Shows a clear disabled state if no AI provider is configured, rather than a
-  chat box that silently fails - also surfaced as a status pill in the
-  topbar (`assistantPill`, checked via `/api/demo/status`), matching
-  `outlook-agent`'s "Mailbox not connected" pattern. This only ever shows
-  connection *status*, never the key itself - the key stays server-side in
-  `.env`/cPanel env vars, unlike `outlook-agent`'s own Settings page, which
-  by its own code comment stores keys in browser `localStorage` and flags
-  itself as an insecure prototype pattern not meant for production.
-- **Automations** — two real, read-only recipes: Morning triage & brief and
-  Invoice cross-check. Enablement and run history are stored per user; every
-  run checks that user's mailbox connection, company AI plan, and the shared
-  server-side provider configuration. Results are saved for review and no run
-  moves, sends, deletes, or marks mail as read. Recipe definitions live in
-  `AUTOMATION_RECIPES`, while `recipe_key` is open-ended in SQLite, so adding
-  another recipe does not require redesigning the persistence or API.
-  `automation_runner.py` checks connected inboxes for new-message notifications
-  and executes due recipes. It is intended for a cPanel Cron Job every five
-  minutes using the application's virtualenv Python. Mailbox polling stores
-  message IDs and header metadata only—never bodies, attachments, or credentials.
-  The first poll establishes a baseline, so connecting an existing inbox does
-  not create alerts for old mail. For
-  example: `/path/to/virtualenv/bin/python /path/to/app/automation_runner.py`.
-  The page also offers Run now for testing. Auto-file and weekly-send remain
-  visibly unavailable because they would change external state.
-- **Activity** — the real approval trail: every prepare/submit/approve/reject
-  event, who did it and when, scoped by the same downward-only visibility as
-  everywhere else. Backed by a genuine append-only `voucher_events` table
-  (`db.py`), not derived from the vouchers table's own timestamp columns -
-  those only reflect *current* state and are cleared on rejection
-  (`approved_by`/`approved_at` go back to `NULL` so a rejected voucher isn't
-  shown as approved by anyone), which would have silently lost who rejected
-  a voucher and when. `list_activity`/`/api/activity`. Existing vouchers
-  created before this table existed have no history, honestly - nothing was
-  backfilled or invented for them.
-- **Instructions** separates shared governance from each person's working
-  context. The company provider and briefing remain Supervisor-only; every
-  approved user can save private personal instructions and a private reference
-  library (10 files, 25 MB total, 5 MB each). Text/data files and modern Office
-  formats (`.docx`, `.xlsx`, `.pptx`) are extracted to readable text on upload;
-  PDF and supported images are passed natively to models that accept them.
-  RTF is normalized to plain text. Legacy `.doc`/`.xls` files must first be
-  saved in their modern formats. Every document query is scoped by `user_id`,
-  so company role does not grant access to somebody else's files:
-  - **AI provider** - a per-company preference among whichever providers
-    have a key configured on this deployment (`db.set_company_model`,
-    `/api/company/model-options`, `/api/company/set-model`). Falls back to
-    the server default the instant the saved choice isn't configured here
-    (`resolve_provider_model` in `server.py`) - a stale preference can never
-    hard-fail. An optional model-string override sits alongside it. This is
-    `outlook-agent`'s model picker, done as a real per-company setting
-    instead of a per-browser one, since one shared deployment key serves
-    every company - see [Vouchers](#vouchers)'s "Fixed while building Chat"
-    note on why `outlook-agent`'s own approach (keys in `localStorage`)
-    isn't appropriate here.
-  - **Custom instructions** - free text folded into every Chat conversation
-    at the company via `providers.with_briefing` (`db.set_company_briefing`,
-    `/api/company/briefing`) - policies, terminology, tone. Cannot switch off
-    Chat's grounding/safety rules, only add context on top of them.
-  - **Personal instructions and documents** - `user_instructions` and
-    `reference_documents` in SQLite, managed through `/api/user/instructions`
-    and `/api/user/reference-documents/*`. Personal instructions and text
-    references also inform mailbox triage and automations; the full private
-    library is available in Ask Ada.
-- **Team** — the approved roster and role guide are visible to every approved
-  user; the pending-approval queue, plan capacity, and Approve/Reject controls
-  remain Supervisor-only. The signed-in person is marked “You”. Join decisions
-  require confirmation and refresh the roster, queue, empty state, seat count,
-  and live nav badge together; the badge is hidden entirely at zero.
-- **Team chat** — available only when the company is on a plan whose audience
-  is `team` (enforced in both UI and API). It is included automatically in
-  every Team pricing tier and excluded from every Individual/Solo tier; it is
-  not controlled by the separately metered AI assistant setting. Approved
-  members of the same company
-  appear in a conversation rail and can exchange messages with the whole team
-  or privately with one selected colleague. Each message supports up to three
-  files. Downloads are authenticated and restricted to members of that group or
-  direct conversation. “Add to Ada” copies a shared file into the current user's
-  private reference library; it does not expose another user's private
-  instructions or library. Messages are append-only and the dashboard polls for
-  new ones while Team chat is open. The selected conversation survives a page
-  refresh. “Clear conversation” stores a per-user visibility marker: it hides
-  existing messages only for the person clearing them and never deletes another
-  member's copy.
+- **Dashboard** — greeting, four stat tiles (invoices generated, reports
+  ready, new enquiries, follow-ups sent), a "Muse is working in the
+  background" banner, a quick-actions row, a Recent Activity table (scrolls
+  horizontally within its own card rather than compressing columns or
+  leaking a page-level scrollbar), a Muse Assistant chat-preview card, and
+  an Active workflows / Upcoming tasks two-column row. All of the numbers
+  here are still **static sample data** wired to real `/api/*` fetches
+  that currently 401 outside a logged-in session — see
+  [What's left](#whats-left-in-the-dashboardtemplates-rebuild) below.
+- **Templates** — the main thing built in this pass. A gallery of 14
+  named automations (Invoice Automation, Weekly Sales Report, Social Media
+  Content, Customer Follow-ups, Monthly Financial Summary, Expense Report,
+  Social Media Calendar, Product Launch Campaign, Customer Enquiry
+  Handler, Email Follow-up Sequence, Lead Capture & CRM, Document
+  Organizer, Order Processing, Customer Feedback Report), each with:
+  - Category filter pills, a search box, a sort dropdown (Most relevant /
+    Newest first / Name A-Z — genuinely reorders the grid), and a
+    grid/list view toggle.
+  - A compact side drawer (click a card) showing its description, a
+    "What's included" checklist, "Works with" integration icons, and a
+    5-step workflow preview.
+  - A full detail page (click a card's arrow button) with a breadcrumb,
+    rating/reviews/businesses-using-it/time-saved stats, five tabs
+    (Overview / How it works / What's included / Integrations / Reviews)
+    that smooth-scroll to their section, a hero panel, a 5-step "How it
+    works" row, 4 "what's included" cards, sample reviews, and a sidebar
+    with Works With / Template details / working Customization toggles.
+  - **Every one of the 14 templates has its actual supplied hero image**
+    wired in full-bleed (`assets/images/<template-id>-hero.png` — e.g.
+    `invoice-hero.png`, `order-processing-hero.png`), used exactly as
+    supplied, never cropped or regenerated. Any *future* template added
+    without a hero image yet gracefully falls back to a labeled "Hero
+    image pending — drop `<name>-hero.png` into assets/images/" placeholder
+    (an `onerror` handler on the `<img>`), so dropping in a correctly-named
+    file later needs no code change — just register the path once in
+    `server.py`'s `STATIC_ASSETS` allowlist if it isn't already there.
+  - Icons throughout (invoice, sidebar nav, app integrations) are real
+    brand SVGs from the same source already used elsewhere in the repo
+    (Simple Icons) — Google Sheets, QuickBooks, TikTok, Dropbox, HubSpot,
+    Shopify, Slack and Google Forms were added to cover every template's
+    integration row; none are CSS/emoji stand-ins.
+- **Invoices & Payments**, **Reports & Documents**, **Social Media**,
+  **Customer Enquiries**, **Email & Follow-ups**, **Data & Integrations**,
+  **Workflows**, **Activity & Logs**, **Settings** — each is a real nav
+  destination and pane that fetches from its own `/api/*` endpoint (see
+  `SOURCES` in `dashboard.html`'s script) and renders whatever rows come
+  back through a generic normalizer; with no session, they correctly show
+  an empty state rather than fabricated rows.
+- **Header** — search box, a working notifications dropdown (bell icon,
+  unread-count dot that clears on open, a scrollable-but-scrollbar-hidden
+  list, "View all activity" footer link) and a working profile dropdown
+  (avatar/name/org, My profile / Company settings / Billing & plan / Log
+  out) — both close on outside click or Escape, and only one is open at a
+  time.
+- **Sidebar footer** — plan card ("Managed Ops", $89/month, Upgrade
+  button) and a usage-this-month panel (workflows run, documents
+  generated, messages sent, time saved) — same static-sample-data caveat
+  as the dashboard tiles above.
 
-The rail also has the other two visual pieces from the reference dashboards:
-a prominent "New voucher" compose button (opens the Vouchers form directly,
-also mirrored as a hero button next to the Overview greeting), and a
-"Connected" sources panel at the bottom showing **Email inbox — Coming
-soon**. Unlike the reference dashboards, that panel is honest about not
-being wired up to anything — no fake "Connect" button, no fabricated
-connected/live state — since real per-user mailbox OAuth (Microsoft Graph/
-Gmail API) is a genuinely separate, unbuilt feature, not a styling exercise.
-See [What's genuinely missing](#whats-genuinely-missing-dont-assume-it-exists).
+### What's left in the dashboard/templates rebuild
 
-**Fixed while building Chat**: `providers.py`'s `chat()` was hardcoded to a
-leftover outlook-agent persona - literally "You are Ada, an assistant for
-Rufus" - unconditionally prepended to *every* call, including the landing
-page's own demo agent (which was then telling the model it was simultaneously
-"Ada, for Rufus" and "the assistant on Buinee's landing page", with the
-latter absurdly framed as "written by Rufus himself"). This was already live
-on the public demo, not something introduced by this feature. Fixed by making
-`chat()` take the caller's full system prompt as a required argument instead
-of a hardcoded default - the landing page passes its own visitor-facing
-prompt, the dashboard's Chat passes `build_chat_system()`, and `CHAT_SYSTEM`
-itself was rewritten to describe Buinee/vouchers generically instead of
-Rufus/BDDG specifically. Verified the new call shape reaches Anthropic's real
-API correctly (a deliberately invalid key returns their actual 401, not a
-Python `TypeError` from a signature mismatch).
-
-Caught one bug while verifying the KPI tiles: the original draft tried to
-update a `#kpiTeam` span's `textContent` from inside `loadTeam()` before
-that span had even been inserted into the DOM (the KPI HTML was built
-afterward), so the team-member count silently stayed blank. Fixed by
-having `loadTeam`/`loadPending` both return their counts directly, used to
-build the KPI list up front — verified live (logged in as Rufus: "Team
-members" correctly showed 2, approving a pending request correctly moved
-them into the roster and cleared the nav badge; logged in as Doreen, an
-Preparer: Team nav item and its KPIs correctly don't appear).
+- **Nothing here is backed by real business logic yet.** The dashboard
+  tiles, Recent Activity rows, usage panel, and every template's
+  rating/review/business-count numbers are illustrative sample data, not
+  computed from anything — unlike the voucher-workspace sections further
+  down in this file, which are explicit that every number they show is
+  real. Whoever picks this up next should decide whether the templates
+  system connects to real automations or stays a catalog/marketing surface
+  in front of a different execution backend.
+- **"Use this template", "Preview workflow", "Share", and the card "···"
+  menu are not wired to anything.** No backend endpoint exists yet for
+  actually provisioning a template into a workspace.
+- **The notification and profile dropdowns render a fixed, hardcoded
+  list** (`NOTIFICATIONS` in the script) — there's no `/api/notifications`
+  or similar endpoint feeding them yet.
+- **The Templates page's sort/search/filter are real but client-side
+  only** — they operate on the 14 templates already in the page's own
+  `TEMPLATES` array; there's no server-side template catalog to page
+  through.
+- Whether the pre-existing backend (`/api/vouchers`, `/api/payments`,
+  auth, Command Center, etc. — see the rest of this file) is still meant
+  to power any of this, or is legacy from the pre-pivot product, hasn't
+  been resolved. The pane-level `SOURCES` mapping in `dashboard.html` still
+  points at those old endpoint names as a best guess, not a verified
+  contract.
 
 ---
 
