@@ -1,0 +1,5 @@
+{
+  "description": "A multi-tenant back-office approval workspace: prepare a voucher from an invoice, get it approved, issue the letter — with real roles, a real approval trail, and a recorded signature. The Preparer -> Approver -> Supervisor model is deliberately generic, not finance-specific.",
+  "tags": ["Python"],
+  "category": "Internal"
+}
