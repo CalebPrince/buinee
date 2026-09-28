@@ -115,7 +115,7 @@ threats:
     control_ids: ["CTL-INFRA-001"]
     residual_risk: "LOW"
     owner: "site-owner"
-    status: "OPEN"
+    status: "MITIGATED"
   - id: "THR-002"
     component_ids: ["CMP-003", "CMP-002"]
     scenario: "Hand-editing server.py to add the two new CMS-editable pages (pricing, case_studies) introduces a mistake that bypasses or weakens the existing owner-only write check, e.g. a copy-pasted handler that skips _admin_role_request, or a STATIC_PAGES/SITE_CONTENT_SCHEMA key collision with an existing page."
@@ -154,7 +154,7 @@ controls:
   - id: "CTL-INFRA-001"
     domain: "INFRASTRUCTURE"
     requirement: "Deny all public HTTP access to .opskeep/ (and any other internal-tooling directory) at the web-server level, not just by filename. Use the same nested-.htaccess pattern already used for storage/ (storage/.htaccess with Require all denied / Deny from all)"
-    status: "REQUIRED"
+    status: "IMPLEMENTED"
     owner: "developer"
     acceptance: "A direct request to https://buinee.app/.opskeep/project-gate/state.json (or any file under it) returns 403/404, verified after deploy"
     evidence_ids: []

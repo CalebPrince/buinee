@@ -1,0 +1,26 @@
+# Internal design and security review documents live here (project gate
+# packages, security baselines, decision records). Nothing in this
+# directory should ever be served over HTTP.
+#
+# The root .htaccess's dot-file rule only blocks a file whose OWN name
+# starts with a dot (e.g. .env) - it does not block files inside a
+# dot-prefixed directory. Without this file, everything under .opskeep/
+# (including an interactive dashboard.html and the full decision/risk
+# record) is downloadable at https://<site>/.opskeep/... the same way
+# storage/ledgerline.db was before storage/.htaccess existed.
+#
+# This is a seatbelt, not the fix. The fix is that the application root
+# should sit OUTSIDE public_html, so there is no URL that maps here at
+# all. Keep both: if the app is ever moved, this file costs nothing; if
+# this file is ever lost, the layout still protects it.
+
+# Apache 2.4
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
