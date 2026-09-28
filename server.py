@@ -269,6 +269,14 @@ STATIC_ASSETS = {
     "/assets/images/google-drive.svg": "assets/images/google-drive.svg",
     "/assets/images/google-calendar.svg": "assets/images/google-calendar.svg",
     "/assets/images/muse-logo.png": "assets/images/muse-logo.png",
+    "/assets/images/google-sheets.svg": "assets/images/google-sheets.svg",
+    "/assets/images/quickbooks.svg": "assets/images/quickbooks.svg",
+    "/assets/images/tiktok.svg": "assets/images/tiktok.svg",
+    "/assets/images/dropbox.svg": "assets/images/dropbox.svg",
+    "/assets/images/hubspot.svg": "assets/images/hubspot.svg",
+    "/assets/images/shopify.svg": "assets/images/shopify.svg",
+    "/assets/images/slack.svg": "assets/images/slack.svg",
+    "/assets/images/google-forms.svg": "assets/images/google-forms.svg",
 }
 
 LEGACY_PAGE_REDIRECTS = {
