@@ -1,0 +1,42 @@
+{
+  "skill": "Opskeep-project-gate",
+  "version": "1.0.0",
+  "project": "Buinee \u2014 AI Solutions Studio landing page",
+  "status": "approved",
+  "approved_at": "2026-09-28T06:36:56Z",
+  "approval_method": "dashboard",
+  "implementation_authorized": false,
+  "next_gate": "opskeep-security",
+  "direction": {
+    "id": "A",
+    "name": "Studio Green"
+  },
+  "decisions": {
+    "confirmed": 18,
+    "inferred": 0,
+    "open": 0,
+    "blocking": 0,
+    "confirmed_explicitly": 18,
+    "confirmed_by_gate_approval": 0
+  },
+  "state_hash": "872ba8fcf6aa48ac",
+  "files": {
+    "PROJECT.md": "17fdba6a7de6078511e61a962df4890153dcf26bf068cb83a45f10126cc8c741",
+    "assumptions.md": "c68cf57e930918a75cefb192eb471110cdfd6bbda7533014712eaad11ad5a4f3",
+    "decisions.yaml": "f765a1b7aadc2b968d3fa35da01190d3d39a4cf8a8aea532dcddc4c20717eb93",
+    "tokens.json": "ffabd50b71745e2c2d833f3d427e67920382e042b1287004c7e09df7f0f15c05",
+    "DESIGN.md": "c6b4f65678e4324753df47c934b9ba08e78b46370646ae4dce6402cbf8850306",
+    "screens.md": "624080d04042bec8c076e6e90a0eaa658e90ebe6597f0e371f09c6fd6895a7af",
+    "components.md": "8d3f8b5adc1d5c6a1e50424c9efc15934c1422b9fdc840f8b03d02d20c8d6999",
+    "responsive.md": "fe9a85e244fe4db4edea2aa3775a1f89e45543580d3398084ab827b708368172",
+    "accessibility.md": "712a23651cc5d4d24c8f8939ee4b764bfa32340f1fa321bb43651997dd48b0a4",
+    "state.json": "9dc3bdcbde72b294bd1f5e31a87e994b2e46cb6d621e089cb2157a1018e6232f"
+  },
+  "history": [
+    {
+      "at": "2026-09-28T06:36:56Z",
+      "event": "approved",
+      "detail": "via dashboard"
+    }
+  ]
+}

@@ -1,0 +1,458 @@
+{
+  "schema": "opskeep.project-gate/state@1",
+  "project": {
+    "name": "Buinee — AI Solutions Studio landing page",
+    "slug": "buinee-landing-redesign",
+    "one_liner": "Reposition buinee.app from a standalone AI assistant to an AI implementation studio that sets up and customizes tools clients already use (Muse and others) — new landing page identity, structure and copy.",
+    "created": "2026-09-28"
+  },
+  "intent": [
+    {
+      "label": "Product",
+      "value": "Public marketing site for an AI implementation/integration studio (buinee.app)"
+    },
+    {
+      "label": "Primary user",
+      "value": "Ghana-based SMB owners and operators evaluating whether to hire Buinee"
+    },
+    {
+      "label": "Usage",
+      "value": "Occasional, evaluation-driven visits before registering a company"
+    },
+    {
+      "label": "Primary job",
+      "value": "Understand the services on offer, see proof it works, and start onboarding"
+    },
+    {
+      "label": "Platform",
+      "value": "Responsive marketing website — redesign of the existing single-page buinee.app landing page, not a new product"
+    }
+  ],
+  "character": [
+    {
+      "trait": "Trustworthy",
+      "score": 85
+    },
+    {
+      "trait": "Operational / proof-led",
+      "score": 80
+    },
+    {
+      "trait": "Bold",
+      "score": 65
+    },
+    {
+      "trait": "Approachable",
+      "score": 60
+    },
+    {
+      "trait": "Minimal",
+      "score": 40
+    }
+  ],
+  "decisions": [
+    {
+      "id": "PG-001",
+      "area": "project",
+      "title": "Marketing-site redesign, not a new product",
+      "status": "CONFIRMED",
+      "confirmed_via": "interview",
+      "value": "This redesigns buinee.app's public landing page (index.html) and its CMS copy schema. The underlying product — registration, dashboard, billing, admin — is unchanged.",
+      "rationale": "Matches the existing repo (server.py-rendered, CMS-token-driven index.html) and the scope of what the user asked for."
+    },
+    {
+      "id": "PG-002",
+      "area": "project",
+      "title": "Muse is the flagship service, not the only one",
+      "status": "CONFIRMED",
+      "confirmed_via": "interview",
+      "value": "Muse Personal Assistant leads the services list as the flagship integration, alongside WhatsApp Automation, Social Media Management, Business Dashboards, Customer Support Agents, Document & Data Automation, Scheduling & Reminders, and Custom AI Solutions.",
+      "rationale": "User corrected mid-session: \"Muse is only one of the services we offer, not the only service,\" after the supplied mockup already showed this exact 8-card structure."
+    },
+    {
+      "id": "PG-017",
+      "area": "screens",
+      "title": "Services grid: the 8 cards from the mockup",
+      "status": "CONFIRMED",
+      "confirmed_via": "interview",
+      "depends_on": [
+        "PG-002"
+      ],
+      "value": "Muse Personal Assistant, WhatsApp Automation, Social Media Management, Business Dashboards, Customer Support Agents, Document & Data Automation, Scheduling & Reminders, Custom AI Solutions — each with a one-line description and an arrow link."
+    },
+    {
+      "id": "PG-018",
+      "area": "screens",
+      "title": "4-step \"How it works\"",
+      "status": "CONFIRMED",
+      "confirmed_via": "interview",
+      "value": "1. Understand Your Business — 2. Set Up & Integrate — 3. Customize Workflows — 4. You Stay in Control, exactly as laid out in the supplied mockup."
+    },
+    {
+      "id": "PG-015",
+      "area": "visual",
+      "title": "Hero uses the supplied photograph, not an illustration",
+      "status": "CONFIRMED",
+      "confirmed_via": "interview",
+      "value": "hero-image1.png (person relaxing, laptop + phone dashboard mockups, WhatsApp/Instagram/Facebook bubbles) is the literal hero asset.",
+      "rationale": "User supplied this file specifically alongside the full-page mockup, which places the same image in the hero."
+    },
+    {
+      "id": "PG-003",
+      "area": "visual",
+      "title": "New accent colour: mint/spring green, replacing the current teal",
+      "status": "CONFIRMED",
+      "value": "Brand accent sampled directly from the supplied logo/ad: #27F997 (logo mark, \"buinee.app\" wordmark) and #48EE94 (ad CTA pill) — the same hue family. A deeper, text-safe shade is derived for links/body copy on light backgrounds to meet 4.5:1 contrast; the bright mint is reserved for buttons, badges and icon fills on dark or white surfaces.",
+      "rationale": "Pixel-sampled from buinee-logo.png and buinee-ad.png rather than guessed — a supplied visual reference is the source of truth over the current site's teal tokens.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-004",
+      "area": "visual",
+      "title": "Bold grotesque-sans headline, dropping the current serif hero",
+      "status": "CONFIRMED",
+      "depends_on": [
+        "PG-003"
+      ],
+      "value": "Headlines (\"Stop spending time formatting and doing reports.\") are set in a bold sans, not the current site's serif display face.",
+      "rationale": "Directly visible in the supplied mockup and ad creative; treated as source of truth per house style for visual references.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-014",
+      "area": "visual",
+      "title": "Neutral white/light-grey surfaces, not the current warm cream",
+      "status": "CONFIRMED",
+      "depends_on": [
+        "PG-003"
+      ],
+      "value": "Light sections sample as pure white (#FFFFFF) page background with #F8F9FA card surfaces — a neutral palette, replacing the current site's warm cream (#F6F4EF/#EFECE5). Dark sections (hero, footer, testimonial band) sample near-black with a faint green cast (~#000B0F), close to the current dark theme's existing tokens, so the dark side of the palette carries over largely unchanged.",
+      "rationale": "Pixel-sampled from the supplied full-page mockup.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-005",
+      "area": "screens",
+      "title": "Stays a single page with anchor navigation",
+      "status": "CONFIRMED",
+      "value": "Home, Services, How It Works and Industries remain anchor-linked sections on one continuous page, matching both the current site's architecture (nav already uses #anchor links) and the mockup's continuous scroll layout.",
+      "rationale": "No signal this needs to become a multi-page app; changing architecture would be a much larger, un-asked-for undertaking.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-006",
+      "area": "screens",
+      "title": "Pricing and Case Studies: anchor or separate page?",
+      "status": "CONFIRMED",
+      "depends_on": [
+        "PG-005"
+      ],
+      "rationale": "The mockup's nav lists Pricing and Case Studies as top-level items, but the one continuous page it shows doesn't render dedicated sections for either — Pricing has no visible section and Case Studies isn't drawn at all (only a single testimonial slide).",
+      "question": "Pricing already exists as a section on the current site. Case Studies doesn't exist anywhere yet. Should both stay as anchor sections on the one page (fastest, matches today), or become real subpages?",
+      "options": [
+        {
+          "value": "anchor",
+          "label": "Both stay anchor sections",
+          "hint": "Fastest — extend the existing Pricing section, add a short Case Studies section on the same page"
+        },
+        {
+          "value": "subpages",
+          "label": "Both become separate pages",
+          "hint": "/pricing and /case-studies — more room to grow each, more build effort now"
+        },
+        {
+          "value": "mixed",
+          "label": "Pricing stays an anchor, Case Studies becomes its own page",
+          "hint": "Pricing already works as a section; case studies benefit from more room and can be added incrementally"
+        }
+      ],
+      "value": "Both become separate pages",
+      "choice": "subpages",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-016",
+      "area": "project",
+      "title": "Rights to display Muse's name and logo",
+      "status": "CONFIRMED",
+      "rationale": "The mockup reproduces Muse's name and blue swirl mark directly (\"Powered by Muse\", app screens labelled \"Muse\"). Using a third party's brand mark without confirmed rights is a real legal exposure regardless of how the business relationship is framed in copy.",
+      "question": "Do you have confirmed partner/reseller rights to use Muse's name and logo on the site as shown in the mockup, or should the integration be referenced without reproducing their brand mark?",
+      "options": [
+        {
+          "value": "licensed",
+          "label": "Yes, rights confirmed",
+          "hint": "Use Muse's name and logo mark as shown in the mockup"
+        },
+        {
+          "value": "name_only",
+          "label": "Name only, no logo",
+          "hint": "Reference \"Muse\" by name/description; don't reproduce their logo"
+        },
+        {
+          "value": "generic",
+          "label": "Don't name Muse specifically",
+          "hint": "Describe the capability generically instead"
+        }
+      ],
+      "value": "Yes, rights confirmed",
+      "choice": "licensed",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-008",
+      "area": "screens",
+      "title": "Existing proven sections carry over beneath the new structure",
+      "status": "CONFIRMED",
+      "value": "The integrations logo strip, the detailed invoice-approval workspace demo, and the FAQ accordion from the current page are restyled to the new identity and kept, slotted in below the mockup's Services/How-it-works/Industries sections rather than dropped.",
+      "rationale": "The mockup is a reference for the new top-of-page identity and structure, not necessarily an exhaustive spec of every section — dropping working content the mockup simply didn't render that far down would be a silent regression.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-007",
+      "area": "project",
+      "title": "Keep the CMS-editable text system",
+      "status": "CONFIRMED",
+      "value": "All new headline/body copy is still routed through the existing {{cms:...}} token system, with SITE_CONTENT_SCHEMA in server.py updated to match the new sections, so the admin Site Contents page keeps working for the new copy.",
+      "rationale": "Existing infrastructure already solves this; rebuilding the page as static hardcoded copy would silently remove an admin capability that works today.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-009",
+      "area": "users",
+      "title": "Primary audience: Ghana-based SMB owners/operators",
+      "status": "CONFIRMED",
+      "confirmed_via": "interview",
+      "value": "Retail, restaurants, health/clinics, schools, churches, hotels and professional-services owners — matches the mockup's \"Trusted by local businesses\" industry strip, GHS-denominated pricing, and the Accra-attributed testimonial."
+    },
+    {
+      "id": "PG-010",
+      "area": "users",
+      "title": "Occasional, evaluation-driven visits",
+      "status": "CONFIRMED",
+      "value": "Visitors browse a handful of times to decide, then register once — not a daily-use surface.",
+      "rationale": "Standard for a marketing/conversion site; nothing in the brief suggests otherwise.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-011",
+      "area": "ux",
+      "title": "Low-stakes interactions on the public site",
+      "status": "CONFIRMED",
+      "value": "Nothing on the public page is destructive; no confirmation dialogs needed outside the existing registration/payment flows, which are out of scope for this redesign.",
+      "rationale": "Marketing pages carry no real risk beyond a misread CTA.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-012",
+      "area": "responsive",
+      "title": "Full mobile parity",
+      "status": "CONFIRMED",
+      "value": "Every new section reflows to a clean single-column mobile layout; nothing is hidden or degraded on phone.",
+      "rationale": "The current site is already fully responsive and this is a conversion-focused public page — standard practice, not a judgment call worth blocking on.",
+      "confirmed_via": "explicit"
+    },
+    {
+      "id": "PG-013",
+      "area": "accessibility",
+      "title": "WCAG 2.2 AA baseline",
+      "status": "CONFIRMED",
+      "value": "Full keyboard operation, visible focus states, 4.5:1 text contrast (driving the deeper green text token in PG-003), labelled controls.",
+      "rationale": "Always-on baseline regardless of brief.",
+      "confirmed_via": "explicit"
+    }
+  ],
+  "conflicts": [],
+  "directions": [
+    {
+      "id": "A",
+      "name": "Studio Green",
+      "tagline": "The supplied mockup, built out: mint identity, dark photographic hero, services-first structure.",
+      "fit": "Directly matches the reference the user supplied — new logo, new accent, new headline system, new services-grid framing. Lowest translation risk between what was approved and what gets shipped.",
+      "tradeoffs": "Full visual-identity swap (accent, type weight, surface palette) is more work than a copy-only reframe, and the dark-hero-photo + green-badge motif needs to be threaded consistently through sections the mockup didn't fully render (pricing, FAQ).",
+      "preview": {
+        "nav": "top",
+        "density": 2,
+        "radius": 14,
+        "surface": "elevated",
+        "palette": {
+          "bg": "#ffffff",
+          "surface": "#f8f9fa",
+          "accent": "#087a4b",
+          "ink": "#0b1210",
+          "line": "#e3e7e4"
+        }
+      },
+      "foundation": {
+        "Theme": "Light sections + dark hero/footer/testimonial band",
+        "Navigation": "Top pill nav, anchor links (Home/Services/How It Works/Pricing/Industries)",
+        "Content width": "Centered, ~1200px max",
+        "Density": "Medium, generous section padding",
+        "Corner radius": "14px cards, 999px pills for buttons/badges",
+        "Typography": "Bold grotesque sans for headlines, current body sans retained",
+        "Primary interaction": "Service cards + step-numbered how-it-works + proof/testimonial band",
+        "Mobile strategy": "Full single-column reflow",
+        "Animation": "Subtle entrance/hover only",
+        "Icons": "Rounded line icons in tinted colour-chip badges, matching the ad creative"
+      },
+      "tokens": {
+        "color": {
+          "bg": "#ffffff",
+          "surface": "#f8f9fa",
+          "border": "#e3e7e4",
+          "text": "#0b1210",
+          "muted": "#5c6b64",
+          "primary": "#087a4b",
+          "primary_contrast": "#ffffff",
+          "success": "#0e9f63",
+          "warning": "#8a5a00",
+          "danger": "#a11d12"
+        },
+        "radius": {
+          "sm": 8,
+          "md": 14,
+          "lg": 20
+        },
+        "font": {
+          "sans": "Inter, system-ui, sans-serif",
+          "mono": "ui-monospace, SFMono-Regular, Menlo, monospace"
+        },
+        "space": {
+          "unit": 4
+        },
+        "density": {
+          "row_height": 40
+        },
+        "color_dark": {
+          "bg": "#000b0f",
+          "surface": "#0c1613",
+          "border": "#1c2a25",
+          "text": "#eef4f1",
+          "muted": "#9fb0a8",
+          "primary": "#27f997",
+          "primary_contrast": "#00150d",
+          "success": "#27f997",
+          "warning": "#f2c26b",
+          "danger": "#ff9d92"
+        }
+      }
+    },
+    {
+      "id": "B",
+      "name": "Minimal Reframe",
+      "tagline": "Same current visual identity (teal, serif hero), only the copy and section order change to the services framing.",
+      "fit": "Lowest effort and lowest visual risk — reuses every existing style token, just rewrites headlines/sections to lead with \"services we implement\" instead of \"your AI assistant.\"",
+      "tradeoffs": "Doesn't use the new logo, mint accent or the supplied hero photo/ad creative at all — the delivered page would look nothing like what was sent for reference, which is the opposite of what a visual reference is for.",
+      "preview": {
+        "nav": "top",
+        "density": 1,
+        "radius": 6,
+        "surface": "flat",
+        "palette": {
+          "bg": "#f6f4ef",
+          "surface": "#ffffff",
+          "accent": "#0e5d57",
+          "ink": "#101619",
+          "line": "#dedad0"
+        }
+      },
+      "foundation": {
+        "Theme": "Light-first, current warm cream palette",
+        "Navigation": "Top pill nav, anchor links",
+        "Content width": "Centered, ~1200px max",
+        "Density": "Airy, current spacing scale",
+        "Corner radius": "6px, current scale",
+        "Typography": "Current serif display + sans body, unchanged",
+        "Primary interaction": "Same section shapes, reworded and reordered",
+        "Mobile strategy": "Full single-column reflow (already true today)",
+        "Animation": "None beyond current",
+        "Icons": "Current line-icon set, unchanged"
+      },
+      "tokens": {
+        "color": {
+          "bg": "#f6f4ef",
+          "surface": "#ffffff",
+          "border": "#dedad0",
+          "text": "#101619",
+          "muted": "#5c6b64",
+          "primary": "#0e5d57",
+          "primary_contrast": "#ffffff",
+          "success": "#0e5d57",
+          "warning": "#7a4700",
+          "danger": "#a11d12"
+        },
+        "radius": {
+          "sm": 4,
+          "md": 6,
+          "lg": 10
+        },
+        "font": {
+          "sans": "system-ui, sans-serif",
+          "mono": "ui-monospace, SFMono-Regular, Menlo, monospace"
+        },
+        "space": {
+          "unit": 4
+        },
+        "density": {
+          "row_height": 40
+        },
+        "color_dark": {
+          "bg": "#0e1315",
+          "surface": "#151b1e",
+          "border": "#262f33",
+          "text": "#eef1f0",
+          "muted": "#8b9599",
+          "primary": "#4fb3a6",
+          "primary_contrast": "#0a1a17",
+          "success": "#4fb3a6",
+          "warning": "#f2c26b",
+          "danger": "#ff9d92"
+        }
+      }
+    }
+  ],
+  "selected_direction": "A",
+  "risks": [
+    {
+      "id": "R-01",
+      "severity": "high",
+      "text": "Using Muse's name/logo without confirmed rights is a real legal exposure — blocked on PG-016."
+    },
+    {
+      "id": "R-02",
+      "severity": "med",
+      "text": "Scope of Pricing/Case Studies (anchor vs subpage, PG-006) changes build effort meaningfully — subpages mean new routes, new CMS schema pages, new SITE_CONTENT_SCHEMA entries."
+    },
+    {
+      "id": "R-03",
+      "severity": "low",
+      "text": "The bright mint (#27F997) fails text contrast on white and must only be used for large text, buttons or dark-surface contexts — the deeper #0e9f63 carries body text and links."
+    },
+    {
+      "id": "R-04",
+      "severity": "low",
+      "text": "Threading the new identity through sections the mockup didn't render (pricing cards, FAQ, integrations strip) means some visual decisions will be extrapolated, not directly copied."
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "AS-01",
+      "text": "Registration, login, dashboard, admin and billing flows are unchanged — this redesign is scoped to the public landing page and its CMS schema only."
+    },
+    {
+      "id": "AS-02",
+      "text": "The 8 services listed in the mockup are the current, accurate list of what Buinee offers today."
+    }
+  ],
+  "gate": {
+    "status": "approved",
+    "history": [
+      {
+        "at": "2026-09-28T06:36:56Z",
+        "event": "approved",
+        "detail": "via dashboard"
+      }
+    ],
+    "approved_at": "2026-09-28T06:36:56Z",
+    "approval_method": "dashboard"
+  }
+}

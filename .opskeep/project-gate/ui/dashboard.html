@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buinee — AI Solutions Studio landing page Project Gate</title>
+<style>
+:root{
+  --bg:#f6f6f3;--panel:#ffffff;--ink:#16181d;--muted:#565d6b;--line:#dfe1e6;--line-strong:#c7cad2;
+  --accent:#2447b8;--accent-ink:#ffffff;--accent-soft:#e8edfb;
+  --ok:#0f6a3b;--ok-bg:#e3f3ea;--warn:#7a4700;--warn-bg:#fcefd6;--bad:#a11d12;--bad-bg:#fbe7e4;
+  --info:#28449a;--info-bg:#e8edfb;--neutral:#3f4652;--neutral-bg:#eceef1;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 6px 20px rgba(16,24,40,.05);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1115;--panel:#171a20;--ink:#eceef2;--muted:#a3aab8;--line:#2a2f39;--line-strong:#3a4150;
+  --accent:#8fb0ff;--accent-ink:#0b1020;--accent-soft:#1c2540;
+  --ok:#66d19a;--ok-bg:#12301f;--warn:#f2c26b;--warn-bg:#33270d;--bad:#ff9d92;--bad-bg:#3a1714;
+  --info:#a9c0ff;--info-bg:#1c2540;--neutral:#c5cad4;--neutral-bg:#232833;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);}}
+:root[data-theme="dark"]{
+  --bg:#0f1115;--panel:#171a20;--ink:#eceef2;--muted:#a3aab8;--line:#2a2f39;--line-strong:#3a4150;
+  --accent:#8fb0ff;--accent-ink:#0b1020;--accent-soft:#1c2540;
+  --ok:#66d19a;--ok-bg:#12301f;--warn:#f2c26b;--warn-bg:#33270d;--bad:#ff9d92;--bad-bg:#3a1714;
+  --info:#a9c0ff;--info-bg:#1c2540;--neutral:#c5cad4;--neutral-bg:#232833;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+button,input,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;line-height:1.2;letter-spacing:-.01em}
+p{margin:0}
+[hidden]{display:none!important}
+.mono{font-family:var(--mono)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.hint,.why{color:var(--muted);font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+.btn{border:1px solid var(--line-strong);background:var(--panel);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:not-allowed;filter:none}
+.link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:13px}
+.link.on{color:var(--accent);font-weight:600}
+
+.pill{display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.04em;text-transform:uppercase;padding:4px 7px;border-radius:999px;white-space:nowrap}
+.s-CONFIRMED{background:var(--ok-bg);color:var(--ok)}
+.s-INFERRED{background:var(--info-bg);color:var(--info)}
+.s-PROPOSED{background:var(--neutral-bg);color:var(--neutral)}
+.s-NEEDS_INPUT{background:var(--warn-bg);color:var(--warn)}
+.s-REJECTED{background:var(--bad-bg);color:var(--bad)}
+.s-SUPERSEDED{background:var(--neutral-bg);color:var(--muted);text-decoration:line-through}
+
+input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--panel)}
+textarea{resize:vertical;min-height:72px}
+
+.meter{height:8px;background:var(--neutral-bg);border-radius:99px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .3s ease}
+
+.mini{display:block;width:100%;height:auto;border-radius:6px}
+
+.result{margin-top:14px;padding:14px;border:1px solid var(--line-strong);border-radius:10px;background:var(--panel)}
+.result h3{font-size:15px;margin-bottom:4px}
+.result textarea{font:12px/1.4 var(--mono);min-height:110px;margin:10px 0}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.wrap{max-width:1180px;margin:0 auto;padding:24px 16px 64px}
+.head{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end;margin-bottom:18px}
+.head h1{font-size:30px;margin-top:8px}
+.head .sub{color:var(--muted);margin-top:4px;max-width:64ch}
+.ready{min-width:260px;flex:1;max-width:420px}
+.ready .big{font:700 28px/1 var(--mono);display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.ready .big small{font:600 11px var(--mono);color:var(--muted);letter-spacing:.1em}
+.counts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.banner{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+.layout{display:grid;gap:24px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 330px;align-items:start}}
+section.blk{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px;box-shadow:var(--shadow)}
+section.blk>h2{font:700 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:8px 16px;margin:0;font-size:14px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+@media (max-width:560px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+.trait{display:grid;grid-template-columns:110px 1fr 44px;gap:12px;align-items:center;font-size:14px;margin:8px 0}
+.trait b{font:600 13px var(--mono);text-align:right}
+.block-need{border-color:var(--warn)}
+.need{padding:14px 0;border-top:1px solid var(--line)}
+.need:first-of-type{border-top:0;padding-top:0}
+.need h3{font-size:16px;margin:6px 0}
+.opts{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-top:10px}
+.opt{text-align:left;border:1.5px solid var(--line-strong);background:var(--panel);border-radius:10px;padding:10px 12px;cursor:pointer}
+.opt:hover{border-color:var(--accent);background:var(--accent-soft)}
+.opt b{display:block;font-size:14px}.opt small{color:var(--muted)}
+.area-h{font-size:15px;margin:18px 0 6px}
+.area-h:first-of-type{margin-top:0}
+ul.decs{list-style:none;margin:0;padding:0}
+.dec{padding:12px 0;border-top:1px solid var(--line)}
+.dec:first-child{border-top:0}
+.dec.muted{opacity:.55}
+.dec-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dec-head .id{font-size:12px;color:var(--muted)}
+.dec-title{font-weight:650;flex:1;min-width:160px}
+.dec-val{margin-top:4px}
+.dec-why{margin-top:2px;color:var(--muted);font-size:13px}
+.dec .row{margin-top:8px}
+.dec.changed{border-left:3px solid var(--accent);padding-left:12px;margin-left:-15px}
+.dirs{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.dir{border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--panel)}
+.dir.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dir-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dir-top h3{font-size:16px;flex:1}
+.dir .detail{font-size:13px;display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.dir .detail dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}
+.dir .detail dt{color:var(--muted)}.dir .detail dd{margin:0;text-align:right}
+.swatchrow{display:flex;gap:4px}.swatchrow i{width:18px;height:18px;border-radius:5px;border:1px solid var(--line)}
+table.found{width:100%;border-collapse:collapse;font-size:14px}
+table.found td{padding:7px 0;border-top:1px solid var(--line)}
+table.found td:first-child{color:var(--muted);width:42%}
+.risk{display:flex;gap:10px;font-size:14px;padding:6px 0}
+.rail{position:sticky;top:12px}
+@media (max-width:999px){.rail{position:static}}
+.gate{border:2px solid var(--warn);border-radius:14px;padding:18px;background:var(--panel);box-shadow:var(--shadow)}
+.gate.ok{border-color:var(--ok)}
+.gate .state{font:700 15px var(--mono);color:var(--warn);margin:8px 0 4px}
+.gate .fine{font-size:13px;color:var(--muted);margin-bottom:12px}
+.gate ul{margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--warn)}
+.gate .btns{display:grid;gap:8px}
+.gate .btns .btn{padding:10px 14px}
+.gate textarea{margin:10px 0;min-height:64px}
+.confirm{border:1px solid var(--line-strong);background:var(--neutral-bg);border-radius:10px;padding:12px;font-size:13px;margin-top:10px;display:grid;gap:10px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>const DATA={"state": {"schema": "opskeep.project-gate/state@1", "project": {"name": "Buinee \u2014 AI Solutions Studio landing page", "slug": "buinee-landing-redesign", "one_liner": "Reposition buinee.app from a standalone AI assistant to an AI implementation studio that sets up and customizes tools clients already use (Muse and others) \u2014 new landing page identity, structure and copy.", "created": "2026-09-28"}, "intent": [{"label": "Product", "value": "Public marketing site for an AI implementation/integration studio (buinee.app)"}, {"label": "Primary user", "value": "Ghana-based SMB owners and operators evaluating whether to hire Buinee"}, {"label": "Usage", "value": "Occasional, evaluation-driven visits before registering a company"}, {"label": "Primary job", "value": "Understand the services on offer, see proof it works, and start onboarding"}, {"label": "Platform", "value": "Responsive marketing website \u2014 redesign of the existing single-page buinee.app landing page, not a new product"}], "character": [{"trait": "Trustworthy", "score": 85}, {"trait": "Operational / proof-led", "score": 80}, {"trait": "Bold", "score": 65}, {"trait": "Approachable", "score": 60}, {"trait": "Minimal", "score": 40}], "decisions": [{"id": "PG-001", "area": "project", "title": "Marketing-site redesign, not a new product", "status": "CONFIRMED", "confirmed_via": "interview", "value": "This redesigns buinee.app's public landing page (index.html) and its CMS copy schema. The underlying product \u2014 registration, dashboard, billing, admin \u2014 is unchanged.", "rationale": "Matches the existing repo (server.py-rendered, CMS-token-driven index.html) and the scope of what the user asked for."}, {"id": "PG-002", "area": "project", "title": "Muse is the flagship service, not the only one", "status": "CONFIRMED", "confirmed_via": "interview", "value": "Muse Personal Assistant leads the services list as the flagship integration, alongside WhatsApp Automation, Social Media Management, Business Dashboards, Customer Support Agents, Document & Data Automation, Scheduling & Reminders, and Custom AI Solutions.", "rationale": "User corrected mid-session: \"Muse is only one of the services we offer, not the only service,\" after the supplied mockup already showed this exact 8-card structure."}, {"id": "PG-017", "area": "screens", "title": "Services grid: the 8 cards from the mockup", "status": "CONFIRMED", "confirmed_via": "interview", "depends_on": ["PG-002"], "value": "Muse Personal Assistant, WhatsApp Automation, Social Media Management, Business Dashboards, Customer Support Agents, Document & Data Automation, Scheduling & Reminders, Custom AI Solutions \u2014 each with a one-line description and an arrow link."}, {"id": "PG-018", "area": "screens", "title": "4-step \"How it works\"", "status": "CONFIRMED", "confirmed_via": "interview", "value": "1. Understand Your Business \u2014 2. Set Up & Integrate \u2014 3. Customize Workflows \u2014 4. You Stay in Control, exactly as laid out in the supplied mockup."}, {"id": "PG-015", "area": "visual", "title": "Hero uses the supplied photograph, not an illustration", "status": "CONFIRMED", "confirmed_via": "interview", "value": "hero-image1.png (person relaxing, laptop + phone dashboard mockups, WhatsApp/Instagram/Facebook bubbles) is the literal hero asset.", "rationale": "User supplied this file specifically alongside the full-page mockup, which places the same image in the hero."}, {"id": "PG-003", "area": "visual", "title": "New accent colour: mint/spring green, replacing the current teal", "status": "INFERRED", "value": "Brand accent sampled directly from the supplied logo/ad: #27F997 (logo mark, \"buinee.app\" wordmark) and #48EE94 (ad CTA pill) \u2014 the same hue family. A deeper, text-safe shade is derived for links/body copy on light backgrounds to meet 4.5:1 contrast; the bright mint is reserved for buttons, badges and icon fills on dark or white surfaces.", "rationale": "Pixel-sampled from buinee-logo.png and buinee-ad.png rather than guessed \u2014 a supplied visual reference is the source of truth over the current site's teal tokens."}, {"id": "PG-004", "area": "visual", "title": "Bold grotesque-sans headline, dropping the current serif hero", "status": "INFERRED", "depends_on": ["PG-003"], "value": "Headlines (\"Stop spending time formatting and doing reports.\") are set in a bold sans, not the current site's serif display face.", "rationale": "Directly visible in the supplied mockup and ad creative; treated as source of truth per house style for visual references."}, {"id": "PG-014", "area": "visual", "title": "Neutral white/light-grey surfaces, not the current warm cream", "status": "INFERRED", "depends_on": ["PG-003"], "value": "Light sections sample as pure white (#FFFFFF) page background with #F8F9FA card surfaces \u2014 a neutral palette, replacing the current site's warm cream (#F6F4EF/#EFECE5). Dark sections (hero, footer, testimonial band) sample near-black with a faint green cast (~#000B0F), close to the current dark theme's existing tokens, so the dark side of the palette carries over largely unchanged.", "rationale": "Pixel-sampled from the supplied full-page mockup."}, {"id": "PG-005", "area": "screens", "title": "Stays a single page with anchor navigation", "status": "INFERRED", "value": "Home, Services, How It Works and Industries remain anchor-linked sections on one continuous page, matching both the current site's architecture (nav already uses #anchor links) and the mockup's continuous scroll layout.", "rationale": "No signal this needs to become a multi-page app; changing architecture would be a much larger, un-asked-for undertaking."}, {"id": "PG-006", "area": "screens", "title": "Pricing and Case Studies: anchor or separate page?", "status": "NEEDS_INPUT", "depends_on": ["PG-005"], "rationale": "The mockup's nav lists Pricing and Case Studies as top-level items, but the one continuous page it shows doesn't render dedicated sections for either \u2014 Pricing has no visible section and Case Studies isn't drawn at all (only a single testimonial slide).", "question": "Pricing already exists as a section on the current site. Case Studies doesn't exist anywhere yet. Should both stay as anchor sections on the one page (fastest, matches today), or become real subpages?", "options": [{"value": "anchor", "label": "Both stay anchor sections", "hint": "Fastest \u2014 extend the existing Pricing section, add a short Case Studies section on the same page"}, {"value": "subpages", "label": "Both become separate pages", "hint": "/pricing and /case-studies \u2014 more room to grow each, more build effort now"}, {"value": "mixed", "label": "Pricing stays an anchor, Case Studies becomes its own page", "hint": "Pricing already works as a section; case studies benefit from more room and can be added incrementally"}]}, {"id": "PG-016", "area": "project", "title": "Rights to display Muse's name and logo", "status": "NEEDS_INPUT", "rationale": "The mockup reproduces Muse's name and blue swirl mark directly (\"Powered by Muse\", app screens labelled \"Muse\"). Using a third party's brand mark without confirmed rights is a real legal exposure regardless of how the business relationship is framed in copy.", "question": "Do you have confirmed partner/reseller rights to use Muse's name and logo on the site as shown in the mockup, or should the integration be referenced without reproducing their brand mark?", "options": [{"value": "licensed", "label": "Yes, rights confirmed", "hint": "Use Muse's name and logo mark as shown in the mockup"}, {"value": "name_only", "label": "Name only, no logo", "hint": "Reference \"Muse\" by name/description; don't reproduce their logo"}, {"value": "generic", "label": "Don't name Muse specifically", "hint": "Describe the capability generically instead"}]}, {"id": "PG-008", "area": "screens", "title": "Existing proven sections carry over beneath the new structure", "status": "PROPOSED", "value": "The integrations logo strip, the detailed invoice-approval workspace demo, and the FAQ accordion from the current page are restyled to the new identity and kept, slotted in below the mockup's Services/How-it-works/Industries sections rather than dropped.", "rationale": "The mockup is a reference for the new top-of-page identity and structure, not necessarily an exhaustive spec of every section \u2014 dropping working content the mockup simply didn't render that far down would be a silent regression."}, {"id": "PG-007", "area": "project", "title": "Keep the CMS-editable text system", "status": "PROPOSED", "value": "All new headline/body copy is still routed through the existing {{cms:...}} token system, with SITE_CONTENT_SCHEMA in server.py updated to match the new sections, so the admin Site Contents page keeps working for the new copy.", "rationale": "Existing infrastructure already solves this; rebuilding the page as static hardcoded copy would silently remove an admin capability that works today."}, {"id": "PG-009", "area": "users", "title": "Primary audience: Ghana-based SMB owners/operators", "status": "CONFIRMED", "confirmed_via": "interview", "value": "Retail, restaurants, health/clinics, schools, churches, hotels and professional-services owners \u2014 matches the mockup's \"Trusted by local businesses\" industry strip, GHS-denominated pricing, and the Accra-attributed testimonial."}, {"id": "PG-010", "area": "users", "title": "Occasional, evaluation-driven visits", "status": "INFERRED", "value": "Visitors browse a handful of times to decide, then register once \u2014 not a daily-use surface.", "rationale": "Standard for a marketing/conversion site; nothing in the brief suggests otherwise."}, {"id": "PG-011", "area": "ux", "title": "Low-stakes interactions on the public site", "status": "INFERRED", "value": "Nothing on the public page is destructive; no confirmation dialogs needed outside the existing registration/payment flows, which are out of scope for this redesign.", "rationale": "Marketing pages carry no real risk beyond a misread CTA."}, {"id": "PG-012", "area": "responsive", "title": "Full mobile parity", "status": "INFERRED", "value": "Every new section reflows to a clean single-column mobile layout; nothing is hidden or degraded on phone.", "rationale": "The current site is already fully responsive and this is a conversion-focused public page \u2014 standard practice, not a judgment call worth blocking on."}, {"id": "PG-013", "area": "accessibility", "title": "WCAG 2.2 AA baseline", "status": "INFERRED", "value": "Full keyboard operation, visible focus states, 4.5:1 text contrast (driving the deeper green text token in PG-003), labelled controls.", "rationale": "Always-on baseline regardless of brief."}], "conflicts": [], "directions": [{"id": "A", "name": "Studio Green", "tagline": "The supplied mockup, built out: mint identity, dark photographic hero, services-first structure.", "fit": "Directly matches the reference the user supplied \u2014 new logo, new accent, new headline system, new services-grid framing. Lowest translation risk between what was approved and what gets shipped.", "tradeoffs": "Full visual-identity swap (accent, type weight, surface palette) is more work than a copy-only reframe, and the dark-hero-photo + green-badge motif needs to be threaded consistently through sections the mockup didn't fully render (pricing, FAQ).", "preview": {"nav": "top", "density": 2, "radius": 14, "surface": "elevated", "palette": {"bg": "#ffffff", "surface": "#f8f9fa", "accent": "#087a4b", "ink": "#0b1210", "line": "#e3e7e4"}}, "foundation": {"Theme": "Light sections + dark hero/footer/testimonial band", "Navigation": "Top pill nav, anchor links (Home/Services/How It Works/Pricing/Industries)", "Content width": "Centered, ~1200px max", "Density": "Medium, generous section padding", "Corner radius": "14px cards, 999px pills for buttons/badges", "Typography": "Bold grotesque sans for headlines, current body sans retained", "Primary interaction": "Service cards + step-numbered how-it-works + proof/testimonial band", "Mobile strategy": "Full single-column reflow", "Animation": "Subtle entrance/hover only", "Icons": "Rounded line icons in tinted colour-chip badges, matching the ad creative"}, "tokens": {"color": {"bg": "#ffffff", "surface": "#f8f9fa", "border": "#e3e7e4", "text": "#0b1210", "muted": "#5c6b64", "primary": "#087a4b", "primary_contrast": "#ffffff", "success": "#0e9f63", "warning": "#8a5a00", "danger": "#a11d12"}, "radius": {"sm": 8, "md": 14, "lg": 20}, "font": {"sans": "Inter, system-ui, sans-serif", "mono": "ui-monospace, SFMono-Regular, Menlo, monospace"}, "space": {"unit": 4}, "density": {"row_height": 40}, "color_dark": {"bg": "#000b0f", "surface": "#0c1613", "border": "#1c2a25", "text": "#eef4f1", "muted": "#9fb0a8", "primary": "#27f997", "primary_contrast": "#00150d", "success": "#27f997", "warning": "#f2c26b", "danger": "#ff9d92"}}}, {"id": "B", "name": "Minimal Reframe", "tagline": "Same current visual identity (teal, serif hero), only the copy and section order change to the services framing.", "fit": "Lowest effort and lowest visual risk \u2014 reuses every existing style token, just rewrites headlines/sections to lead with \"services we implement\" instead of \"your AI assistant.\"", "tradeoffs": "Doesn't use the new logo, mint accent or the supplied hero photo/ad creative at all \u2014 the delivered page would look nothing like what was sent for reference, which is the opposite of what a visual reference is for.", "preview": {"nav": "top", "density": 1, "radius": 6, "surface": "flat", "palette": {"bg": "#f6f4ef", "surface": "#ffffff", "accent": "#0e5d57", "ink": "#101619", "line": "#dedad0"}}, "foundation": {"Theme": "Light-first, current warm cream palette", "Navigation": "Top pill nav, anchor links", "Content width": "Centered, ~1200px max", "Density": "Airy, current spacing scale", "Corner radius": "6px, current scale", "Typography": "Current serif display + sans body, unchanged", "Primary interaction": "Same section shapes, reworded and reordered", "Mobile strategy": "Full single-column reflow (already true today)", "Animation": "None beyond current", "Icons": "Current line-icon set, unchanged"}, "tokens": {"color": {"bg": "#f6f4ef", "surface": "#ffffff", "border": "#dedad0", "text": "#101619", "muted": "#5c6b64", "primary": "#0e5d57", "primary_contrast": "#ffffff", "success": "#0e5d57", "warning": "#7a4700", "danger": "#a11d12"}, "radius": {"sm": 4, "md": 6, "lg": 10}, "font": {"sans": "system-ui, sans-serif", "mono": "ui-monospace, SFMono-Regular, Menlo, monospace"}, "space": {"unit": 4}, "density": {"row_height": 40}, "color_dark": {"bg": "#0e1315", "surface": "#151b1e", "border": "#262f33", "text": "#eef1f0", "muted": "#8b9599", "primary": "#4fb3a6", "primary_contrast": "#0a1a17", "success": "#4fb3a6", "warning": "#f2c26b", "danger": "#ff9d92"}}}], "selected_direction": null, "risks": [{"id": "R-01", "severity": "high", "text": "Using Muse's name/logo without confirmed rights is a real legal exposure \u2014 blocked on PG-016."}, {"id": "R-02", "severity": "med", "text": "Scope of Pricing/Case Studies (anchor vs subpage, PG-006) changes build effort meaningfully \u2014 subpages mean new routes, new CMS schema pages, new SITE_CONTENT_SCHEMA entries."}, {"id": "R-03", "severity": "low", "text": "The bright mint (#27F997) fails text contrast on white and must only be used for large text, buttons or dark-surface contexts \u2014 the deeper #0e9f63 carries body text and links."}, {"id": "R-04", "severity": "low", "text": "Threading the new identity through sections the mockup didn't render (pricing cards, FAQ, integrations strip) means some visual decisions will be extrapolated, not directly copied."}], "assumptions": [{"id": "AS-01", "text": "Registration, login, dashboard, admin and billing flows are unchanged \u2014 this redesign is scoped to the public landing page and its CMS schema only."}, {"id": "AS-02", "text": "The 8 services listed in the mockup are the current, accurate list of what Buinee offers today."}], "gate": {"status": "not_approved", "history": []}}, "base_hash": "a40667fc85a643d0"};</script>
+<script>
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+function lum(hex) {
+  const h = String(hex).replace('#', '');
+  const f = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  const v = [0, 2, 4].map(i => parseInt(f.substr(i, 2), 16) / 255).map(c => c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4));
+  return .2126 * v[0] + .7152 * v[1] + .0722 * v[2];
+}
+
+/* Wireframe preview drawn from a small spec: nav, density(1-3), radius, surface, palette, serif/mono, title */
+function miniPreview(s) {
+  s = s || {};
+  const P = Object.assign({bg:'#f6f7f9', surface:'#ffffff', accent:'#2f6feb', ink:'#1b1f24', line:'#dfe3e8'}, s.palette || {});
+  const W = 200, H = 125;
+  const r = Math.max(0, Math.min(s.radius == null ? 6 : s.radius, 14));
+  const nav = s.nav || 'top', dens = s.density || 2, surf = s.surface || 'flat';
+  const f = (x, y, w, h, fill, o) => {
+    o = o || {};
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.r || 0}" fill="${fill}"` +
+      (o.stroke ? ` stroke="${o.stroke}" stroke-width="1"` : '') + (o.op != null ? ` opacity="${o.op}"` : '') + '/>';
+  };
+  let g = f(0, 0, W, H, P.bg, {r: 6});
+  let x0 = 10, y0 = 10, x1 = W - 10, y1 = H - 10;
+  if (nav === 'sidebar') {
+    g += f(0, 0, 36, H, P.surface, {stroke: P.line}) + f(8, 10, 10, 10, P.accent, {r: 3});
+    for (let i = 0; i < 5; i++) g += f(8, 30 + i * 13, 20, 5, P.ink, {r: 2, op: i === 1 ? .9 : .25});
+    x0 = 46;
+  } else if (nav === 'top') {
+    g += f(0, 0, W, 18, P.surface, {stroke: P.line}) + f(8, 5, 8, 8, P.accent, {r: 3});
+    for (let i = 0; i < 3; i++) g += f(60 + i * 22, 7, 16, 4, P.ink, {r: 2, op: i === 0 ? .9 : .25});
+    y0 = 26;
+  } else if (nav === 'tabs') {
+    g += f(0, H - 20, W, 20, P.surface, {stroke: P.line});
+    for (let i = 0; i < 4; i++) g += f(24 + i * 40, H - 13, 10, 6, i === 0 ? P.accent : P.ink, {r: 2, op: i === 0 ? 1 : .3});
+    y1 = H - 28;
+  }
+  const font = s.serif ? 'Georgia,serif' : (s.mono ? 'ui-monospace,Menlo,monospace' : 'system-ui,sans-serif');
+  g += `<text x="${x0}" y="${y0 + 11}" font-family="${font}" font-size="12" font-weight="700" fill="${P.ink}">${esc((s.title || 'Aa').slice(0, 14))}</text>`;
+  g += f(x1 - 26, y0 + 1, 26, 10, P.accent, {r: Math.min(r, 5)});
+  const cy = y0 + 20, ch = y1 - cy;
+  if (dens === 3) {
+    const n = Math.max(3, Math.floor(ch / 11));
+    for (let i = 0; i < n; i++) {
+      const y = cy + i * 11;
+      g += f(x0, y, x1 - x0, 9, i === 0 ? P.line : P.surface, {r: Math.min(r, 3), stroke: P.line});
+      g += f(x0 + 4, y + 3, 18 + ((i * 7) % 14), 3, P.ink, {r: 1, op: .55}) + f(x0 + 70, y + 3, 24, 3, P.ink, {r: 1, op: .25});
+      g += f(x1 - 24, y + 3, 14, 3, P.accent, {r: 1, op: i % 2 ? .5 : .9});
+    }
+  } else {
+    const cols = dens === 2 ? 3 : 2, gap = dens === 2 ? 6 : 10, rows = dens === 2 ? 2 : 1;
+    const cw = (x1 - x0 - gap * (cols - 1)) / cols, h = (ch - (rows - 1) * gap) / rows;
+    for (let rr = 0; rr < rows; rr++) for (let c = 0; c < cols; c++) {
+      const x = x0 + c * (cw + gap), y = cy + rr * (h + gap);
+      if (surf === 'elevated') g += f(x, y + 2, cw, h, '#000', {r: r, op: .12}) + f(x, y, cw, h, P.surface, {r: r});
+      else if (surf === 'open') g += f(x, y, cw, 2, P.ink, {op: .6});
+      else g += f(x, y, cw, h, P.surface, {r: r, stroke: P.line});
+      g += f(x + 6, y + 8, cw * .5, 3, P.ink, {r: 1, op: .7}) + f(x + 6, y + 15, cw * .75, 3, P.ink, {r: 1, op: .25});
+      if (h > 34) g += f(x + 6, y + h - 14, cw * .3, 6, P.accent, {r: Math.min(r, 3)});
+    }
+  }
+  return `<svg class="mini" viewBox="0 0 ${W} ${H}" role="img" aria-label="Layout preview">${g}</svg>`;
+}
+
+/* Result hand-off: always selectable text + copy + download, because sandboxes may block either. */
+function resultPanel(obj, o) {
+  const txt = JSON.stringify(obj);
+  return `<section class="result" aria-live="polite"><h3>${esc(o.title)}</h3><p class="hint">${esc(o.lead)}</p>` +
+    `<textarea id="result-json" readonly rows="6" aria-label="Response to paste back to Claude">${esc(txt)}</textarea>` +
+    `<div class="row"><button type="button" class="btn primary" data-a="copy">Copy</button>` +
+    `<button type="button" class="btn" data-a="download" data-f="${esc(o.filename)}">Download .json</button></div>` +
+    `<p class="hint" id="copy-hint" style="margin-top:8px"></p></section>`;
+}
+function hintMsg(m) { const e = $('#copy-hint'); if (e) e.textContent = m; }
+async function copyResult() {
+  const t = $('#result-json'); if (!t) return;
+  try { await navigator.clipboard.writeText(t.value); hintMsg('Copied. Paste it back to Claude.'); }
+  catch (e) { t.focus(); t.select(); try { document.execCommand('copy'); hintMsg('Copied. Paste it back to Claude.'); } catch (_) { hintMsg('Select the text above and copy it.'); } }
+}
+function downloadResult(name) {
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([$('#result-json').value], {type: 'application/json'}));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    hintMsg('Downloaded. If nothing saved, copy the text instead.');
+  } catch (e) { hintMsg('Download is blocked here. Copy the text instead.'); }
+}
+
+</script>
+<script>
+const S = DATA.state, H = DATA.base_hash, KEY = 'pg-dash:' + H;
+const LABEL = {CONFIRMED:'Confirmed', INFERRED:'Inferred', PROPOSED:'Proposed', NEEDS_INPUT:'Needs input', REJECTED:'Rejected', SUPERSEDED:'Superseded'};
+const AREAS = [['project','Project'],['users','Users & jobs'],['ux','UX decisions'],['screens','Screen architecture'],['visual','Visual direction'],['responsive','Responsive strategy'],['accessibility','Accessibility']];
+const W = {CONFIRMED:1, INFERRED:.75, PROPOSED:.5, NEEDS_INPUT:0, REJECTED:0};
+
+let edits = {}, selDir = S.selected_direction || null, notes = '', editing = null, confirming = false, result = null;
+const openDirs = new Set();
+(function () { const s = store.get(KEY); if (s) { edits = s.edits || {}; selDir = s.selDir || selDir; notes = s.notes || ''; } })();
+const persist = () => store.set(KEY, {edits, selDir, notes});
+
+const eff = d => Object.assign({}, d, edits[d.id] || {});
+const decs = () => S.decisions.map(eff);
+function counts() { const c = {CONFIRMED:0,INFERRED:0,PROPOSED:0,NEEDS_INPUT:0,REJECTED:0,SUPERSEDED:0}; decs().forEach(d => c[d.status]++); return c; }
+function readiness(c) {
+  const active = c.CONFIRMED + c.INFERRED + c.PROPOSED + c.NEEDS_INPUT + c.REJECTED;
+  if (!active) return 0;
+  return Math.round(Object.keys(W).reduce((s, k) => s + W[k] * c[k], 0) / active * 100);
+}
+function conflicts() {
+  const m = Object.fromEntries(decs().map(d => [d.id, d])), live = x => x && !['REJECTED', 'SUPERSEDED'].includes(x.status);
+  return (S.conflicts || []).filter(c => live(m[c.a]) && live(m[c.b]));
+}
+function blockers() {
+  const c = counts(), b = [];
+  if (c.NEEDS_INPUT) b.push(`${c.NEEDS_INPUT} decision${c.NEEDS_INPUT > 1 ? 's' : ''} still need your input`);
+  if (c.REJECTED) b.push(`${c.REJECTED} rejected: use Request Changes so I can replace ${c.REJECTED > 1 ? 'them' : 'it'}`);
+  const cf = conflicts().length; if (cf) b.push(`${cf} unresolved conflict${cf > 1 ? 's' : ''}`);
+  if (!selDir) b.push('Pick a design direction');
+  return b;
+}
+const pill = s => `<span class="pill s-${s}">${LABEL[s]}</span>`;
+const dirName = id => (S.directions.find(x => x.id === id) || {}).name || '';
+
+/* ---------- pieces ---------- */
+function header(c, pct) {
+  return `<div class="head"><div><div class="eyebrow">Opskeep · Project Gate</div><h1>${esc(S.project.name)}</h1>` +
+    (S.project.one_liner ? `<p class="sub">${esc(S.project.one_liner)}</p>` : '') + `</div>` +
+    `<div class="ready"><div class="big"><span>${pct}%</span><small>READY</small></div>` +
+    `<div class="meter" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` +
+    `<div class="counts">${['CONFIRMED','INFERRED','PROPOSED','NEEDS_INPUT'].map(k => `<span class="pill s-${k}">${c[k]} ${LABEL[k].toLowerCase()}</span>`).join('')}` +
+    `<span class="pill ${conflicts().length ? 's-REJECTED' : 's-PROPOSED'}">${conflicts().length} conflicts</span></div></div></div>`;
+}
+function reopenBanner() {
+  const g = S.gate || {};
+  if (g.status !== 'reopened' || !(g.reopened || []).length) return '';
+  return `<div class="banner"><b>Reopened.</b> ${g.reopened.length} decision${g.reopened.length > 1 ? 's' : ''} affected by a change (${esc(g.reopened.join(', '))}). Everything else stays as approved.</div>`;
+}
+function intentBlock() {
+  return `<section class="blk"><h2>Project intent</h2><dl class="kv">${(S.intent || []).map(r => `<dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd>`).join('')}</dl></section>`;
+}
+function characterBlock() {
+  if (!(S.character || []).length) return '';
+  return `<section class="blk"><h2>Product character</h2>${S.character.map(t =>
+    `<div class="trait"><span>${esc(t.trait)}</span><div class="meter" role="img" aria-label="${esc(t.trait)} ${t.score} percent"><i style="width:${t.score}%"></i></div><b>${t.score}%</b></div>`).join('')}</section>`;
+}
+function needBlock() {
+  const ns = decs().filter(d => d.status === 'NEEDS_INPUT');
+  if (!ns.length) return '';
+  return `<section class="blk block-need"><h2>Blocking decisions · ${ns.length}</h2>${ns.map(d => `<div class="need"><span class="pill s-NEEDS_INPUT">Needs input</span> <span class="mono hint">${d.id}</span>` +
+    `<h3>${esc(d.question || d.title)}</h3>${d.rationale ? `<p class="hint">${esc(d.rationale)}</p>` : ''}` +
+    (d.reopened_because ? `<p class="hint">Reopened: ${esc(d.reopened_because)}</p>` : '') +
+    (d.options && d.options.length
+      ? `<div class="opts">${d.options.map(o => `<button type="button" class="opt" data-a="choose" data-id="${d.id}" data-v="${esc(o.value)}" data-l="${esc(o.label)}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ''}</button>`).join('')}</div>`
+      : `<textarea id="ed-${d.id}" placeholder="Your answer" aria-label="${esc(d.title)}"></textarea><button type="button" class="btn primary sm" data-a="save-free" data-id="${d.id}">Save answer</button>`) +
+    `</div>`).join('')}</section>`;
+}
+function actions(d, changed) {
+  const b = (a, l, cls) => `<button type="button" class="btn sm ${cls || ''}" data-a="${a}" data-id="${d.id}">${l}</button>`;
+  let r = '';
+  if (d.status === 'INFERRED' || d.status === 'PROPOSED') r = b('confirm', 'Confirm', 'primary') + b('edit', 'Change') + b('reject', 'Reject', 'danger');
+  else if (d.status === 'CONFIRMED') r = b('edit', 'Change') + (changed ? b('reset', 'Undo') : '');
+  else if (d.status === 'REJECTED') r = b('reset', 'Reconsider');
+  return r ? `<div class="row">${r}</div>` : '';
+}
+function editor(d) {
+  return `<div class="row" style="align-items:stretch;flex-direction:column;gap:8px;margin-top:8px">` +
+    (d.options && d.options.length ? `<div class="opts">${d.options.map(o => `<button type="button" class="opt" data-a="choose" data-id="${d.id}" data-v="${esc(o.value)}" data-l="${esc(o.label)}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ''}</button>`).join('')}</div>` : '') +
+    `<textarea id="ed-${d.id}" aria-label="Edit ${esc(d.title)}">${esc(d.value)}</textarea>` +
+    `<div class="row"><button type="button" class="btn primary sm" data-a="save-edit" data-id="${d.id}">Save change</button><button type="button" class="btn sm" data-a="cancel-edit">Cancel</button></div></div>`;
+}
+function decRow(d) {
+  const changed = !!edits[d.id];
+  return `<li class="dec ${d.status === 'SUPERSEDED' ? 'muted' : ''} ${changed ? 'changed' : ''}" id="${d.id}"><div class="dec-head"><span class="mono id">${d.id}</span><span class="dec-title">${esc(d.title)}</span>${pill(d.status)}</div>` +
+    `<div class="dec-val">${esc(d.value)}</div>${d.rationale ? `<div class="dec-why">${esc(d.rationale)}</div>` : ''}` +
+    (editing === d.id ? editor(d) : actions(d, changed)) + `</li>`;
+}
+function decisionsBlock() {
+  const all = decs().filter(d => d.status !== 'NEEDS_INPUT');
+  const html = AREAS.map(([k, label]) => {
+    const rows = all.filter(d => d.area === k && d.status !== 'SUPERSEDED');
+    return rows.length ? `<h3 class="area-h">${label}</h3><ul class="decs">${rows.map(decRow).join('')}</ul>` : '';
+  }).join('');
+  const sup = all.filter(d => d.status === 'SUPERSEDED');
+  return `<section class="blk"><h2>Decisions</h2>${html}${sup.length ? `<h3 class="area-h">Superseded</h3><ul class="decs">${sup.map(decRow).join('')}</ul>` : ''}</section>`;
+}
+function conflictBlock() {
+  const cf = conflicts(); if (!cf.length) return '';
+  return `<section class="blk block-need"><h2>Conflicts · ${cf.length}</h2>${cf.map(c => `<p class="need"><span class="mono">${c.a} ↔ ${c.b}</span><br>${esc(c.text)}<br><span class="hint">Reject or change one of them above to resolve.</span></p>`).join('')}</section>`;
+}
+function dirCard(x) {
+  const sel = selDir === x.id, open = openDirs.has(x.id), col = (x.tokens && x.tokens.color) || {};
+  return `<article class="dir ${sel ? 'sel' : ''}"><div class="stage">${miniPreview(Object.assign({title: S.project.name}, x.preview))}</div>` +
+    `<div class="dir-top"><span class="mono hint">${x.id}</span><h3>${esc(x.name)}</h3>${sel ? '<span class="pill s-CONFIRMED">Selected</span>' : ''}</div><p>${esc(x.tagline)}</p>` +
+    (open ? `<div class="detail"><p>${esc(x.fit)}</p><div class="swatchrow" aria-label="Palette">${['bg','surface','primary','text'].map(k => col[k] ? `<i style="background:${esc(col[k])}" title="${k} ${esc(col[k])}"></i>` : '').join('')}</div>` +
+      `<dl>${Object.entries(x.foundation).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl><p><b>Trade-off:</b> ${esc(x.tradeoffs)}</p></div>` : '') +
+    `<div class="row"><button type="button" class="btn ${sel ? '' : 'primary'}" data-a="select-dir" data-id="${x.id}" aria-pressed="${sel}">${sel ? 'Selected' : 'Select direction'}</button>` +
+    `<button type="button" class="btn" data-a="toggle-dir" data-id="${x.id}" aria-expanded="${open}">${open ? 'Hide details' : 'Explore direction'}</button></div></article>`;
+}
+function directionsBlock() {
+  return `<section class="blk"><h2>Design directions</h2><div class="dirs">${S.directions.map(dirCard).join('')}</div></section>`;
+}
+function foundationBlock() {
+  const x = S.directions.find(d => d.id === selDir);
+  return `<section class="blk"><h2>Foundation${x ? ' · ' + esc(x.name) : ''}</h2>` +
+    (x ? `<table class="found">${Object.entries(x.foundation).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>` : '<p class="hint">Select a direction to see its foundation.</p>') + '</section>';
+}
+function riskBlock() {
+  const rs = S.risks || [], as = S.assumptions || [];
+  if (!rs.length && !as.length) return '';
+  return `<section class="blk"><h2>Risks &amp; assumptions</h2>` +
+    rs.map(r => `<div class="risk"><span class="pill ${r.severity === 'high' ? 's-REJECTED' : r.severity === 'low' ? 's-PROPOSED' : 's-NEEDS_INPUT'}">${esc(r.severity || 'med')}</span><span>${esc(r.text)}</span></div>`).join('') +
+    as.map(a => `<div class="risk"><span class="pill s-INFERRED">assumed</span><span>${esc(a.text)}</span></div>`).join('') + '</section>';
+}
+function approvalRail() {
+  const bl = blockers(), c = counts(), unrev = c.INFERRED + c.PROPOSED;
+  return `<div class="gate ${result && result.action === 'approve_project_gate' ? 'ok' : ''}"><div class="eyebrow">Project gate</div>` +
+    `<div class="state">${result && result.action === 'approve_project_gate' ? 'APPROVAL SUBMITTED' : '⚠ NOT APPROVED'}</div>` +
+    `<p class="fine">${result && result.action === 'approve_project_gate' ? 'Not recorded until Claude validates and applies it.' : 'Approving authorises the design direction only, not implementation.'}</p>` +
+    (bl.length ? `<ul>${bl.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : '') +
+    `<label class="hint" for="notes">Notes for Claude (optional)</label><textarea id="notes" placeholder="Anything to add or change">${esc(notes)}</textarea>` +
+    `<div class="btns"><button type="button" class="btn primary" data-a="ask-approve" ${bl.length ? 'disabled' : ''}>Approve Project Gate</button>` +
+    `<button type="button" class="btn" data-a="submit" data-act="request_changes">Request Changes</button>` +
+    `<button type="button" class="btn" data-a="submit" data-act="explore_alternative">Explore Alternative</button></div>` +
+    (confirming ? `<div class="confirm"><span>Approve <b>${esc(dirName(selDir))}</b> for <b>${esc(S.project.name)}</b>?` +
+      (unrev ? ` ${unrev} inferred/proposed decision${unrev > 1 ? 's' : ''} will be confirmed by approving.` : '') + ` Implementation stays locked until the security gate passes.</span>` +
+      `<div class="row"><button type="button" class="btn primary sm" data-a="submit" data-act="approve_project_gate">Yes, approve</button><button type="button" class="btn sm" data-a="cancel-approve">Cancel</button></div></div>` : '') +
+    (result ? resultPanel(result, {title: {approve_project_gate: 'Approval ready', request_changes: 'Change request ready', explore_alternative: 'Alternative request ready'}[result.action], lead: 'Copy this and paste it back into the chat with Claude, or download it.', filename: 'gate-response.json'}) : '') + '</div>';
+}
+
+function render() {
+  const c = counts();
+  $('#app').innerHTML = header(c, readiness(c)) + reopenBanner() +
+    `<div class="layout"><div>${intentBlock()}${characterBlock()}${needBlock()}${conflictBlock()}${directionsBlock()}${foundationBlock()}${decisionsBlock()}${riskBlock()}</div><aside class="rail">${approvalRail()}</aside></div>`;
+  if (editing) { const t = $('#ed-' + editing); if (t) t.focus(); }
+}
+
+/* ---------- actions ---------- */
+function setEdit(id, patch) { edits[id] = Object.assign({}, edits[id] || {}, patch); result = null; confirming = false; persist(); }
+function buildResponse(action) {
+  const changes = [];
+  Object.entries(edits).forEach(([id, e]) => {
+    const base = S.decisions.find(d => d.id === id); if (!base) return;
+    if (e.status !== base.status || (e.value != null && e.value !== base.value)) {
+      const ch = {id, status: e.status, value: e.value != null ? e.value : base.value};
+      if (e.choice) ch.choice = e.choice; changes.push(ch);
+    }
+  });
+  return {schema: 'opskeep.project-gate/response@1', project: S.project.slug, base_hash: H, action, selected_direction: selDir, changes, notes: notes.trim(), submitted_at: new Date().toISOString()};
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-a]'); if (!t) return;
+  const a = t.dataset.a, id = t.dataset.id;
+  if (a === 'copy') return copyResult();
+  if (a === 'download') return downloadResult(t.dataset.f);
+  if (a === 'confirm') setEdit(id, {status: 'CONFIRMED'});
+  else if (a === 'reject') setEdit(id, {status: 'REJECTED'});
+  else if (a === 'reset') { delete edits[id]; result = null; persist(); }
+  else if (a === 'edit') editing = id;
+  else if (a === 'cancel-edit') editing = null;
+  else if (a === 'save-edit') { const v = $('#ed-' + id).value.trim(); if (v) setEdit(id, {status: 'CONFIRMED', value: v}); editing = null; }
+  else if (a === 'save-free') { const v = $('#ed-' + id).value.trim(); if (!v) return; setEdit(id, {status: 'CONFIRMED', value: v}); }
+  else if (a === 'choose') { setEdit(id, {status: 'CONFIRMED', value: t.dataset.l, choice: t.dataset.v}); editing = null; }
+  else if (a === 'select-dir') { selDir = id; result = null; confirming = false; persist(); }
+  else if (a === 'toggle-dir') { openDirs.has(id) ? openDirs.delete(id) : openDirs.add(id); }
+  else if (a === 'ask-approve') confirming = true;
+  else if (a === 'cancel-approve') confirming = false;
+  else if (a === 'submit') { if (t.dataset.act === 'approve_project_gate' && blockers().length) return; confirming = false; result = buildResponse(t.dataset.act); }
+  else return;
+  render();
+  if (result && (a === 'submit')) { const r = $('#result-json'); if (r) r.scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
+});
+document.addEventListener('input', e => { if (e.target.id === 'notes') { notes = e.target.value; result = null; persist(); } });
+render();
+</script>
+</body>
+</html>
