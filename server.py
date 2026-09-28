@@ -221,6 +221,8 @@ STATIC_PAGES = {
     "/payment/success": "payment-success.html",
     "/payment/failed": "payment-failed.html",
     "/contact": "contact.html",
+    "/pricing": "pricing.html",
+    "/case-studies": "case-studies.html",
     "/privacy": "legal.html",
     "/terms": "legal.html",
     "/cookies": "legal.html",
@@ -246,11 +248,29 @@ STATIC_PAGES = {
     "/admin/site-contents": "admin-site-contents.html",
 }
 
+# Public brand imagery used by the landing page. Keep this explicit instead of
+# exposing the project directory as a general-purpose static file server.
+STATIC_ASSETS = {
+    "/assets/images/buinee-logo.png": "assets/images/buinee-logo.png",
+    "/assets/images/hero-image1.png": "assets/images/hero-image1.png",
+    "/assets/images/buinee-ad.png": "assets/images/buinee-ad.png",
+    "/assets/images/landing-page-reference.png": "assets/images/landing-page-reference.png",
+    "/assets/images/black-african-industries.png": "assets/images/black-african-industries.png",
+    "/assets/images/whatsapp.svg": "assets/images/whatsapp.svg",
+    "/assets/images/instagram.svg": "assets/images/instagram.svg",
+    "/assets/images/facebook.svg": "assets/images/facebook.svg",
+    "/assets/images/linkedin.svg": "assets/images/linkedin.svg",
+    "/assets/images/youtube.svg": "assets/images/youtube.svg",
+    "/assets/images/x.svg": "assets/images/x.svg",
+}
+
 LEGACY_PAGE_REDIRECTS = {
     "/index.html": "/",
     "/register.html": "/register",
     "/login.html": "/login",
     "/contact.html": "/contact",
+    "/pricing.html": "/pricing",
+    "/case-studies.html": "/case-studies",
     "/privacy.html": "/privacy",
     "/terms.html": "/terms",
     "/cookies.html": "/cookies",
@@ -295,41 +315,110 @@ CMS_CHECK_SVG = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
 
 SITE_CONTENT_SCHEMA = {
     "index": [
-        {"key": "hero_eyebrow", "label": "Hero eyebrow", "type": "text",
-         "default": "One assistant, built into every workspace"},
+        {"key": "hero_eyebrow", "label": "Hero eyebrow", "type": "text", "default": ""},
         {"key": "hero_headline", "label": "Hero headline", "type": "paragraph",
-         "default": "Every person on your team gets their own AI assistant, not a chatbot bolted to "
-                     "the corner."},
+         "default": "AI solutions for real businesses."},
         {"key": "hero_lede", "label": "Hero subtext", "type": "paragraph",
-         "default": "Connect a mailbox and it sorts, drafts and flags overnight. Hand it a file and it "
-                     "reads, extracts and acts. Tell it your rules once, and it works to them, your "
-                     "approval steps, your templates, your terms. All inside one workspace for messages, "
-                     "documents, tasks, approvals and customer work."},
-        {"key": "hero_bold_note", "label": "Hero bold note (below subtext)", "type": "text",
-         "default": "Drafts, never sends. Suggests, never decides, until you say so."},
-        {"key": "hero_cta_primary", "label": "Hero primary button", "type": "text", "default": "Create your workspace"},
-        {"key": "hero_cta_secondary", "label": "Hero secondary button", "type": "text", "default": "Meet your assistant"},
+         "default": "Buinee handles invoices, reports, documentation and customer communication, "
+                     "so your team can move from manual execution to high-level oversight."},
+        {"key": "hero_bold_note", "label": "Hero bold note (below subtext)", "type": "text", "default": ""},
+        {"key": "hero_cta_primary", "label": "Hero primary button", "type": "text", "default": "Get Muse for Your Business"},
+        {"key": "hero_cta_secondary", "label": "Hero secondary button", "type": "text", "default": "See How It Works"},
         {"key": "hero_note", "label": "Hero note", "type": "text",
-         "default": "Your team joins by name, no per-seat setup, no IT project."},
+         "default": "Set up for your business · Integrate your tools · Ongoing support"},
 
-        {"key": "how_eyebrow", "label": "\"How it works\" eyebrow", "type": "text", "default": "How work moves"},
+        {"key": "trusted_label", "label": "\"Trusted by\" strip label", "type": "text",
+         "default": "Trusted by local businesses and organisations"},
+
+        {"key": "services_eyebrow", "label": "Services eyebrow", "type": "text", "default": "Our services"},
+        {"key": "services_headline", "label": "Services headline", "type": "text",
+         "default": "An autonomous operational partner for your business."},
+        {"key": "services_subtext", "label": "Services subtext", "type": "paragraph",
+         "default": "We combine deep automation with secure cloud workspaces to remove administrative "
+                     "bottlenecks while your team stays firmly in control."},
+        {"key": "service1_tag", "label": "Service 1 tag (e.g. Flagship)", "type": "text", "default": "Flagship"},
+        {"key": "service1_title", "label": "Service 1 title", "type": "text", "default": "Muse Personal Assistant"},
+        {"key": "service1_text", "label": "Service 1 text", "type": "paragraph",
+         "default": "Your AI assistant for invoices, reports, data entry, follow-ups and daily admin."},
+        {"key": "service2_title", "label": "Service 2 title", "type": "text", "default": "WhatsApp Automation"},
+        {"key": "service2_text", "label": "Service 2 text", "type": "paragraph",
+         "default": "Capture enquiries, answer questions and follow up automatically."},
+        {"key": "service3_title", "label": "Service 3 title", "type": "text", "default": "Social Media Management"},
+        {"key": "service3_text", "label": "Service 3 text", "type": "paragraph",
+         "default": "Plan, create and schedule content for Instagram, Facebook, TikTok and more."},
+        {"key": "service4_title", "label": "Service 4 title", "type": "text", "default": "Business Dashboards"},
+        {"key": "service4_text", "label": "Service 4 text", "type": "paragraph",
+         "default": "Get clear insights on sales, customers, finances and operations."},
+        {"key": "service5_title", "label": "Service 5 title", "type": "text", "default": "Customer Support Agents"},
+        {"key": "service5_text", "label": "Service 5 text", "type": "paragraph",
+         "default": "Automate customer enquiries and support across web, WhatsApp and social media."},
+        {"key": "service6_title", "label": "Service 6 title", "type": "text", "default": "Document & Data Automation"},
+        {"key": "service6_text", "label": "Service 6 text", "type": "paragraph",
+         "default": "Extract, organize and record data from invoices, receipts and documents."},
+        {"key": "service7_title", "label": "Service 7 title", "type": "text", "default": "Scheduling & Reminders"},
+        {"key": "service7_text", "label": "Service 7 text", "type": "paragraph",
+         "default": "Automate appointments, reminders and internal tasks."},
+        {"key": "service8_title", "label": "Service 8 title", "type": "text", "default": "Custom AI Solutions"},
+        {"key": "service8_text", "label": "Service 8 text", "type": "paragraph",
+         "default": "Tailored AI agents and integrations built for your unique workflows."},
+
+        {"key": "how_eyebrow", "label": "\"How it works\" eyebrow", "type": "text", "default": "How it works"},
         {"key": "how_headline", "label": "\"How it works\" headline", "type": "text",
-         "default": "One request. The right people. A clear outcome."},
+         "default": "From setup to results in a few simple steps."},
         {"key": "how_subtext", "label": "\"How it works\" subtext", "type": "paragraph",
-         "default": "Whether it starts as an email, file, customer question or internal task, the work "
-                     "stays connected from arrival to completion."},
-        {"key": "how_step1_title", "label": "Step 1 title", "type": "text", "default": "Work comes in"},
+         "default": "We learn your workflow, connect your tools, and tailor the AI so you stay in "
+                     "control from the first day."},
+        {"key": "how_step1_title", "label": "Step 1 title", "type": "text", "default": "Understand your business"},
         {"key": "how_step1_text", "label": "Step 1 text", "type": "paragraph",
-         "default": "Bring in an email, document, request or customer conversation. Buinee keeps the "
-                     "source and context together."},
-        {"key": "how_step2_title", "label": "Step 2 title", "type": "text", "default": "Someone takes ownership"},
+         "default": "We learn your workflow, challenges and goals."},
+        {"key": "how_step2_title", "label": "Step 2 title", "type": "text", "default": "Set up & integrate"},
         {"key": "how_step2_text", "label": "Step 2 text", "type": "paragraph",
-         "default": "Assign it, discuss it, add instructions and complete the next step without losing "
-                     "decisions across separate tools."},
-        {"key": "how_step3_title", "label": "Step 3 title", "type": "text", "default": "The outcome is recorded"},
+         "default": "We configure Muse and connect your tools (email, accounting, CRM, calendar, etc)."},
+        {"key": "how_step3_title", "label": "Step 3 title", "type": "text", "default": "Customize workflows"},
         {"key": "how_step3_text", "label": "Step 3 text", "type": "paragraph",
-         "default": "Send the reply, approve the document, close the task or issue the final file with a "
-                     "history everyone can trust."},
+         "default": "We tailor the AI to handle your specific tasks and approval process."},
+        {"key": "how_step4_title", "label": "Step 4 title", "type": "text", "default": "You stay in control"},
+        {"key": "how_step4_text", "label": "Step 4 text", "type": "paragraph",
+         "default": "Muse does the groundwork. You review and approve. We provide ongoing support as "
+                     "you grow."},
+
+        {"key": "industries_eyebrow", "label": "Industries eyebrow", "type": "text", "default": "Built for real businesses"},
+        {"key": "industries_headline", "label": "Industries headline", "type": "text",
+         "default": "Used by businesses like yours."},
+        {"key": "industries_subtext", "label": "Industries subtext", "type": "paragraph",
+         "default": "From shop floors to clinics, the same workspace adapts to how each kind of business "
+                     "actually runs."},
+        {"key": "industry1_title", "label": "Industry 1 title", "type": "text", "default": "Retail & Shops"},
+        {"key": "industry1_text", "label": "Industry 1 text", "type": "text",
+         "default": "Invoices, inventory, customer follow-ups"},
+        {"key": "industry2_title", "label": "Industry 2 title", "type": "text", "default": "Restaurants & Cafes"},
+        {"key": "industry2_text", "label": "Industry 2 text", "type": "text",
+         "default": "Orders, reports, supplier invoices"},
+        {"key": "industry3_title", "label": "Industry 3 title", "type": "text", "default": "Health & Clinics"},
+        {"key": "industry3_text", "label": "Industry 3 text", "type": "text",
+         "default": "Appointments, patient records, reminders"},
+        {"key": "industry4_title", "label": "Industry 4 title", "type": "text", "default": "Schools & Institutions"},
+        {"key": "industry4_text", "label": "Industry 4 text", "type": "text",
+         "default": "Admissions, communications, reports"},
+        {"key": "industry5_title", "label": "Industry 5 title", "type": "text", "default": "Churches"},
+        {"key": "industry5_text", "label": "Industry 5 text", "type": "text",
+         "default": "Member records, event management, communications"},
+        {"key": "industry6_title", "label": "Industry 6 title", "type": "text", "default": "Hotels & Travel"},
+        {"key": "industry6_text", "label": "Industry 6 text", "type": "text",
+         "default": "Bookings, enquiries, follow-ups"},
+
+        {"key": "testimonial_quote", "label": "Testimonial quote", "type": "paragraph",
+         "default": "I get my evenings back. Muse handles the invoices and reports, I just approve."},
+        {"key": "testimonial_attribution", "label": "Testimonial attribution", "type": "text",
+         "default": "Business Owner, Accra, Ghana"},
+        {"key": "testimonial_stat1_value", "label": "Testimonial stat 1 value", "type": "text", "default": "10+"},
+        {"key": "testimonial_stat1_label", "label": "Testimonial stat 1 label", "type": "text", "default": "Hours saved weekly"},
+        {"key": "testimonial_stat2_value", "label": "Testimonial stat 2 value", "type": "text", "default": ""},
+        {"key": "testimonial_stat2_label", "label": "Testimonial stat 2 label", "type": "text", "default": "More productivity"},
+        {"key": "testimonial_stat3_value", "label": "Testimonial stat 3 value", "type": "text", "default": ""},
+        {"key": "testimonial_stat3_label", "label": "Testimonial stat 3 label", "type": "text", "default": "Happier customers"},
+        {"key": "testimonial_stat4_value", "label": "Testimonial stat 4 value", "type": "text", "default": ""},
+        {"key": "testimonial_stat4_label", "label": "Testimonial stat 4 label", "type": "text", "default": "Organized business"},
 
         {"key": "roles_eyebrow", "label": "Roles eyebrow", "type": "text", "default": "Roles & visibility"},
         {"key": "roles_headline", "label": "Roles headline", "type": "text",
@@ -500,18 +589,18 @@ SITE_CONTENT_SCHEMA = {
                      "setting anything up twice."},
 
         {"key": "cta_headline", "label": "Closing CTA headline", "type": "text",
-         "default": "Start with the work your team handles every day."},
+         "default": "Get Muse for your business."},
         {"key": "cta_subtext", "label": "Closing CTA subtext", "type": "paragraph",
-         "default": "Create a workspace, invite the right people, and bring your next request, "
-                     "conversation or document into one clear process."},
-        {"key": "cta_primary", "label": "Closing CTA primary button", "type": "text", "default": "Choose a plan"},
+         "default": "Let us implement and customize AI solutions that save time, reduce manual work "
+                     "and help your business grow."},
+        {"key": "cta_primary", "label": "Closing CTA primary button", "type": "text", "default": "Get Started"},
         {"key": "cta_secondary", "label": "Closing CTA secondary button", "type": "text",
-         "default": "Join a company already here"},
+         "default": "Book a free consultation"},
         {"key": "cta_fine", "label": "Closing CTA fine print", "type": "text",
          "default": "If your company is already registered, you'll be placed in it automatically."},
 
         {"key": "footer_tagline", "label": "Footer tagline", "type": "text",
-         "default": "Buinee, one workspace for the work behind your business."},
+         "default": "AI solutions for real businesses."},
     ],
     "register": [
         {"key": "brand_headline", "label": "Brand panel headline", "type": "text",
@@ -603,9 +692,36 @@ SITE_CONTENT_SCHEMA = {
         {"key": "social_facebook", "label": "Facebook URL (leave blank to hide)", "type": "text", "default": ""},
         {"key": "social_instagram", "label": "Instagram URL (leave blank to hide)", "type": "text", "default": ""},
     ],
+    "pricing": [
+        {"key": "pricing_eyebrow", "label": "Pricing eyebrow", "type": "text", "default": "Pricing"},
+        {"key": "pricing_headline", "label": "Pricing headline", "type": "text",
+         "default": "Simple pricing for real businesses."},
+        {"key": "pricing_subtext", "label": "Pricing subtext", "type": "paragraph",
+         "default": "Every plan gets the same connected workspace for messages, documents, tasks and "
+                     "business records. What changes is how many people it covers and which advanced "
+                     "features are included."},
+        {"key": "pricing_aud_individual", "label": "Pricing toggle: individual", "type": "text", "default": "Just me"},
+        {"key": "pricing_aud_team", "label": "Pricing toggle: team", "type": "text", "default": "My team"},
+    ],
+    "case_studies": [
+        {"key": "case_studies_eyebrow", "label": "Case studies eyebrow", "type": "text", "default": "Case studies"},
+        {"key": "case_studies_headline", "label": "Case studies headline", "type": "text",
+         "default": "Real businesses, real results."},
+        {"key": "case_studies_subtext", "label": "Case studies subtext", "type": "paragraph",
+         "default": "A look at how businesses like yours use Buinee day to day."},
+        {"key": "case_studies_empty_title", "label": "Empty state title", "type": "text",
+         "default": "We're gathering our first stories."},
+        {"key": "case_studies_empty_text", "label": "Empty state text", "type": "paragraph",
+         "default": "Want to be one of them? Tell us how you're using Buinee and we may feature your "
+                     "business here."},
+        {"key": "case_studies_empty_cta", "label": "Empty state button", "type": "text", "default": "Get in touch"},
+    ],
 }
 
-CMS_PAGE_ROUTES = {"/": "index", "/register": "register", "/login": "login", "/contact": "contact"}
+CMS_PAGE_ROUTES = {
+    "/": "index", "/register": "register", "/login": "login", "/contact": "contact",
+    "/pricing": "pricing", "/case-studies": "case_studies",
+}
 
 _CMS_TOKEN_RE = re.compile(r"\{\{cms:(?:([a-z0-9_]+)\.)?([a-z0-9_]+)\}\}")
 _CMS_JSON_TOKEN_RE = re.compile(r"\{\{cms_json:([a-z0-9_]+)\}\}")
@@ -3160,6 +3276,13 @@ class RouteHandlerMixin:
             admin = self._admin_role_request("owner")
             if not admin: return
             return self._json({"signups": db.list_ada_pending_signups()})
+
+        if path in STATIC_ASSETS:
+            asset = ROOT / STATIC_ASSETS[path]
+            if not asset.is_file():
+                return self._json({"error": "asset missing"}, 404)
+            media_type = "image/svg+xml" if asset.suffix.lower() == ".svg" else "image/png"
+            return self._send(200, asset.read_bytes(), media_type)
 
         if path in STATIC_PAGES:
             f = ROOT / STATIC_PAGES[path]
