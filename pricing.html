@@ -1,0 +1,1693 @@
+<meta charset="utf-8">
+<title>Pricing, Buinee</title>
+<meta name="description" content="Simple, flexible pricing for Buinee. Start free, bring your own Muse token, or let us manage everything for your business.">
+<script>
+  // Arm scroll-reveal animations before first paint (so sections start
+  // hidden with no flash), unless the visitor prefers reduced motion.
+  // Fixed light/dark-band palette below - no user theme toggle on this page.
+  (function () {
+    try {
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.documentElement.classList.add("anim");
+      }
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root {
+    --paper: #ffffff;
+    --surface: #f8f9fa;
+    --surface-2: #eef1ef;
+    --line: #e3e7e4;
+    --line-strong: #cfd6d2;
+    --ink: #0b1210;
+    --ink-2: #3a453f;
+    --ink-3: #5c6b64;
+    --ink-4: #8b978f;
+
+    --teal: #08c875;
+    --teal-deep: #07985c;
+    --teal-soft: #e5fff2;
+    --ochre: #c0611c;
+    --ochre-soft: #f8ead9;
+
+    --good: #087a4b;
+    --good-soft: #e3f3ea;
+    --warn: #b07d1b;
+    --warn-soft: #f8eed6;
+
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(11,18,16,.05), 0 14px 34px rgba(11,18,16,.07);
+    --shadow-lg: 0 30px 80px rgba(11,18,16,.16);
+
+    --sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    --serif: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--teal-soft); }
+  h1,h2,h3,h4 { margin: 0; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; }
+  p { margin: 0; }
+  a { color: inherit; }
+  button, input, select { font-family: inherit; font-size: inherit; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
+  .eyebrow {
+    font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase;
+    font-weight: 700; color: var(--teal);
+  }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 4px; }
+
+  /* ---------------- nav ---------------- */
+  /* Always dark, regardless of the light/dark theme toggle: the logo file
+     is a light wordmark meant to sit on a dark bar, matching the reference. */
+  .nav {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 40;
+    background: transparent; border: 0;
+    transition: background .22s ease, box-shadow .22s ease, transform .22s ease;
+  }
+  .nav.is-scrolled {
+    position: fixed; background: rgba(0,10,13,.92); backdrop-filter: blur(14px);
+    box-shadow: none; border: 0; animation: navDrop .22s ease both;
+  }
+  @keyframes navDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+  .nav .wrap { position: relative; display: flex; align-items: center; gap: 18px; height: 82px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand-logo { height: 38px; width: auto; display: block; }
+  /* Centering lives on this wrapper, not on .nav-links itself: the intro
+     animation below sets its own transform on .nav-links (translateY, then
+     none), and that would silently overwrite a translateX(-50%) placed on
+     the same element once the animation finished. */
+  .nav-links-pos { position: absolute; left: 50%; transform: translateX(-50%); }
+  .nav-links { display: flex; gap: 34px; margin: 0; white-space: nowrap; }
+  .nav-links a { font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; }
+  .nav-links a:hover { color: #27f997; }
+  .nav-links a.active { color: #27f997; position: relative; }
+  .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; background: #27f997; border-radius: 2px; }
+  .nav .spacer { flex: 1; }
+  .nav .icobtn { border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: rgba(238,244,241,.82); }
+  .nav .icobtn:hover { color: #27f997; border-color: #27f997; }
+  .nav .btn.ghost { border-color: rgba(255,255,255,.22); color: #eef4f1; background: transparent; }
+  .nav .btn.ghost:hover { border-color: #27f997; color: #27f997; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 12px 22px; border-radius: 999px; font-size: 14px; font-weight: 750;
+    text-decoration: none; border: 1px solid transparent; cursor: pointer;
+    transition: background .14s, border-color .14s, transform .14s;
+  }
+  .btn svg { width: 16px; height: 16px; }
+  .btn.primary { background: linear-gradient(135deg, #0ce787, #2af0a0); color: #04130c; box-shadow: 0 10px 28px rgba(12,231,135,.2); }
+  .btn.primary:hover { background: var(--teal-deep); }
+  .btn.ghost { border-color: var(--line-strong); color: var(--ink); background: var(--surface); }
+  .btn.ghost:hover { border-color: var(--teal); color: var(--teal); }
+  .btn.sm { padding: 8px 15px; font-size: 14px; }
+  .icobtn {
+    width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--surface); display: grid; place-items: center; color: var(--ink-2); cursor: pointer;
+  }
+  .icobtn:hover { color: var(--teal); border-color: var(--teal); }
+  .icobtn svg { width: 17px; height: 17px; }
+
+  /* ---------------- mobile drawer ---------------- */
+  .nav-toggle { display: none; }
+  .drawer-backdrop {
+    position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45);
+    opacity: 0; pointer-events: none; transition: opacity .3s;
+  }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 71;
+    width: min(86vw, 340px); background: var(--surface); border-left: 1px solid var(--line);
+    box-shadow: var(--shadow-lg); display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform .4s cubic-bezier(.16,1,.3,1);
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head {
+    display: flex; align-items: center; gap: 10px; padding: 18px 20px;
+    background: rgba(0,11,15,.96); border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .drawer-head .icobtn { border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: rgba(238,244,241,.82); }
+  .drawer-head .icobtn:hover { color: #27f997; border-color: #27f997; }
+  .drawer-head .spacer { flex: 1; }
+  .drawer-links { display: flex; flex-direction: column; padding: 14px 10px; overflow-y: auto; }
+  .drawer-links a { padding: 13px 12px; border-radius: 9px; font-size: 15px; font-weight: 600; color: var(--ink-2); text-decoration: none; }
+  .drawer-links a:hover { background: var(--surface-2); color: var(--teal); }
+  .drawer-foot { margin-top: auto; padding: 16px 20px 22px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .drawer-foot .btn { width: 100%; }
+
+  /* ---------------- hero ---------------- */
+  /* Always dark, like the nav: this is a deliberate section treatment from
+     the reference, not tied to the light/dark theme toggle. */
+  .hero {
+    min-height: 720px; padding: 152px 0 86px; background: #02090b; color: #eef4f1; overflow: hidden;
+    background-image: linear-gradient(90deg, rgba(0,7,9,.98) 0%, rgba(0,7,9,.9) 30%, rgba(0,7,9,.38) 57%, rgba(0,7,9,.08) 100%), url('/assets/images/hero-image1.png');
+    background-size: cover; background-position: center;
+    display: flex; align-items: center;
+  }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 580px) 1fr; gap: 40px; align-items: center; width: 100%; }
+  .hero .eyebrow { color: #27f997; }
+  .hero h1 {
+    font-family: var(--serif); font-size: clamp(48px, 6.2vw, 78px);
+    line-height: .98; margin: 14px 0 24px; font-weight: 850; letter-spacing: -.045em; color: #fff;
+  }
+  .hero h1 em { font-style: normal; color: #27f997; }
+  .hero .lede { font-size: 18px; line-height: 1.55; color: rgba(248,252,250,.9); max-width: 31em; }
+  .hero .cta { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+  .hero .cta .btn.ghost { border-color: rgba(255,255,255,.22); color: #eef4f1; background: transparent; }
+  .hero .cta .btn.ghost:hover { border-color: #27f997; color: #27f997; }
+  .hero .note { margin-top: 20px; font-size: 13px; color: rgba(238,244,241,.72); }
+  .hero-photo { display: none; }
+
+  /* Shorter hero used on secondary pages (e.g. pricing): same dark photo
+     treatment as the homepage hero, just less vertical real estate since
+     there's no headline row of buttons underneath. */
+  .hero.hero-sm {
+    min-height: 0; padding: 150px 0 58px;
+    background-image: linear-gradient(90deg, rgba(0,7,9,.96) 0%, rgba(0,7,9,.82) 34%, rgba(0,7,9,.3) 60%, rgba(0,7,9,.05) 100%), url('/assets/images/pricing-hero.png');
+    background-position: center;
+  }
+  .hero.hero-sm h1 { font-size: clamp(38px, 5vw, 56px); margin: 12px 0 18px; }
+  .hero-badges { display: flex; flex-wrap: wrap; gap: 22px 28px; margin-top: 26px; }
+  .hero-badges span { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: rgba(238,244,241,.85); }
+  .hero-badges svg { width: 18px; height: 18px; flex: none; color: #27f997; }
+
+  /* ---------------- trusted-by strip ---------------- */
+  .trusted-strip { padding: 34px 0; border-bottom: 1px solid var(--line); border-radius: 24px 24px 0 0; margin-top: -24px; position: relative; z-index: 2; background: #fff; }
+  .trusted-label {
+    text-align: center; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+    font-weight: 700; color: var(--ink-4); margin-bottom: 20px;
+  }
+  .trusted-row {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 28px 38px;
+  }
+  .trusted-row span {
+    display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .trusted-row svg { width: 18px; height: 18px; flex: none; color: var(--ink-4); }
+
+  /* ---------------- services ---------------- */
+  .svc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .svc-card {
+    position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 20px 50px; box-shadow: 0 12px 36px rgba(11,18,16,.04);
+    transition: transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s ease, border-color .35s ease;
+  }
+  .svc-card:hover { transform: translateY(-8px); border-color: #cfe9dc; box-shadow: 0 24px 54px rgba(11,18,16,.12); }
+  .svc-tag {
+    position: absolute; top: 16px; right: 16px; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--teal); background: var(--teal-soft); padding: 3px 9px; border-radius: 999px;
+  }
+  .svc-icon {
+    width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 14px;
+  }
+  .svc-icon svg, .svc-icon img { width: 24px; height: 24px; display: block; }
+  .svc-icon-muse {
+    background-color: #eef2ff;
+    background-image: url('/assets/images/landing-page-reference.png');
+    background-size: 2500% auto; background-repeat: no-repeat;
+    background-position: 5.4% 41.75%; color: transparent;
+  }
+  .svc-icon-muse svg { display: none; }
+  .svc-icon-whatsapp { background: #e8fff1; }
+  .svc-icon-ig { background: #fff1f5; }
+  .svc-icon-blue { background: #dbeafe; color: #2563eb; }
+  .svc-icon-purple { background: #ede9fe; color: #7c3aed; }
+  .svc-icon-orange { background: #ffedd5; color: #c2410c; }
+  .svc-icon-green { background: var(--teal-soft); color: var(--teal); }
+  .svc-card h3 { font-size: 15.5px; margin-bottom: 7px; }
+  .svc-card p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .svc-arrow {
+    position: absolute; right: 18px; bottom: 18px; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-3);
+  }
+  .svc-arrow svg { width: 14px; height: 14px; }
+  .svc-arrow:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ---------------- how it works (icon steps) ---------------- */
+  .how-steps { display: flex; align-items: flex-start; gap: 8px; }
+  .how-step { flex: 1; min-width: 0; }
+  .how-ic {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--teal); color: #fff;
+    display: grid; place-items: center; margin-bottom: 16px;
+  }
+  .how-ic svg { width: 20px; height: 20px; }
+  .how-step h3 { font-size: 15.5px; margin-bottom: 7px; }
+  .how-step p { font-size: 13.5px; color: var(--ink-2); }
+  .how-chevron { flex: none; align-self: center; margin-top: 22px; color: var(--ink-4); font-size: 20px; }
+
+  /* ---------------- industries ---------------- */
+  .industry-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .industry-card {
+    background: transparent; border: 0; border-radius: 0; padding: 0;
+    overflow: hidden; position: relative; min-height: 0;
+  }
+  .industry-ic {
+    width: 100%; aspect-ratio: 1.25; border-radius: 13px; color: transparent;
+    display: block; margin-bottom: 12px; background-image: url('/assets/images/black-african-industries.png');
+    background-size: 600% auto; background-repeat: no-repeat; background-position-y: 8%;
+    transition: transform .55s cubic-bezier(.16,1,.3,1), filter .4s ease;
+  }
+  .industry-ic svg { display: none; }
+  .industry-card:nth-child(1) .industry-ic { background-position-x: 0%; }
+  .industry-card:nth-child(2) .industry-ic { background-position-x: 20%; }
+  .industry-card:nth-child(3) .industry-ic { background-position-x: 40%; }
+  .industry-card:nth-child(4) .industry-ic { background-position-x: 60%; }
+  .industry-card:nth-child(5) .industry-ic { background-position-x: 80%; }
+  .industry-card:nth-child(6) .industry-ic { background-position-x: 100%; }
+  .industry-card:hover .industry-ic { transform: scale(1.035); filter: saturate(1.06); }
+  .industry-card h3 { font-size: 16px; margin-bottom: 6px; }
+  .industry-card p { font-size: 13.5px; color: var(--ink-2); }
+
+  /* ---------------- testimonial ---------------- */
+  .testimonial-band { background: #fff; color: #eef4f1; padding-top: 28px; }
+  .testimonial-shell { background: #001015; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,16,21,.16); }
+  .testimonial-grid { display: grid; grid-template-columns: 1.05fr 1.12fr 1fr; gap: 0; align-items: stretch; padding: 0; }
+  .testimonial-photo {
+    min-height: 320px;
+    background-image:
+      linear-gradient(90deg, rgba(0,16,21,0) 45%, rgba(0,16,21,.55) 78%, #001015 100%),
+      linear-gradient(0deg, #001015 0%, rgba(0,16,21,0) 22%, rgba(0,16,21,0) 82%, #001015 100%),
+      url('/assets/images/hero-image1.png');
+    background-position: center, center, 72% 18%;
+    background-size: cover, cover, 190% auto;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+  }
+  .testimonial-quote { padding: 48px 38px; display: flex; flex-direction: column; justify-content: center; }
+  .quote-mark { width: 30px; height: 30px; color: #27f997; margin-bottom: 12px; }
+  .testimonial-quote p {
+    font-family: var(--serif); font-size: clamp(22px, 2.35vw, 31px); line-height: 1.25; font-weight: 800;
+  }
+  .testimonial-attr { margin-top: 16px; font-size: 13.5px; color: rgba(238,244,241,.65); }
+  .testimonial-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 34px; align-content: center; }
+  .tstat { min-height: 190px; padding: 26px; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(255,255,255,.035); transition: transform .3s ease, background .3s ease; }
+  .tstat:hover { transform: translateY(-4px); background: rgba(255,255,255,.07); }
+  .tstat-icon { width: 38px; height: 38px; display: block; margin-bottom: 22px; color: #27f997; }
+  .tstat b {
+    display: block; font-family: var(--serif); font-size: 38px; font-weight: 700; color: #27f997;
+    letter-spacing: -.02em; line-height: 1;
+  }
+  .tstat b:empty { display: none; }
+  .tstat span { display: block; margin-top: 8px; font-size: 16px; line-height: 1.4; color: rgba(238,244,241,.85); }
+
+  @media (max-width: 700px) {
+    .svc-grid { grid-template-columns: repeat(2, 1fr); }
+    .how-steps { flex-direction: column; gap: 26px; }
+    .how-chevron { display: none; }
+    .industry-grid { grid-template-columns: 1fr; }
+    .testimonial-grid { grid-template-columns: 1fr; gap: 30px; }
+    .testimonial-stats { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* voucher card - the hero's thesis, not decoration */
+  .voucher {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-lg); overflow: hidden;
+  }
+  .v-head { padding: 15px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 11px; }
+  .v-head .t { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+  .v-head .s { font-size: 11.5px; color: var(--ink-3); }
+  .v-badge {
+    margin-left: auto; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+    background: var(--warn-soft); color: var(--warn);
+  }
+  .v-body { padding: 6px 18px 14px; }
+  .v-row {
+    display: flex; justify-content: space-between; gap: 16px; padding: 7px 0;
+    font-size: 13.5px; border-bottom: 1px dashed var(--line);
+  }
+  .v-row:last-child { border-bottom: none; }
+  .v-row span:first-child { color: var(--ink-3); }
+  .v-row b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .v-row.total { border-top: 1px solid var(--line-strong); border-bottom: none; margin-top: 5px; padding-top: 11px; }
+  .v-row.total span:first-child { color: var(--ink); font-weight: 600; }
+  .v-row.total b { font-size: 17px; color: var(--teal); }
+  .v-note {
+    margin: 0 18px 14px; padding: 9px 12px; border-radius: 9px; background: var(--teal-soft);
+    font-size: 12px; color: var(--teal-deep); display: flex; gap: 8px; align-items: flex-start;
+  }
+  .v-foot { padding: 13px 18px; border-top: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; gap: 10px; }
+  .sig { display: flex; align-items: center; gap: 9px; }
+  .sig-av { width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+  .sig .n { font-size: 12.5px; font-weight: 600; }
+  .sig .r { font-size: 11px; color: var(--ink-3); }
+
+  /* ---------------- sections ---------------- */
+  section { padding: 84px 0; }
+  .sec-head { max-width: 44rem; margin-bottom: 42px; }
+  .sec-head h2 { font-family: var(--serif); font-size: clamp(27px, 3.4vw, 37px); line-height: 1.14; margin: 13px 0 14px; font-weight: 800; letter-spacing: -.015em; }
+  .sec-head p { font-size: 17px; color: var(--ink-2); }
+
+  .band { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+  /* roles */
+  .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .role {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px; position: relative; box-shadow: var(--shadow);
+  }
+  .band .role { background: var(--paper); }
+  .role .tier { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); font-weight: 700; }
+  .role h3 { font-size: 18px; margin: 9px 0 8px; }
+  .role p { font-size: 14px; color: var(--ink-2); }
+  .role ul { margin: 13px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .role li { font-size: 13.5px; color: var(--ink-2); display: flex; gap: 9px; align-items: flex-start; }
+  .role li svg { width: 15px; height: 15px; flex: none; margin-top: 3px; color: var(--teal); }
+  .role .sees { margin-top: 15px; padding-top: 13px; border-top: 1px dashed var(--line); font-size: 12.5px; color: var(--ink-3); }
+  .role .sees b { color: var(--ink); }
+
+  /* chain */
+  .chain { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; align-items: stretch; }
+  .step { padding: 26px 24px; border-left: 3px solid var(--line); }
+  .step:first-child { border-left-color: var(--teal); }
+  .step .n { font-family: var(--mono); font-size: 12px; color: var(--ink-4); font-weight: 600; }
+  .step h3 { font-size: 18px; margin: 8px 0 9px; }
+  .step p { font-size: 14.5px; color: var(--ink-2); }
+
+  /* feature rows */
+  .feat { display: grid; grid-template-columns: 1fr 1fr; gap: 54px; align-items: center; }
+  .feat + .feat { margin-top: 74px; }
+  .feat h3 { font-family: var(--serif); font-size: 27px; margin: 12px 0 14px; }
+  .feat p { font-size: 16.5px; color: var(--ink-2); }
+  .feat ul { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 11px; }
+  .feat li { display: flex; gap: 11px; font-size: 15px; color: var(--ink-2); align-items: flex-start; }
+  .feat li svg { width: 17px; height: 17px; flex: none; margin-top: 4px; color: var(--teal); }
+
+  /* chat mock */
+  .chat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .chat-head { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+  .chat-body { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
+  .bub { max-width: 84%; padding: 10px 13px; border-radius: 13px; font-size: 13.5px; line-height: 1.55; }
+  .bub.them { background: var(--surface-2); border-top-left-radius: 4px; }
+  .bub.me { align-self: flex-end; background: var(--teal); color: #fff; border-top-right-radius: 4px; }
+  .bub .who { display: block; font-size: 11px; font-weight: 700; margin-bottom: 3px; opacity: .8; }
+  .file {
+    display: inline-flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 10px;
+    background: var(--paper); border: 1px solid var(--line); font-size: 12.5px; margin-top: 7px;
+  }
+  .file svg { width: 16px; height: 16px; color: var(--ochre); }
+  .bub.agent { background: var(--ochre-soft); border: 1px solid var(--ochre); }
+  .bub.agent .who { color: var(--ochre); }
+
+  /* proof strip - a lightweight divider band, not a full section: less
+     vertical padding than .sec-head sections, and dividers between the
+     stats so three short lines read as one connected strip rather than
+     floating alone in a lot of white space. */
+  .proof-section { padding: 42px 0; }
+  .proof-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; text-align: center; }
+  .proof-stat { padding: 0 22px; border-left: 1px solid var(--line); }
+  .proof-stat:first-child { border-left: none; }
+  .proof-stat b { display: block; font-family: var(--serif); font-size: clamp(26px, 3.2vw, 34px); font-weight: 600; color: var(--teal); letter-spacing: -.02em; }
+  .proof-stat span { display: block; margin-top: 6px; font-size: 14px; color: var(--ink-2); }
+  @media (max-width: 900px) {
+    .proof-strip { grid-template-columns: 1fr; gap: 22px; }
+    .proof-stat { border-left: none; padding: 0; }
+  }
+
+  /* trust */
+  .trust { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .tcard { padding: 24px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+  .band .tcard { background: var(--paper); }
+  .tcard h4 { font-size: 16.5px; margin-bottom: 9px; }
+  .tcard p { font-size: 14px; color: var(--ink-2); }
+  .tcard .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; margin-bottom: 14px; }
+  .tcard .ic svg { width: 18px; height: 18px; }
+
+  /* integrations - a continuous marquee, not a manual scroller: the strip
+     is two identical copies of the same 18 chips laid side by side, and
+     the whole thing translates by exactly one copy's width (-50%) on a
+     loop, so the seam is invisible. Pauses on hover/focus so someone can
+     actually read a chip, and drops the animation under reduced motion. */
+  .tool-scroll-wrap { position: relative; margin: 0 -4px; overflow: hidden; }
+  .tool-scroll-wrap::before, .tool-scroll-wrap::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 48px; pointer-events: none; z-index: 1;
+  }
+  .tool-scroll-wrap::before { left: 0; background: linear-gradient(90deg, var(--paper), transparent); }
+  .tool-scroll-wrap::after { right: 0; background: linear-gradient(270deg, var(--paper), transparent); }
+  .band .tool-scroll-wrap::before { background: linear-gradient(90deg, var(--surface), transparent); }
+  .band .tool-scroll-wrap::after { background: linear-gradient(270deg, var(--surface), transparent); }
+  .tool-scroll {
+    display: flex; gap: 12px; width: max-content; padding: 4px 4px 16px;
+    animation: tool-scroll-marquee 46s linear infinite;
+  }
+  .tool-scroll-wrap:hover .tool-scroll, .tool-scroll-wrap:focus-within .tool-scroll { animation-play-state: paused; }
+  @keyframes tool-scroll-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .tool-scroll { animation: none; } }
+  .tool-scroll-track { flex: none; display: flex; gap: 12px; }
+  .tool-chip {
+    flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 11px 17px 11px 12px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface); box-shadow: var(--shadow);
+  }
+  .band .tool-chip { background: var(--paper); }
+  .tool-chip .ico {
+    width: 30px; height: 30px; flex: none; border-radius: 8px; background: #fff;
+    border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden;
+  }
+  .tool-chip img { width: 18px; height: 18px; object-fit: contain; }
+  .tool-chip span { font-size: 13.5px; font-weight: 600; white-space: nowrap; color: var(--ink); }
+
+  /* pricing */
+  .aud-toggle {
+    display: inline-flex; gap: 3px; padding: 4px; margin-bottom: 26px;
+    background: var(--surface-2); border-radius: 11px; border: 1px solid var(--line);
+  }
+  .band .aud-toggle { background: var(--paper); }
+  .currency-switch { display:flex; justify-content:center; align-items:center; gap:8px; margin:12px 0 4px; color:var(--ink-3); font-size:12px; }
+  .currency-switch button { border:1px solid var(--line); background:var(--paper); color:var(--ink-2); border-radius:999px; padding:6px 11px; cursor:pointer; font-weight:700; }
+  .currency-switch button.active { background:var(--teal-deep); color:#fff; border-color:var(--teal-deep); }
+  .aud {
+    padding: 9px 20px; border-radius: 8px; border: none; background: transparent;
+    font-size: 14px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+  }
+  .aud.active { background: var(--surface); color: var(--teal); box-shadow: var(--shadow); }
+  .band .aud.active { background: var(--surface); }
+
+  .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; align-items: start; }
+  .plan {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px 24px; display: flex; flex-direction: column; gap: 16px; position: relative;
+  }
+  .band .plan { background: var(--paper); }
+  .plan.featured { border-color: var(--teal); box-shadow: var(--shadow); }
+  .plan .pop {
+    position: absolute; top: -11px; left: 24px; background: var(--teal); color: #fff;
+    font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .plan h3 { font-size: 17px; }
+  .plan .price { display: flex; align-items: baseline; gap: 7px; }
+  .plan .price b { font-family: var(--serif); font-size: 34px; font-weight: 600; letter-spacing: -.03em; }
+  .plan .price span { font-size: 13.5px; color: var(--ink-3); }
+  .plan ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .plan li { font-size: 14px; color: var(--ink-2); display: flex; gap: 9px; align-items: flex-start; }
+  .plan li svg { width: 15px; height: 15px; flex: none; margin-top: 3.5px; color: var(--teal); }
+  .plan li.off { color: var(--ink-4); }
+  .plan li.off svg { color: var(--ink-4); }
+  .plan .btn { margin-top: auto; }
+  .plans-note { margin-top: 22px; font-size: 13.5px; color: var(--ink-3); }
+  .plans-loading { font-size: 14.5px; color: var(--ink-3); }
+
+  /* plans page: header row (headline + billing toggle) and card icon badges */
+  .plans-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 34px; flex-wrap: wrap; }
+  .billing-toggle { display: flex; align-items: center; gap: 12px; flex: none; }
+  .billing-toggle .aud-toggle-inner { display: inline-flex; gap: 3px; padding: 4px; background: var(--surface-2); border-radius: 999px; border: 1px solid var(--line); }
+  .billing-toggle .aud { border-radius: 999px; padding: 8px 18px; }
+  .billing-toggle .save-badge {
+    font-size: 11.5px; font-weight: 700; color: var(--teal-deep); background: var(--teal-soft);
+    padding: 5px 11px; border-radius: 999px;
+  }
+  .plan-icon {
+    width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+  }
+  .plan-icon svg { width: 21px; height: 21px; }
+  .plan-icon-green { background: var(--teal-soft); color: var(--teal-deep); }
+  .plan-icon-blue { background: #dbeafe; color: #2563eb; }
+  .plan-icon-teal { background: #ccfbef; color: #0d9488; }
+  .plan-icon-purple { background: #ede9fe; color: #7c3aed; }
+  .plan-desc { font-size: 13.5px; color: var(--ink-2); margin-top: -8px; }
+  .plan-social-row { padding-left: 24px; }
+  .plan-social-icons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .plan-social-icons img {
+    width: 22px; height: 22px; padding: 4px; border-radius: 7px;
+    background: var(--paper); border: 1px solid var(--line); object-fit: contain;
+  }
+  .price-ghs { font-size: 12.5px; color: var(--ink-3); margin-top: -10px; }
+
+  /* compare table */
+  .compare-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+  .compare-table { width: 100%; border-collapse: collapse; min-width: 640px; background: var(--paper); }
+  .compare-table th, .compare-table td { padding: 14px 18px; text-align: center; font-size: 13.5px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .compare-table td:first-child, .compare-table th:first-child { text-align: left; color: var(--ink); font-weight: 600; white-space: normal; min-width: 220px; }
+  .compare-table thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 700; background: var(--surface); }
+  .compare-table tbody td { color: var(--ink-2); }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table th.hl, .compare-table td.hl { background: var(--teal-soft); color: var(--ink); font-weight: 600; }
+  .compare-table td.yes { color: var(--teal-deep); font-weight: 700; font-size: 16px; }
+  .compare-table td.no { color: var(--ink-4); }
+
+  /* faq */
+  .faq-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; max-width: none; }
+  .faq-head .btn.ghost { flex: none; }
+  .faq-list { max-width: 46rem; display: flex; flex-direction: column; gap: 10px; }
+  .faq-list-2col { max-width: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 700px) { .faq-list-2col { grid-template-columns: 1fr; } }
+  .faq-item {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden;
+  }
+  .band .faq-item { background: var(--paper); }
+  .faq-item summary {
+    padding: 17px 20px; font-size: 15px; font-weight: 600; cursor: pointer; list-style: none;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary svg { width: 17px; height: 17px; flex: none; color: var(--ink-3); transition: transform .15s; }
+  .faq-item[open] summary svg { transform: rotate(45deg); }
+  .faq-a { padding: 0 20px 18px; font-size: 14.5px; color: var(--ink-2); line-height: 1.6; }
+
+  /* closing CTA: horizontal structure from the supplied reference */
+  .cta-band { display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 54px; align-items: center; background: linear-gradient(110deg, #ecfff5, #d9ffed); color: var(--ink); border-radius: 22px; padding: 40px 68px; text-align: left; position: relative; overflow: hidden; }
+  .cta-band .cta-eyebrow { grid-column: 1; display: block; margin-bottom: 7px; color: var(--ink-3); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .cta-band::after { content: ""; position: absolute; width: 330px; height: 330px; right: -95px; bottom: -225px; border-radius: 50%; background: rgba(12,231,135,.2); }
+  .cta-band h2 { grid-column: 1; font-family: var(--serif); font-size: clamp(28px, 3.6vw, 40px); margin-bottom: 8px; color: var(--ink); font-weight: 800; letter-spacing: -.025em; }
+  .cta-band > p:not(.fine) { grid-column: 1; font-size: 16px; color: var(--ink-2); max-width: 52ch; margin: 0; }
+  .cta-row { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 8px; justify-content: center; align-items: center; position: relative; z-index: 1; }
+  .cta-row .btn.ghost { border: 0; padding: 3px 8px; background: transparent; color: var(--ink-2); font-size: 12px; }
+  .cta-band .fine { font-size: 12.5px; color: var(--ink-3); margin: 0; text-align: center; }
+
+  footer { padding: 54px 0 42px; border-top: 0; margin-top: 64px; background: #001015; color: #eef4f1; border-radius: 28px 28px 0 0; }
+  .foot { display: grid; grid-template-columns: 1.2fr .9fr .9fr 1.1fr; gap: 36px; align-items: start; }
+  .foot p { font-size: 13.5px; color: rgba(238,244,241,.58); }
+  .foot-brand img { height: 32px; width: auto; margin-bottom: 14px; }
+  .foot-group { display: flex; flex-direction: column; gap: 9px; }
+  .foot-group b { font-size: 13px; margin-bottom: 4px; color: #fff; }
+  .foot-group a { font-size: 13px; color: rgba(238,244,241,.7); }
+  .foot-bottom { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 18px; padding-top: 26px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,.1); }
+  .foot a { color: var(--teal); text-decoration: none; font-weight: 600; }
+  .foot-legal { display: flex; gap: 12px; flex-wrap: wrap; }
+  .foot-contact { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .foot-ic {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+    display: grid; place-items: center; color: var(--ink-2);
+  }
+  .foot-ic:hover { color: var(--teal); border-color: var(--teal); }
+  .foot-ic svg, .foot-ic img { width: 16px; height: 16px; display: block; }
+  .foot-ic[hidden] { display: none; }
+  .foot-contact-link { font-size: 13px; }
+
+  @media (max-width: 1040px) {
+    .hero-grid, .feat { grid-template-columns: 1fr; gap: 38px; }
+    .svc-grid { grid-template-columns: repeat(2, 1fr); }
+    .nav-links-pos { display: none; }
+    .nav-toggle { display: grid; }
+    .nav .wrap > a.btn { display: none; }
+    .hero { min-height: 680px; padding-top: 132px; background-position: 62% center; }
+    .hero.hero-sm { min-height: 0; padding-top: 132px; background-position: 74% center; }
+    .hero-grid { grid-template-columns: minmax(0, 560px); }
+    .testimonial-grid { grid-template-columns: 1fr 1.15fr; }
+    .testimonial-photo { display: none; }
+    .foot { grid-template-columns: 1fr 1fr; }
+    .industry-grid { grid-template-columns: repeat(3, 1fr); }
+    section { padding: 56px 0; }
+    .cta-band { padding: 38px 32px; grid-template-columns: 1fr; row-gap: 10px; }
+    .cta-row { grid-column: 1; grid-row: auto; align-items: flex-start; margin-top: 12px; }
+  }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 20px; }
+    .hero { min-height: 700px; padding: 118px 0 64px; background-image: linear-gradient(90deg, rgba(0,7,9,.97), rgba(0,7,9,.88)), url('/assets/images/hero-image1.png'); background-position: 66% center; }
+    .hero.hero-sm { min-height: 0; padding: 128px 0 44px; background-image: linear-gradient(90deg, rgba(0,7,9,.97) 0%, rgba(0,7,9,.9) 55%, rgba(0,7,9,.6) 100%), url('/assets/images/pricing-hero.png'); background-position: 78% center; }
+    .hero h1 { font-size: clamp(42px, 14vw, 62px); }
+    .hero .lede { font-size: 16px; }
+    .svc-grid { grid-template-columns: 1fr; }
+    .testimonial-grid { grid-template-columns: 1fr; }
+    .testimonial-quote { padding: 36px 24px 18px; }
+    .testimonial-stats { padding: 18px 24px 32px; }
+    .tstat { min-height: 108px; padding: 16px; }
+    .cta-band { padding: 34px 24px; }
+    .foot { grid-template-columns: 1fr; }
+    .foot-bottom { align-items: flex-start; flex-direction: column; }
+    .brand-logo { height: 32px; }
+    .industry-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* ---- Ask Ada (public demo widget) ---- */
+  .ada-launcher {
+    position: fixed; right: 22px; bottom: 22px; z-index: 60; width: 58px; height: 58px;
+    border-radius: 50%; border: 0; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--teal), var(--teal-deep)); color: #fff;
+    box-shadow: var(--shadow-lg); cursor: pointer; transition: transform .15s;
+  }
+  .ada-launcher:hover { transform: scale(1.05); }
+  .ada-launcher svg { width: 24px; height: 24px; }
+  .ada-launcher-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: 999px; background: var(--ochre); color: #fff; font: 700 11px var(--sans);
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px var(--paper);
+    animation: adaBadgePulse 1.8s ease-in-out infinite;
+  }
+  .ada-launcher-badge.hidden { display: none; }
+  @keyframes adaBadgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  .ada-launcher-status {
+    position: absolute; bottom: 3px; right: 3px; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--ink-4); border: 2px solid var(--paper);
+  }
+  .ada-launcher-status.online { background: var(--good); }
+  #adaPanelStatus { display: flex; align-items: center; gap: 5px; }
+  #adaPanelStatus .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-4); flex: none; }
+  #adaPanelStatus .status-dot.online { background: var(--good); }
+  .ada-offline-notice {
+    background: var(--warn-soft); border: 1px solid var(--warn); color: var(--ink-2);
+    border-radius: 10px; padding: 9px 12px; font-size: 12px; line-height: 1.5; margin-bottom: 12px;
+  }
+  .ada-panel {
+    position: fixed; right: 22px; bottom: 92px; z-index: 60; width: 360px; max-width: calc(100vw - 32px);
+    height: min(520px, calc(100vh - 140px)); background: var(--surface); border: 1px solid var(--line);
+    border-radius: 16px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;
+    opacity: 0; transform: translateY(12px) scale(.98); pointer-events: none; transition: opacity .16s, transform .16s;
+  }
+  .ada-panel.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .ada-panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .ada-panel-head .av {
+    width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--teal), var(--teal-deep)); color: #fff; font: 800 12px var(--sans);
+  }
+  .ada-panel-head b { display: block; font-size: 14px; }
+  .ada-panel-head span { display: block; font-size: 11px; color: var(--ink-3); }
+  .ada-panel-close { margin-left: auto; border: 0; background: transparent; color: var(--ink-3); cursor: pointer; padding: 4px; display: grid; place-items: center; }
+  .ada-panel-close svg { width: 18px; height: 18px; }
+  .ada-panel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+  .ada-panel-log { display: flex; flex-direction: column; gap: 12px; }
+  .ada-panel-msg { display: flex; gap: 8px; }
+  .ada-panel-msg .bub { max-width: 86%; padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+  .ada-panel-msg.ai .bub { background: var(--surface-2); border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .ada-panel-msg.me { flex-direction: row-reverse; }
+  .ada-panel-msg.me .bub { background: var(--teal); color: #fff; border-top-right-radius: 4px; }
+  .ada-reg-card {
+    border: 1px solid var(--teal); border-radius: 12px; background: var(--teal-soft);
+    padding: 13px 14px; font-size: 12.5px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .ada-reg-card .t { font-weight: 700; color: var(--teal-deep); font-size: 13px; }
+  .ada-reg-card .row { display: flex; justify-content: space-between; gap: 8px; color: var(--ink-2); }
+  .ada-reg-card .row b { color: var(--ink); font-weight: 600; }
+  .ada-reg-card input:not([type=checkbox]) {
+    padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--surface); color: var(--ink); font-size: 12.5px; width: 100%;
+  }
+  .ada-reg-card label.terms { display: flex; align-items: flex-start; gap: 7px; font-size: 11.5px; color: var(--ink-2); }
+  .ada-reg-card label.terms input { margin-top: 2px; flex: none; }
+  .ada-reg-card label.terms a { color: var(--teal-deep); font-weight: 600; }
+  .ada-reg-card button {
+    padding: 9px 12px; border-radius: 9px; border: 0; background: var(--teal); color: #fff;
+    font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .ada-reg-card button:disabled { opacity: .6; cursor: default; }
+  .ada-reg-card .err { color: var(--bad); font-size: 11.5px; display: none; }
+  .ada-reg-card .err.show { display: block; }
+  .ada-reg-card .ok { display: flex; flex-direction: column; gap: 8px; }
+  .ada-reg-card .ok a.pay {
+    display: inline-flex; align-items: center; justify-content: center; padding: 9px 12px;
+    border-radius: 9px; background: var(--teal); color: #fff; font-weight: 700; text-decoration: none;
+  }
+  .ada-starters-mini { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+  .ada-starter-mini { text-align: left; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-2); font-size: 12px; cursor: pointer; }
+  .ada-starter-mini:hover { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+  .ada-panel-foot { border-top: 1px solid var(--line); padding: 10px 12px; }
+  .ada-panel-box { display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 11px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); }
+  .ada-panel-box textarea { flex: 1; max-height: 90px; padding: 4px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: 13px/1.5 var(--sans); }
+  .ada-panel-send { width: 30px; height: 30px; border: 0; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--teal); color: #fff; cursor: pointer; }
+  .ada-panel-send svg { width: 15px; height: 15px; }
+  .ada-typing { display: flex; align-items: center; gap: 4px; padding: 3px 2px; }
+  .ada-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: adaBlink 1.3s ease-in-out infinite; }
+  .ada-typing i:nth-child(2) { animation-delay: .18s; }
+  .ada-typing i:nth-child(3) { animation-delay: .36s; }
+  @keyframes adaBlink { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+  /* Voice: hear Ada's replies aloud (UK English, female) */
+  .ada-voice-btn { align-self: flex-end; flex: none; width: 24px; height: 24px; margin-bottom: 2px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); cursor: pointer; display: grid; place-items: center; opacity: .55; transition: opacity .15s, color .15s, background .15s; }
+  .ada-voice-btn:hover { opacity: 1; color: var(--teal); background: var(--teal-soft); }
+  .ada-voice-btn svg { width: 14px; height: 14px; }
+  .ada-voice-btn.speaking { opacity: 1; color: var(--teal); background: var(--teal-soft); }
+  .ada-voice-btn.speaking svg { animation: adaVoicePulse 1s ease-in-out infinite; }
+  @keyframes adaVoicePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+  .ada-auto-btn { flex: none; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink-3); cursor: pointer; display: grid; place-items: center; transition: color .15s, background .15s, border-color .15s; }
+  .ada-auto-btn:hover { color: var(--teal); border-color: var(--teal); }
+  .ada-auto-btn svg { width: 16px; height: 16px; }
+  .ada-auto-btn.on { color: #fff; background: var(--teal); border-color: var(--teal); }
+  /* Voice input: let the visitor dictate their message */
+  .ada-mic-btn { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; display: grid; place-items: center; background: transparent; color: var(--ink-3); cursor: pointer; transition: color .15s, background .15s; }
+  .ada-mic-btn:hover { color: var(--teal); background: var(--teal-soft); }
+  .ada-mic-btn svg { width: 16px; height: 16px; }
+  .ada-mic-btn.listening { color: #fff; background: var(--bad); }
+  .ada-mic-btn.listening svg { animation: adaMicPulse 1s ease-in-out infinite; }
+  @keyframes adaMicPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+  @media (max-width: 480px) {
+    .ada-panel { right: 12px; left: 12px; width: auto; bottom: 84px; }
+    .ada-launcher { right: 16px; bottom: 16px; }
+  }
+
+  /* ---- Scroll-reveal: sections ease in as they enter the viewport ---- */
+  /* The hidden state is pure CSS keyed on html.anim, which the head script
+     sets before first paint (so there's no flash) and only when motion is
+     allowed. With JS disabled, .anim is never added and everything shows. */
+  html.anim .sec-head,
+  html.anim .hero-grid > div,
+  html.anim .plans > .plan,
+  html.anim .cta-band {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity .7s cubic-bezier(.16, .8, .3, 1), transform .7s cubic-bezier(.16, .8, .3, 1);
+    will-change: opacity, transform;
+  }
+  html.anim .reveal-in { opacity: 1 !important; transform: none !important; }
+  html.anim body:not(.page-ready) .nav .brand,
+  html.anim body:not(.page-ready) .nav-links,
+  html.anim body:not(.page-ready) .nav .btn,
+  html.anim body:not(.page-ready) .hero h1,
+  html.anim body:not(.page-ready) .hero .lede,
+  html.anim body:not(.page-ready) .hero .cta,
+  html.anim body:not(.page-ready) .hero .note,
+  html.anim body:not(.page-ready) .hero .hero-badges { opacity: 0; transform: translateY(18px); }
+  html.anim body.page-ready .nav .brand,
+  html.anim body.page-ready .nav-links,
+  html.anim body.page-ready .nav .btn,
+  html.anim body.page-ready .hero h1,
+  html.anim body.page-ready .hero .lede,
+  html.anim body.page-ready .hero .cta,
+  html.anim body.page-ready .hero .note,
+  html.anim body.page-ready .hero .hero-badges { animation: pageIntro .75s cubic-bezier(.16,1,.3,1) both; }
+  html.anim body.page-ready .nav-links { animation-delay: .08s; }
+  html.anim body.page-ready .nav .btn { animation-delay: .13s; }
+  html.anim body.page-ready .hero h1 { animation-delay: .16s; }
+  html.anim body.page-ready .hero .lede { animation-delay: .26s; }
+  html.anim body.page-ready .hero .cta { animation-delay: .36s; }
+  html.anim body.page-ready .hero .note { animation-delay: .44s; }
+  html.anim body.page-ready .hero .hero-badges { animation-delay: .36s; }
+  @keyframes pageIntro { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    html.anim .sec-head,
+    html.anim .hero-grid > div,
+    html.anim .plans > .plan,
+    html.anim .cta-band { opacity: 1 !important; transform: none !important; transition: none !important; }
+  }
+</style>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <img class="brand-logo" src="/assets/images/buinee-logo.png" alt="Buinee">
+    </a>
+    <span class="nav-links-pos">
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/#services">Services</a>
+        <a href="/#how">How It Works</a>
+        <a href="/pricing" class="active" aria-current="page">Pricing</a>
+        <a href="/#industries">Industries</a>
+        <a href="/case-studies">Case Studies</a>
+      </nav>
+    </span>
+    <span class="spacer"></span>
+    <a class="btn primary sm" href="/register">Get started</a>
+    <button class="icobtn nav-toggle" onclick="toggleDrawer()" aria-label="Toggle navigation" aria-expanded="false" aria-controls="navDrawer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="toggleDrawer(false)"></div>
+<div class="drawer" id="navDrawer" role="dialog" aria-label="Navigation menu">
+  <div class="drawer-head">
+    <img class="brand-logo" src="/assets/images/buinee-logo.png" alt="Buinee">
+    <span class="spacer"></span>
+    <button class="icobtn" onclick="toggleDrawer(false)" aria-label="Close menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <nav class="drawer-links">
+    <a href="/">Home</a>
+    <a href="/#services">Services</a>
+    <a href="/#how">How It Works</a>
+    <a href="/pricing" class="active" aria-current="page">Pricing</a>
+    <a href="/#industries">Industries</a>
+    <a href="/case-studies">Case Studies</a>
+  </nav>
+  <div class="drawer-foot">
+    <a class="btn ghost" href="/login">Sign in</a>
+    <a class="btn primary" href="/register">Get started</a>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- ============ PRICING HERO ============ -->
+  <section class="hero hero-sm">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">{{cms:pricing_eyebrow}}</span>
+        <h1>{{cms:pricing_headline}}</h1>
+        <p class="lede">{{cms:pricing_subtext}}</p>
+        <div class="hero-badges">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>{{cms:pricing_badge1}}</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>{{cms:pricing_badge2}}</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>{{cms:pricing_badge3}}</span>
+        </div>
+      </div>
+
+      <span aria-hidden="true"></span>
+    </div>
+  </section>
+
+  <!-- ============ PLANS ============ -->
+  <section id="plans">
+    <div class="wrap">
+      <div class="plans-head">
+        <div class="sec-head" style="margin-bottom:0">
+          <span class="eyebrow">{{cms:pricing_plans_eyebrow}}</span>
+          <h2>{{cms:pricing_plans_headline}}</h2>
+          <p>{{cms:pricing_plans_subtext}}</p>
+        </div>
+        <div class="billing-toggle" id="billingToggle">
+          <div class="aud-toggle-inner" role="group" aria-label="Billing period">
+            <button type="button" class="aud active" data-period="monthly">{{cms:pricing_toggle_monthly}}</button>
+            <button type="button" class="aud" data-period="yearly">{{cms:pricing_toggle_yearly}}</button>
+          </div>
+          <span class="save-badge">{{cms:pricing_toggle_save}}</span>
+        </div>
+      </div>
+
+      <div class="plans">
+        <div class="plan">
+          <span class="plan-icon plan-icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-11 11M22 2l-7 20-4-9-9-4 20-7Z"/></svg></span>
+          <h3>{{cms:pricing1_name}}</h3>
+          <p class="plan-desc">{{cms:pricing1_desc}}</p>
+          <div class="price">
+            <b data-usd data-monthly="{{cms:pricing1_price_usd}}" data-yearly="{{cms:pricing1_price_usd_yearly}}">{{cms:pricing1_price_usd}}</b>
+            <span>{{cms:pricing_period_label}}</span>
+          </div>
+          <div class="price-ghs" data-ghs data-monthly="{{cms:pricing1_price_ghs}}" data-yearly="{{cms:pricing1_price_ghs_yearly}}">{{cms:pricing1_price_ghs}}</div>
+          <a class="btn ghost" href="/register">{{cms:pricing1_cta_label}}</a>
+          <ul>
+            {{cms:pricing1_features_pre}}
+            <li class="plan-social-row">
+              <span class="plan-social-icons" role="img" aria-label="WhatsApp, Instagram, Facebook, LinkedIn and YouTube">
+                <img src="/assets/images/whatsapp.svg" alt="">
+                <img src="/assets/images/instagram.svg" alt="">
+                <img src="/assets/images/facebook.svg" alt="">
+                <img src="/assets/images/linkedin.svg" alt="">
+                <img src="/assets/images/youtube.svg" alt="">
+              </span>
+            </li>
+            {{cms:pricing1_features_post}}
+          </ul>
+        </div>
+
+        <div class="plan">
+          <span class="plan-icon plan-icon-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M2 20h20"/></svg></span>
+          <h3>{{cms:pricing2_name}}</h3>
+          <p class="plan-desc">{{cms:pricing2_desc}}</p>
+          <div class="price">
+            <b data-usd data-monthly="{{cms:pricing2_price_usd}}" data-yearly="{{cms:pricing2_price_usd_yearly}}">{{cms:pricing2_price_usd}}</b>
+            <span>{{cms:pricing_period_label}}</span>
+          </div>
+          <div class="price-ghs" data-ghs data-monthly="{{cms:pricing2_price_ghs}}" data-yearly="{{cms:pricing2_price_ghs_yearly}}">{{cms:pricing2_price_ghs}}</div>
+          <a class="btn ghost" href="/register">{{cms:pricing2_cta_label}}</a>
+          <ul>{{cms:pricing2_features}}</ul>
+        </div>
+
+        <div class="plan featured">
+          <span class="pop">{{cms:pricing3_tag}}</span>
+          <span class="plan-icon plan-icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg></span>
+          <h3>{{cms:pricing3_name}}</h3>
+          <p class="plan-desc">{{cms:pricing3_desc}}</p>
+          <div class="price">
+            <b data-usd data-monthly="{{cms:pricing3_price_usd}}" data-yearly="{{cms:pricing3_price_usd_yearly}}">{{cms:pricing3_price_usd}}</b>
+            <span>{{cms:pricing_period_label}}</span>
+          </div>
+          <div class="price-ghs" data-ghs data-monthly="{{cms:pricing3_price_ghs}}" data-yearly="{{cms:pricing3_price_ghs_yearly}}">{{cms:pricing3_price_ghs}}</div>
+          <a class="btn primary" href="/register">{{cms:pricing3_cta_label}}</a>
+          <ul>{{cms:pricing3_features}}</ul>
+        </div>
+
+        <div class="plan">
+          <span class="plan-icon plan-icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 6 4 3 6-6 6 6 4-3-2 13H4L2 6Z"/></svg></span>
+          <h3>{{cms:pricing4_name}}</h3>
+          <p class="plan-desc">{{cms:pricing4_desc}}</p>
+          <div class="price">
+            <b data-usd data-monthly="{{cms:pricing4_price_usd}}" data-yearly="{{cms:pricing4_price_usd_yearly}}">{{cms:pricing4_price_usd}}</b>
+            <span>{{cms:pricing_period_label}}</span>
+          </div>
+          <div class="price-ghs" data-ghs data-monthly="{{cms:pricing4_price_ghs}}" data-yearly="{{cms:pricing4_price_ghs_yearly}}">{{cms:pricing4_price_ghs}}</div>
+          <a class="btn ghost" href="/contact">{{cms:pricing4_cta_label}}</a>
+          <ul>{{cms:pricing4_features}}</ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMPARE PLANS ============ -->
+  <section class="band">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>{{cms:pricing_compare_eyebrow}}</h2>
+        <p>{{cms:pricing_compare_subtext}}</p>
+      </div>
+      <div class="compare-scroll">
+        <table class="compare-table">
+          <thead>
+            <tr><th>Features</th><th>Free</th><th>BYOT</th><th class="hl">Managed Ops</th><th>Custom Agent</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Users</td><td>1</td><td>2</td><td class="hl">5</td><td>Unlimited</td></tr>
+            <tr><td>Social media apps (WhatsApp, Instagram, Facebook, LinkedIn, YouTube)</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="hl yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Invoicing &amp; payments</td><td class="no">&ndash;</td><td class="yes">&check;</td><td class="hl yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Customer management</td><td class="no">&ndash;</td><td class="yes">&check;</td><td class="hl yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Automation templates</td><td>Basic</td><td>Standard</td><td class="hl">Advanced</td><td>Custom</td></tr>
+            <tr><td>Custom integrations</td><td>Limited</td><td>Standard</td><td class="hl">More integrations</td><td>Advanced / API</td></tr>
+            <tr><td>Managed Muse infrastructure</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="hl yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Ongoing maintenance</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="hl yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Priority support</td><td>Community</td><td>Email</td><td class="hl">Priority</td><td>24/7 Dedicated</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section id="faq">
+    <div class="wrap">
+      <div class="sec-head faq-head">
+        <div>
+          <h2>{{cms:pricing_faq_headline}}</h2>
+          <p>{{cms:pricing_faq_subtext}}</p>
+        </div>
+        <a class="btn ghost" href="/contact">{{cms:pricing_faq_link}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+      <div class="faq-list faq-list-2col">{{cms:pricing_faq_items}}</div>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="cta-band">
+        <span class="cta-eyebrow">{{cms:pricing_cta_eyebrow}}</span>
+        <h2>{{cms:pricing_cta_headline}}</h2>
+        <p>{{cms:pricing_cta_subtext}}</p>
+        <div class="cta-row">
+          <a class="btn primary" href="/register">{{cms:pricing_cta_primary}}</a>
+          <p class="fine">{{cms:pricing_cta_fine}}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="foot-brand"><img src="/assets/images/buinee-logo.png" alt="Buinee"><p>{{cms:footer_tagline}}</p></div>
+    <nav class="foot-group" aria-label="Services"><b>Services</b><a href="#services">Muse assistant</a><a href="#services">WhatsApp automation</a><a href="#services">Document workflows</a><a href="#services">Business dashboards</a></nav>
+    <nav class="foot-group" aria-label="Company"><b>Company</b><a href="#industries">Industries</a><a href="/case-studies">Case studies</a><a href="/contact">Contact</a><a href="/pricing">Pricing</a></nav>
+    <div class="foot-group"><b>Support</b><a href="/contact">Help center</a><a href="/security">Security</a><a href="/login">Sign in</a></div>
+    <div class="foot-bottom">
+    <nav class="foot-legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/cookies">Cookies</a><a href="/refunds">Refunds</a></nav>
+    <div class="foot-contact" id="footContact" aria-label="Contact and social links">
+      <a class="foot-ic" href="mailto:{{cms:contact.contact_email}}" data-empty="mailto:" aria-label="Email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg></a>
+      <a class="foot-ic" href="tel:{{cms:contact.contact_phone}}" data-empty="tel:" aria-label="Call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
+      <a class="foot-ic" href="https://wa.me/{{cms:contact.contact_whatsapp}}" target="_blank" rel="noopener" data-empty="https://wa.me/" aria-label="WhatsApp"><img src="/assets/images/whatsapp.svg" alt=""></a>
+      <a class="foot-ic" href="{{cms:contact.social_twitter}}" target="_blank" rel="noopener" data-empty="" aria-label="X (Twitter)"><img src="/assets/images/x.svg" alt=""></a>
+      <a class="foot-ic" href="{{cms:contact.social_linkedin}}" target="_blank" rel="noopener" data-empty="" aria-label="LinkedIn"><img src="/assets/images/linkedin.svg" alt=""></a>
+      <a class="foot-ic" href="{{cms:contact.social_facebook}}" target="_blank" rel="noopener" data-empty="" aria-label="Facebook"><img src="/assets/images/facebook.svg" alt=""></a>
+      <a class="foot-ic" href="{{cms:contact.social_instagram}}" target="_blank" rel="noopener" data-empty="" aria-label="Instagram"><img src="/assets/images/instagram.svg" alt=""></a>
+      <a class="foot-contact-link" href="/contact">Contact us</a>
+    </div>
+    <p>© 2026 Buinee. Built by <a href="https://princecaleb.dev" target="_blank" rel="noopener">princecaleb.dev</a> · <a href="/admin/login" style="font-weight:400">Owner sign in</a></p>
+    </div>
+  </div>
+</footer>
+
+<button class="ada-launcher" id="adaLauncherBtn" type="button" aria-label="Chat with Ada" onclick="toggleAdaPanel()">
+  <span class="ada-launcher-badge" id="adaLauncherBadge">1</span>
+  <span class="ada-launcher-status" id="adaLauncherStatus"></span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path id="adaLauncherIcon" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+</button>
+
+<div class="ada-panel" id="adaPanel" role="dialog" aria-label="Chat with Ada">
+  <div class="ada-panel-head">
+    <span class="av">A</span>
+    <div><b>Ask Ada</b><span id="adaPanelStatus"><span class="status-dot" id="adaPanelStatusDot"></span><span id="adaPanelStatusText">Questions about Buinee, answered live</span></span></div>
+    <button class="ada-auto-btn" type="button" id="adaAutoReadBtn" aria-pressed="false" title="Auto-read Ada's new replies aloud" onclick="toggleAdaAutoRead(this)" style="margin-left:auto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+    </button>
+    <button class="ada-panel-close" type="button" aria-label="Close" onclick="toggleAdaPanel(false)" style="margin-left:6px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="ada-panel-scroll" id="adaPanelScroll">
+    <div class="ada-panel-log" id="adaPanelLog"></div>
+    <!-- Kept outside the log because renderLandingAdaLog() rewrites that whole
+         node on every message and on the 2-minute status poll - a half-typed
+         password must not vanish underneath the visitor. -->
+    <div id="adaRegSlot"></div>
+    <div id="adaOfflineSlot"></div>
+    <div class="ada-starters-mini" id="adaStartersMini">
+      <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;What is Buinee, in a nutshell?&quot;)">What is Buinee, in a nutshell?</button>
+      <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;How much does it cost?&quot;)">How much does it cost?</button>
+      <button class="ada-starter-mini" type="button" onclick="primeLandingAda(&quot;How do I get my team set up?&quot;)">How do I get my team set up?</button>
+    </div>
+  </div>
+  <form class="ada-panel-foot" onsubmit="return sendLandingAda(event)">
+    <div class="ada-panel-box">
+      <textarea id="adaPanelInput" rows="1" placeholder="Ask a question…" oninput="adaAutoGrow(this)" onkeydown="adaPanelKey(event)"></textarea>
+      <button class="ada-mic-btn" type="button" id="adaMicBtn" aria-label="Dictate your message" title="Speak your message" onclick="adaMicToggle(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
+      <button class="ada-panel-send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/></svg></button>
+    </div>
+  </form>
+</div>
+
+<script>
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add("page-ready")));
+
+  // The reference keeps the header completely transparent over the hero,
+  // then turns it into a fixed, readable bar only after the page moves.
+  const landingHeader = document.querySelector(".nav");
+  const syncLandingHeader = () => landingHeader.classList.toggle("is-scrolled", window.scrollY > 48);
+  window.addEventListener("scroll", syncLandingHeader, { passive: true });
+  syncLandingHeader();
+
+  document.querySelectorAll("#footContact .foot-ic").forEach(a => {
+    if (a.getAttribute("href") === a.dataset.empty) a.hidden = true;
+  });
+
+  // Smooth in-page nav without hijacking anything else.
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener("click", e => {
+      const el = document.querySelector(a.getAttribute("href"));
+      if (!el) return;
+      e.preventDefault();
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  // ---- mobile drawer ----
+  let drawerOpen = false;
+  function toggleDrawer(force) {
+    drawerOpen = typeof force === "boolean" ? force : !drawerOpen;
+    document.getElementById("navDrawer").classList.toggle("open", drawerOpen);
+    document.getElementById("drawerBackdrop").classList.toggle("open", drawerOpen);
+    document.querySelector(".nav-toggle").setAttribute("aria-expanded", String(drawerOpen));
+    document.body.style.overflow = drawerOpen ? "hidden" : "";
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && drawerOpen) toggleDrawer(false);
+  });
+  document.querySelectorAll(".drawer-links a, .drawer-foot a").forEach(a => {
+    a.addEventListener("click", () => toggleDrawer(false));
+  });
+
+  // ---- billing toggle: swap each plan card's price between the stored
+  // monthly and yearly figures instead of hardcoding two price tables ----
+  (function initBillingToggle() {
+    const toggle = document.getElementById("billingToggle");
+    if (!toggle) return;
+    toggle.querySelectorAll(".aud").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const period = btn.dataset.period;
+        toggle.querySelectorAll(".aud").forEach(b => b.classList.toggle("active", b === btn));
+        document.querySelectorAll("[data-usd], [data-ghs]").forEach(el => {
+          const value = el.dataset[period];
+          if (value) el.textContent = value;
+        });
+      });
+    });
+  })();
+
+  // ---- Ask Ada (public demo widget) ----
+  let adaLandingHistory = [];
+
+  function adaLandingKey() { return "buinee.landingAdaConversation"; }
+
+  // A stable id so the whole conversation groups into one Command Center
+  // inbox thread, instead of one row per message.
+  function getLandingAdaSessionId() {
+    const key = "buinee.landingAdaSessionId";
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(key, id);
+    }
+    return id;
+  }
+
+  function loadLandingAda() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(adaLandingKey()) || "[]");
+      adaLandingHistory = Array.isArray(saved)
+        ? saved.filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").slice(-30)
+        : [];
+    } catch { adaLandingHistory = []; }
+  }
+
+  function saveLandingAda() {
+    localStorage.setItem(adaLandingKey(), JSON.stringify(adaLandingHistory.slice(-30)));
+  }
+
+  let adaOnline = true;
+  async function refreshAdaStatus() {
+    try {
+      const res = await fetch("/api/livechat/status");
+      const data = await res.json();
+      adaOnline = !!data.online;
+    } catch { adaOnline = true; }
+    const launcherDot = document.getElementById("adaLauncherStatus");
+    if (launcherDot) launcherDot.classList.toggle("online", adaOnline);
+    const panelDot = document.getElementById("adaPanelStatusDot");
+    if (panelDot) panelDot.classList.toggle("online", adaOnline);
+    const panelText = document.getElementById("adaPanelStatusText");
+    if (panelText) panelText.textContent = adaOnline ? "Online now" : "Currently offline";
+    if (adaPanelOpen) renderLandingAdaLog();
+  }
+  refreshAdaStatus();
+  setInterval(refreshAdaStatus, 120000);
+
+  function escapeHtmlAda(s) {
+    const d = document.createElement("div");
+    d.textContent = s ?? "";
+    return d.innerHTML;
+  }
+
+  function adaChatMarkdown(text) {
+    return escapeHtmlAda(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+  }
+
+  // ---- Ada voice: read her replies aloud in a UK English female voice ----
+  const AdaVoice = (function () {
+    const synth = window.speechSynthesis || null;
+    let voice = null, autoRead = false, activeBtn = null;
+    const AUTO_KEY = "buinee.adaAutoRead";
+
+    function pickVoice() {
+      if (!synth) return null;
+      const voices = synth.getVoices();
+      if (!voices.length) return null;
+      const FEMALE = /(female|zira|susan|hazel|libby|sonia|maisie|serena|kate|stephanie|amy|emma|fiona|martha|samantha|karen|moira|tessa|veena|catherine|allison|ava|joanna|salli|kendra|kimberly)/i;
+      const MALE = /\b(male|david|mark|george|daniel|james|guy|ryan|richard|eric|arthur|paul|fred|albert)\b/i;
+      const gb = voices.filter(v => /en[-_]?gb/i.test(v.lang));
+      const en = voices.filter(v => /^en/i.test(v.lang));
+      return gb.find(v => FEMALE.test(v.name))
+        || gb.find(v => !MALE.test(v.name))
+        || gb[0]
+        || en.find(v => FEMALE.test(v.name))
+        || en.find(v => !MALE.test(v.name))
+        || en[0]
+        || voices.find(v => FEMALE.test(v.name))
+        || voices[0] || null;
+    }
+    function ensureVoice() { if (!voice) voice = pickVoice(); return voice; }
+    if (synth) {
+      ensureVoice();
+      try { synth.onvoiceschanged = () => { voice = pickVoice(); }; } catch {}
+    }
+    try { autoRead = localStorage.getItem(AUTO_KEY) === "1"; } catch {}
+
+    function clean(text) {
+      return String(text || "")
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+        .replace(/[*_`#>]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    function setState(btn, on) {
+      if (!btn) return;
+      btn.classList.toggle("speaking", on);
+      btn.setAttribute("aria-label", on ? "Stop reading" : "Hear this reply aloud");
+    }
+    function stop() {
+      if (synth) synth.cancel();
+      setState(activeBtn, false);
+      activeBtn = null;
+    }
+    function play(text, btn) {
+      if (!synth) return;
+      synth.cancel();
+      const words = clean(text);
+      if (!words) return;
+      setState(activeBtn, false);
+      activeBtn = btn || null;
+      const u = new SpeechSynthesisUtterance(words);
+      const v = ensureVoice();
+      if (v) u.voice = v;
+      u.lang = (v && v.lang) || "en-GB";
+      u.rate = 1; u.pitch = 1;
+      u.onstart = () => setState(activeBtn, true);
+      u.onend = u.onerror = () => { if (activeBtn === btn) { setState(btn, false); activeBtn = null; } };
+      synth.speak(u);
+    }
+    return {
+      supported: () => !!synth,
+      toggle(text, btn) {
+        if (!synth) return;
+        if (btn && activeBtn === btn && (synth.speaking || synth.pending)) { stop(); return; }
+        play(text, btn);
+      },
+      auto(text) { if (autoRead) play(text, null); },
+      stop,
+      isAuto: () => autoRead,
+      setAuto(on) {
+        autoRead = !!on;
+        try { localStorage.setItem(AUTO_KEY, autoRead ? "1" : "0"); } catch {}
+        if (!autoRead) stop();
+      },
+    };
+  })();
+
+  const ADA_VOICE_BTN = AdaVoice.supported()
+    ? '<button class="ada-voice-btn" type="button" aria-label="Hear this reply aloud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19.5 5a9 9 0 0 1 0 14"/></svg></button>'
+    : "";
+
+  function toggleAdaAutoRead(btn) {
+    AdaVoice.setAuto(!AdaVoice.isAuto());
+    syncAdaAutoReadBtn(btn);
+  }
+  function syncAdaAutoReadBtn(btn) {
+    if (!btn) return;
+    if (!AdaVoice.supported()) { btn.style.display = "none"; return; }
+    const on = AdaVoice.isAuto();
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = on ? "Auto-read is on, new replies play aloud" : "Auto-read Ada's new replies aloud";
+  }
+
+  // ---- Ada mic: let the visitor speak their message (UK English) ----
+  const AdaMic = (function () {
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    let rec = null, listening = false, btn = null;
+    function setState(on) {
+      listening = on;
+      if (btn) {
+        btn.classList.toggle("listening", on);
+        btn.setAttribute("aria-label", on ? "Stop dictation" : "Dictate your message");
+      }
+    }
+    function stop() { if (rec) { try { rec.stop(); } catch {} } }
+    function toggle(input, button, grow) {
+      if (!Rec || !input) return;
+      if (listening) { stop(); return; }
+      try { AdaVoice.stop(); } catch {}
+      btn = button;
+      const base = input.value ? input.value.replace(/\s*$/, "") + " " : "";
+      rec = new Rec();
+      rec.lang = "en-GB";
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (e) => {
+        let t = "";
+        for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+        input.value = (base + t).replace(/\s+/g, " ").replace(/^\s+/, "");
+        if (grow) grow(input);
+      };
+      rec.onend = () => { setState(false); input.focus(); };
+      rec.onerror = () => setState(false);
+      try { rec.start(); setState(true); } catch { setState(false); }
+    }
+    return { supported: () => !!Rec, toggle, stop };
+  })();
+
+  function adaMicToggle(btn) {
+    AdaMic.toggle(document.getElementById("adaPanelInput"), btn, adaAutoGrow);
+  }
+
+  // One delegated listener survives the log being re-rendered on every message.
+  (function initAdaVoice() {
+    const log = document.getElementById("adaPanelLog");
+    if (log) log.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".ada-voice-btn");
+      if (!btn) return;
+      const msg = btn.closest(".ada-panel-msg");
+      const bub = msg && msg.querySelector(".bub");
+      if (!bub) return;
+      AdaVoice.toggle(bub.textContent, btn);
+    });
+    syncAdaAutoReadBtn(document.getElementById("adaAutoReadBtn"));
+    const mic = document.getElementById("adaMicBtn");
+    if (mic && !AdaMic.supported()) mic.style.display = "none";
+  })();
+
+  // ---- Scroll-reveal: ease sections in as they scroll into view ----
+  (function initReveal() {
+    const root = document.documentElement;
+    if (!root.classList.contains("anim")) return; // reduced motion / JS-off
+    const SELECTOR = ".sec-head, .hero-grid > div, .plans > .plan, .cta-band";
+    const targets = Array.prototype.slice.call(document.querySelectorAll(SELECTOR));
+    if (!targets.length) return;
+
+    // Stagger siblings that share a parent so a row of cards cascades in.
+    const seen = new Map();
+    targets.forEach(el => {
+      const p = el.parentNode;
+      const i = seen.get(p) || 0;
+      seen.set(p, i + 1);
+      el.style.transitionDelay = Math.min(i * 90, 360) + "ms";
+    });
+
+    const reveal = el => el.classList.add("reveal-in");
+    if (!("IntersectionObserver" in window)) { targets.forEach(reveal); return; }
+
+    const io = new IntersectionObserver((entries, obs) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { reveal(e.target); obs.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+    targets.forEach(el => io.observe(el));
+
+    // Failsafe: never leave content hidden if the observer misfires.
+    setTimeout(() => targets.forEach(reveal), 4000);
+  })();
+
+  function renderLandingAdaLog() {
+    const box = document.getElementById("adaPanelLog");
+    const welcome = "<div class=\"ada-panel-msg ai\"><div class=\"bub\">Hi, I'm Ada. Ask me anything about Buinee, what it does, pricing, or how to get your team started.</div>" + ADA_VOICE_BTN + "</div>";
+    const offlineNotice = adaOnline ? "" : "<div class=\"ada-offline-notice\">We're offline right now. Send a message and leave a way to reach you, and our team will follow up as soon as we're back.</div>";
+    box.innerHTML = offlineNotice + welcome + adaLandingHistory.map(m => {
+      const mine = m.role === "user";
+      return `<div class="ada-panel-msg ${mine ? "me" : "ai"}"><div class="bub">${mine ? escapeHtmlAda(m.content) : adaChatMarkdown(m.content)}</div>${mine ? "" : ADA_VOICE_BTN}</div>`;
+    }).join("");
+    const starters = document.getElementById("adaStartersMini");
+    if (starters) starters.style.display = adaLandingHistory.length ? "none" : "flex";
+    const scroll = document.getElementById("adaPanelScroll");
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
+  function adaAutoGrow(input) {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 90) + "px";
+  }
+
+  function adaPanelKey(ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      ev.target.closest("form").requestSubmit();
+    }
+  }
+
+  function primeLandingAda(prompt) {
+    const input = document.getElementById("adaPanelInput");
+    input.value = prompt;
+    adaAutoGrow(input);
+    input.focus();
+  }
+
+  const ADA_CHAT_ICON = "M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z";
+  const ADA_CLOSE_ICON = "M18 6 6 18M6 6l12 12";
+
+  function playAdaChime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      [660, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + i * 0.09);
+        gain.gain.linearRampToValueAtTime(0.18, now + i * 0.09 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.09 + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.09);
+        osc.stop(now + i * 0.09 + 0.24);
+      });
+      setTimeout(() => ctx.close(), 500);
+    } catch {}
+  }
+
+  // Nobody wants to come back to a stale conversation days later, and an
+  // idle open panel serves no one - so a period of no activity while it's
+  // open closes it and wipes the thread back to the first-visit welcome
+  // screen, the same as if they'd never chatted. Only runs while the panel
+  // is actually open; sending a message or typing pushes it back out.
+  const ADA_INACTIVITY_MS = 5 * 60 * 1000;
+  let adaInactivityTimer = null;
+
+  function resetAdaInactivityTimer() {
+    clearTimeout(adaInactivityTimer);
+    if (!adaPanelOpen) return;
+    adaInactivityTimer = setTimeout(adaHandleInactivity, ADA_INACTIVITY_MS);
+  }
+
+  function adaHandleInactivity() {
+    if (!adaPanelOpen) return;
+    resetLandingAdaConversation();
+    toggleAdaPanel(false);
+  }
+
+  function resetLandingAdaConversation() {
+    adaLandingHistory = [];
+    localStorage.removeItem(adaLandingKey());
+    localStorage.removeItem("buinee.landingAdaSessionId");
+    adaRegisterDone = false;
+    adaOfflineFormShown = false;
+    const regSlot = document.getElementById("adaRegSlot");
+    if (regSlot) regSlot.innerHTML = "";
+    const offlineSlot = document.getElementById("adaOfflineSlot");
+    if (offlineSlot) offlineSlot.innerHTML = "";
+  }
+
+  let adaPanelOpen = false;
+  function toggleAdaPanel(force) {
+    adaPanelOpen = typeof force === "boolean" ? force : !adaPanelOpen;
+    document.getElementById("adaPanel").classList.toggle("open", adaPanelOpen);
+    document.getElementById("adaLauncherIcon").setAttribute("d", adaPanelOpen ? ADA_CLOSE_ICON : ADA_CHAT_ICON);
+    document.getElementById("adaLauncherBtn").setAttribute("aria-label", adaPanelOpen ? "Close chat with Ada" : "Chat with Ada");
+    if (adaPanelOpen) {
+      document.getElementById("adaLauncherBadge").classList.add("hidden");
+      playAdaChime();
+      loadLandingAda();
+      renderLandingAdaLog();
+      document.getElementById("adaPanelInput").focus();
+      resetAdaInactivityTimer();
+    } else {
+      clearTimeout(adaInactivityTimer);
+    }
+  }
+
+  // Any interaction inside the open panel counts as activity, not just
+  // sending a message - otherwise someone reading a long reply or picking
+  // a starter prompt could get timed out mid-thought.
+  document.getElementById("adaPanel").addEventListener("click", () => resetAdaInactivityTimer());
+  document.getElementById("adaPanel").addEventListener("keydown", () => resetAdaInactivityTimer());
+  document.getElementById("adaPanel").addEventListener("input", () => resetAdaInactivityTimer());
+
+  async function sendLandingAda(ev) {
+    ev.preventDefault();
+    const input = document.getElementById("adaPanelInput");
+    const text = input.value.trim();
+    if (!text) return false;
+
+    adaLandingHistory.push({ role: "user", content: text });
+    saveLandingAda();
+    input.value = "";
+    adaAutoGrow(input);
+    renderLandingAdaLog();
+
+    // Offline means no one's watching to correct a bad answer, so Ada
+    // doesn't reply at all - the visitor leaves contact details instead
+    // and a person follows up once the team's back.
+    if (!adaOnline) {
+      renderAdaOfflineCard();
+      return false;
+    }
+
+    const box = document.getElementById("adaPanelLog");
+    box.insertAdjacentHTML("beforeend", '<div class="ada-panel-msg ai" id="adaPanelPending"><div class="bub"><span class="ada-typing"><i></i><i></i><i></i></span></div></div>');
+    document.getElementById("adaPanelScroll").scrollTop = 1e9;
+
+    try {
+      const res = await fetch("/api/demo", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          history: adaLandingHistory.slice(0, -1).map(({ role, content }) => ({ role, content })),
+          session_id: getLandingAdaSessionId(),
+        }),
+      });
+      const data = await res.json();
+      adaLandingHistory.push({ role: "assistant", content: res.ok ? data.reply : (data.error || "Could not reach the assistant.") });
+      saveLandingAda();
+      renderLandingAdaLog();
+      if (res.ok && data.reply) AdaVoice.auto(data.reply);
+      if (res.ok && data.register_draft) renderAdaRegisterCard(data.register_draft);
+    } catch {
+      adaLandingHistory.push({ role: "assistant", content: "Could not reach the server." });
+      saveLandingAda();
+      renderLandingAdaLog();
+    }
+    return false;
+  }
+
+  // ---- Leaving contact details while the live chat is offline ----
+  let adaOfflineFormShown = false;
+
+  function renderAdaOfflineCard() {
+    // One prompt per conversation - repeating it after every offline
+    // message would just be noise once they've already left their details.
+    if (adaOfflineFormShown) return;
+    adaOfflineFormShown = true;
+    const box = document.getElementById("adaOfflineSlot");
+    box.innerHTML = `
+      <div class="ada-reg-card" id="adaOfflineCard">
+        <div class="t">We're offline right now</div>
+        <div style="color:var(--ink-2)">Leave a way to reach you and our team will follow up as soon as we're back.</div>
+        <form onsubmit="return submitAdaOfflineContact(event)">
+          <input type="text" id="adaOfflineName" placeholder="Your name" required style="margin-bottom:9px">
+          <input type="email" id="adaOfflineEmail" placeholder="Email address" style="margin-bottom:9px">
+          <input type="tel" id="adaOfflinePhone" placeholder="Phone number" style="margin-bottom:9px">
+          <div class="err" id="adaOfflineErr"></div>
+          <button type="submit" id="adaOfflineSubmit" style="margin-top:9px;width:100%">Send my details</button>
+        </form>
+      </div>`;
+    document.getElementById("adaPanelScroll").scrollTop = 1e9;
+  }
+
+  async function submitAdaOfflineContact(ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById("adaOfflineErr");
+    errEl.classList.remove("show");
+    const name = document.getElementById("adaOfflineName").value.trim();
+    const email = document.getElementById("adaOfflineEmail").value.trim();
+    const phone = document.getElementById("adaOfflinePhone").value.trim();
+    if (!name || (!email && !phone)) {
+      errEl.textContent = "Add your name and an email or phone number so we can reach you.";
+      errEl.classList.add("show");
+      return false;
+    }
+    const btn = document.getElementById("adaOfflineSubmit");
+    btn.disabled = true; btn.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/demo/contact", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name, email, phone,
+          history: adaLandingHistory.map(({ role, content }) => ({ role, content })),
+          session_id: getLandingAdaSessionId(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || "Something went wrong.";
+        errEl.classList.add("show");
+        btn.disabled = false; btn.textContent = "Send my details";
+        return false;
+      }
+      document.getElementById("adaOfflineCard").innerHTML =
+        `<div class="ok"><div class="t">Thanks, ${escapeHtmlAda(name)}</div>` +
+        `<div>We've got your message and will get back to you as soon as we're online.</div></div>`;
+    } catch {
+      errEl.textContent = "Could not reach the server.";
+      errEl.classList.add("show");
+      btn.disabled = false; btn.textContent = "Send my details";
+    }
+    return false;
+  }
+
+  // ---- Ada registering a company mid-chat ----
+  let adaRegisterDone = false;
+
+  function renderAdaRegisterCard(draft) {
+    // One workspace per visit. If Ada emits a second marker after a signup has
+    // already gone through, ignore it rather than replacing the confirmation
+    // with a form that would try to register the same email twice.
+    if (adaRegisterDone) return;
+    const priceLine = draft.price > 0
+      ? `${displayPlanPrice(draft)}/month (display estimate)`
+      : "Free";
+    const box = document.getElementById("adaRegSlot");
+    box.innerHTML = "";
+    box.insertAdjacentHTML("beforeend", `
+      <div class="ada-reg-card" id="adaRegCard">
+        <div class="t">Set a password to finish creating your workspace</div>
+        <div class="row"><span>Name</span><b>${escapeHtmlAda(draft.name)}</b></div>
+        <div class="row"><span>Email</span><b>${escapeHtmlAda(draft.email)}</b></div>
+        ${draft.company_name ? `<div class="row"><span>Company</span><b>${escapeHtmlAda(draft.company_name)}</b></div>` : ""}
+        <div class="row"><span>Plan</span><b>${escapeHtmlAda(draft.plan_name)} · ${priceLine}</b></div>
+        <form onsubmit="return submitAdaRegister(event)">
+          <input type="password" id="adaRegPassword" placeholder="Choose a password (12+ characters)" minlength="12" required autocomplete="new-password" style="margin-bottom:9px">
+          <label class="terms"><input type="checkbox" id="adaRegTerms" required><span>I agree to Buinee's <a href="/terms" target="_blank">Terms of Use</a> and acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label>
+          <div class="err" id="adaRegErr"></div>
+          <button type="submit" id="adaRegSubmit" style="margin-top:9px;width:100%">Create my workspace</button>
+        </form>
+      </div>`);
+    document.getElementById("adaPanelScroll").scrollTop = 1e9;
+    document.getElementById("adaRegCard").dataset.draft = JSON.stringify(draft);
+  }
+
+  async function submitAdaRegister(ev) {
+    ev.preventDefault();
+    const card = document.getElementById("adaRegCard");
+    const draft = JSON.parse(card.dataset.draft);
+    const errEl = document.getElementById("adaRegErr");
+    errEl.classList.remove("show");
+    const password = document.getElementById("adaRegPassword").value;
+    const termsOk = document.getElementById("adaRegTerms").checked;
+    if (!termsOk) {
+      errEl.textContent = "Agree to the Terms of Use and Privacy Policy to continue.";
+      errEl.classList.add("show");
+      return false;
+    }
+    const btn = document.getElementById("adaRegSubmit");
+    btn.disabled = true; btn.textContent = "Creating your workspace…";
+    try {
+      const res = await fetch("/api/demo/register", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name, email: draft.email, company_name: draft.company_name,
+          plan_id: draft.plan_id, password, terms_accepted: termsOk,
+          allow_duplicate_name: !!draft.allow_duplicate_name,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 409 && data.duplicate_name) {
+        // Somebody already registered this company name. It's usually the same
+        // business signing up twice, so say so and make them confirm rather
+        // than silently creating a second workspace with an identical name.
+        errEl.textContent = data.error || "A company with that name already exists.";
+        errEl.classList.add("show");
+        card.dataset.draft = JSON.stringify({ ...draft, allow_duplicate_name: true });
+        btn.disabled = false; btn.textContent = "This is a different company, continue";
+        return false;
+      }
+      if (res.status === 503) {
+        // The account exists but Paystack wouldn't open. Retrying the form
+        // would only fail on "that email is already registered", so close it
+        // out and send them somewhere that can actually finish the payment.
+        adaRegisterDone = true;
+        card.innerHTML = `<div class="ok">
+          <div class="t">Your workspace was created</div>
+          <div>${escapeHtmlAda(data.error || "Payment could not start.")}
+            Sign in at <a href="/login">/login</a> to finish paying.</div>
+        </div>`;
+        return false;
+      }
+      if (!res.ok) {
+        errEl.textContent = data.error || "Something went wrong.";
+        errEl.classList.add("show");
+        btn.disabled = false; btn.textContent = "Create my workspace";
+        return false;
+      }
+      adaRegisterDone = true;
+      if (data.payment_required) {
+        card.innerHTML = data.authorization_url
+          ? `<div class="ok">
+              <div class="t">Almost there, one step left</div>
+              <div>Your workspace is ready. Pay securely to activate it:</div>
+              <a class="pay" href="${escapeHtmlAda(data.authorization_url)}" target="_blank" rel="noopener">Pay securely with Paystack</a>
+            </div>`
+          : `<div class="ok">
+              <div class="t">Your workspace is ready</div>
+              <div>We couldn't open the payment page from here, sign in at
+                <a href="/login">/login</a> and you'll be taken straight to it.</div>
+            </div>`;
+      } else {
+        card.innerHTML = `<div class="ok">
+          <div class="t">You're all set</div>
+          <div>${escapeHtmlAda(data.message || "Your workspace has been created and is pending review.")}</div>
+        </div>`;
+      }
+    } catch {
+      errEl.textContent = "Could not reach the server.";
+      errEl.classList.add("show");
+      btn.disabled = false; btn.textContent = "Create my workspace";
+    }
+    return false;
+  }
+</script>
