@@ -2211,9 +2211,9 @@ def build_system(computed: dict | None) -> str:
         "\n\n## Figures computed for this visitor - present these exactly",
         f"Invoice total: {v['total_invoice']:,.2f}",
         f"Vatable portion: {v['vatable_amount']:,.2f}",
-        f"NHIL/GETFL at 5%: {v['nhil_getfl']:,.2f}",
-        f"VAT at 15%: {v['vat']:,.2f}",
-        f"Withholding tax at 7.5%: {v['wht']:,.2f}",
+        f"NHIL/GETFL at {v['rate_nhil']:.1%}: {v['nhil_getfl']:,.2f}",
+        f"VAT at {v['rate_vat']:.0%}: {v['vat']:,.2f}",
+        f"Withholding tax at {v['rate_wht']:.1%}: {v['wht']:,.2f}",
         f"Net amount payable: {v['net_payable']:,.2f}",
     ]
     if v.get("exchange_rate"):
