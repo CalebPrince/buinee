@@ -12,7 +12,7 @@ The split is therefore:
 
 Rules were reverse-engineered from a real BDDG voucher (invoice EWS/BEF/07/26)
 and every figure reconciles to the cent. Run this module directly to re-check
-that against the sample:  python bridge/voucher.py
+that against the sample:  python voucher.py
 """
 
 from __future__ import annotations
@@ -26,14 +26,45 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class TaxRegime:
-    """Rates for one jurisdiction. Ghana's are the defaults."""
+    """Rates for one jurisdiction over one period. Ghana's are the defaults."""
     nhil_getfl: float = 0.05     # NHIL / GETFL / TL / CST
     vat: float = 0.15
     wht: float = 0.075           # withholding tax
     currency: str = "GHS"
+    #: True when VAT is charged on the value *plus* the levies (compounded),
+    #: False when VAT and the levies are all charged on the same value.
+    vat_on_levies: bool = False
+    effective_from: date = date(2026, 1, 1)
+    name: str = "Ghana VAT Act 2025 (Act 1151)"
 
 
-GHANA = TaxRegime()
+# Ghana, by the date of the invoice. Newest first.
+#
+# From 1 January 2026, the VAT Act 2025 (Act 1151): VAT 15%, NHIL 2.5% and
+# GETFund 2.5% all on the same taxable value (20% in total), and the 1%
+# COVID-19 Health Recovery Levy repealed.
+#
+# Before that (from 1 January 2023, when VAT went to 15%): NHIL 2.5%,
+# GETFund 2.5% and COVID-19 levy 1% on the value, then VAT 15% on the value
+# plus those levies, about 21.9% in total.
+GHANA_2026 = TaxRegime()
+GHANA_2023 = TaxRegime(
+    nhil_getfl=0.06,             # NHIL 2.5% + GETFund 2.5% + COVID-19 1%
+    vat_on_levies=True,
+    effective_from=date(2023, 1, 1),
+    name="Ghana VAT Act 2013 (Act 870), as amended",
+)
+GHANA_REGIMES = (GHANA_2026, GHANA_2023)
+GHANA = GHANA_2026
+
+
+def regime_for(when: date, regimes: tuple[TaxRegime, ...] = GHANA_REGIMES) -> TaxRegime:
+    """The regime in force on a date. Dates before the oldest regime get the
+    oldest one, and review() flags them, because nothing earlier is modelled."""
+    for r in regimes:
+        if when >= r.effective_from:
+            return r
+    return regimes[-1]
 
 
 # ------------------------------------------------------------- FX rate table
@@ -122,18 +153,22 @@ class VoucherInput:
 def compute(
     inp: VoucherInput,
     rates: FxRates | None = None,
-    regime: TaxRegime = GHANA,
+    regime: TaxRegime | None = None,
 ) -> dict:
     """Produce every figure on the voucher.
 
-    Verified against the BDDG sample: NHIL, VAT, WHT, net payable and both
-    foreign-currency columns all reconcile exactly.
+    The tax regime is the one in force on the invoice date unless one is
+    passed in. Verified against the BDDG sample: NHIL, VAT, WHT, net payable
+    and both foreign-currency columns all reconcile exactly.
     """
+    if regime is None:
+        regime = regime_for(inp.invoice_date)
     total = round(sum(l.amount for l in inp.lines), 2)
     vatable = round(inp.vatable_amount, 2)
 
     nhil = round(vatable * regime.nhil_getfl, 2) if inp.apply_nhil else 0.0
-    vat = round(vatable * regime.vat, 2) if inp.apply_vat else 0.0
+    vat_base = vatable + nhil if regime.vat_on_levies else vatable
+    vat = round(vat_base * regime.vat, 2) if inp.apply_vat else 0.0
     wht = round(vatable * regime.wht, 2)
 
     # Amount booked is the invoice less any VAT-relief purchase order.
@@ -173,6 +208,8 @@ def compute(
         "rate_nhil": regime.nhil_getfl,
         "rate_vat": regime.vat,
         "rate_wht": regime.wht,
+        "tax_regime": regime.name,
+        "vat_on_levies": regime.vat_on_levies,
         "vrpo": "YES" if inp.vrpo else "NO",
     }
 
@@ -212,6 +249,12 @@ def review(v: dict) -> list[str]:
         notes.append("Due date falls before the invoice date.")
     if v["received_date"] < v["invoice_date"]:
         notes.append("Invoice was recorded as received before it was issued.")
+    if v["invoice_date"] < GHANA_REGIMES[-1].effective_from:
+        notes.append(
+            f"Invoice is dated before {GHANA_REGIMES[-1].effective_from}; the "
+            f"tax rates for that date are not modelled, so the "
+            f"{GHANA_REGIMES[-1].effective_from.year} rates were used."
+        )
     if v.get("exchange_rate_is_fallback"):
         notes.append(
             f"No BOG rate was published on {v['invoice_date']}; used the "
@@ -222,44 +265,9 @@ def review(v: dict) -> list[str]:
 
 # ------------------------------------------------------------------ self-test
 
-def _self_test() -> int:
-    """Reproduce the real BDDG voucher and check every figure."""
-    root = Path(__file__).parent.parent
-    fx_file = root / "07-July-26 BOG FX RATES.xlsx"
-
-    rates = FxRates.from_workbook(fx_file) if fx_file.exists() else None
-    if rates is None:
-        print("  ! BOG rates workbook not found - skipping FX checks\n")
-
-    sample = VoucherInput(
-        supplier_name="EMPOWER WORKFORCE SOLUTIONS",
-        supplier_address="P O BOX, ACCRA",
-        invoice_number="EWS/BEF/07/26",
-        invoice_date=date(2026, 7, 2),
-        received_date=date(2026, 7, 13),
-        credit_terms_days=3,
-        vatable_amount=1784.58,
-        lines=[LineItem("LABOUR BROKERAGE FOR THE MONTH OF JULY 2026",
-                        12610.95, "SUNDRY", "ADMIN EXP")],
-    )
-
-    v = compute(sample, rates)
-
-    expected = {
-        "total_invoice": 12610.95,
-        "nhil_getfl": 89.23,
-        "vat": 267.69,
-        "wht": 133.84,
-        "net_payable": 12477.11,
-        "due_date": date(2026, 7, 16),
-    }
-    if rates is not None:
-        expected |= {
-            "exchange_rate": 11.3895,
-            "fcy_total_invoice": 1107.24,
-            "fcy_net_payable": 1095.49,
-        }
-
+def _check(title: str, v: dict, expected: dict) -> int:
+    """Print one case's figures against the expected ones; return mismatches."""
+    print(f"  {title}\n")
     print(f"  {'figure':<22}{'computed':>14}{'expected':>14}   ok")
     print(f"  {'-' * 54}")
     failures = 0
@@ -273,9 +281,80 @@ def _self_test() -> int:
             g, w = str(got), str(want)
         failures += 0 if ok else 1
         print(f"  {key:<22}{g:>14}{w:>14}   {'YES' if ok else 'NO'}")
+    print(f"\n  review notes: {review(v) or 'none - voucher looks clean'}\n")
+    return failures
 
-    print(f"\n  review notes: {review(v) or 'none - voucher looks clean'}")
-    print(f"\n  {'ALL FIGURES RECONCILE' if not failures else str(failures) + ' MISMATCH(ES)'}")
+
+def _self_test() -> int:
+    """Reproduce the real BDDG voucher, then check the tax regime switch."""
+    root = Path(__file__).parent.parent
+    fx_file = root / "07-July-26 BOG FX RATES.xlsx"
+
+    rates = FxRates.from_workbook(fx_file) if fx_file.exists() else None
+    if rates is None:
+        print("  ! BOG rates workbook not found - skipping FX checks\n")
+
+    # 1. The real BDDG voucher (July 2026, so the Act 1151 regime): levies
+    #    5% and VAT 15%, both on the vatable amount.
+    sample = VoucherInput(
+        supplier_name="EMPOWER WORKFORCE SOLUTIONS",
+        supplier_address="P O BOX, ACCRA",
+        invoice_number="EWS/BEF/07/26",
+        invoice_date=date(2026, 7, 2),
+        received_date=date(2026, 7, 13),
+        credit_terms_days=3,
+        vatable_amount=1784.58,
+        lines=[LineItem("LABOUR BROKERAGE FOR THE MONTH OF JULY 2026",
+                        12610.95, "SUNDRY", "ADMIN EXP")],
+    )
+    expected = {
+        "total_invoice": 12610.95,
+        "nhil_getfl": 89.23,
+        "vat": 267.69,
+        "wht": 133.84,
+        "net_payable": 12477.11,
+        "due_date": date(2026, 7, 16),
+        "vat_on_levies": False,
+    }
+    if rates is not None:
+        expected |= {
+            "exchange_rate": 11.3895,
+            "fcy_total_invoice": 1107.24,
+            "fcy_net_payable": 1095.49,
+        }
+    failures = _check("BDDG voucher EWS/BEF/07/26 (real, 2 Jul 2026)",
+                      compute(sample, rates), expected)
+
+    # 2 and 3. The same GHS 10,000 invoice either side of 1 January 2026.
+    #    These are worked examples, not real vouchers: 2025 compounds VAT on
+    #    the value plus 6% levies (10,600 x 15% = 1,590, about 21.9% in all);
+    #    2026 charges 5% levies and 15% VAT on the same 10,000 (20% in all).
+    def boundary(day: date) -> VoucherInput:
+        return VoucherInput(
+            supplier_name="WORKED EXAMPLE", invoice_number=f"TEST/{day}",
+            invoice_date=day, received_date=day, credit_terms_days=30,
+            vatable_amount=10000.00,
+            lines=[LineItem("Services", 10000.00)],
+        )
+
+    failures += _check("Worked example, 31 Dec 2025 (pre-Act 1151, compounded)",
+                       compute(boundary(date(2025, 12, 31))), {
+        "nhil_getfl": 600.00,
+        "vat": 1590.00,
+        "wht": 750.00,
+        "net_payable": 9250.00,
+        "vat_on_levies": True,
+    })
+    failures += _check("Worked example, 1 Jan 2026 (Act 1151, same base)",
+                       compute(boundary(date(2026, 1, 1))), {
+        "nhil_getfl": 500.00,
+        "vat": 1500.00,
+        "wht": 750.00,
+        "net_payable": 9250.00,
+        "vat_on_levies": False,
+    })
+
+    print(f"  {'ALL FIGURES RECONCILE' if not failures else str(failures) + ' MISMATCH(ES)'}")
     return 1 if failures else 0
 
 

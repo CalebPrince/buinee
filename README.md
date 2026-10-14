@@ -761,6 +761,17 @@ landing page's demo (the model/preparer supplies inputs, code does the
 arithmetic). This means a future tax-rate change re-derives every existing
 voucher instead of leaving stale numbers behind.
 
+**Tax rates follow the invoice date** (`voucher.regime_for`). From
+1 January 2026 (VAT Act 2025, Act 1151, per GRA's notice to VAT-registered
+taxpayers): VAT 15%, NHIL 2.5% and GETFund 2.5% all on the same vatable
+amount, 20% in total, with the 1% COVID-19 levy repealed. Invoices dated
+1 January 2023 to 31 December 2025 use the old compounded model: NHIL 2.5% +
+GETFund 2.5% + COVID-19 1% (6%) on the value, then VAT 15% on the value plus
+those levies (about 21.9%). Anything dated before 2023 (VAT was 12.5% then)
+is not modelled: it gets the 2023 rates and `review()` flags it. Withholding
+tax stays at 7.5% in both. `python voucher.py` checks the real July 2026 BDDG
+voucher plus a worked GHS 10,000 example either side of 1 January 2026.
+
 **Visibility** (`db.list_vouchers`) follows the same downward-only rule as
 everywhere else in this app: an Preparer sees only their own
 vouchers, a Approver sees their own plus every Preparer's,
