@@ -68,6 +68,7 @@ import db  # noqa: E402
 import doc_tools  # noqa: E402
 import mailbox  # noqa: E402
 import outbound_mail  # noqa: E402
+import sandbox_pay  # noqa: E402
 import providers  # noqa: E402
 import secretstore  # noqa: E402
 import tools  # noqa: E402
@@ -250,6 +251,8 @@ STATIC_PAGES = {
     # BuineePay merchant sandbox: public, no sign-in, all data simulated in
     # the visitor's own browser (localStorage). Never touches the database.
     "/buineepay/sandbox": "buineepay-sandbox.html",
+    # The customer side of "pay from your own phone": opened from the QR code.
+    "/buineepay/pay": "buineepay-pay.html",
 }
 
 ASSET_MEDIA_TYPES = {
@@ -271,6 +274,7 @@ STATIC_ASSETS = {
     "/assets/images/pay-logos/visa.svg": "assets/images/pay-logos/visa.svg",
     "/assets/images/pay-logos/mastercard.svg": "assets/images/pay-logos/mastercard.svg",
     "/assets/images/pay-logos/buineepay-leaf.png": "assets/images/pay-logos/buineepay-leaf.png",
+    "/assets/js/qrcode.js": "assets/js/qrcode.js",
     "/assets/fonts/sora-latin-wght.woff2": "assets/fonts/sora-latin-wght.woff2",
     "/assets/fonts/inter-latin-wght.woff2": "assets/fonts/inter-latin-wght.woff2",
     "/assets/images/hero-image1.png": "assets/images/hero-image1.png",
@@ -2800,6 +2804,9 @@ class RouteHandlerMixin:
             if user and user["status"] == "approved":
                 return self._redirect("/dashboard", 302)
 
+        if path in ("/api/sandbox/session", "/api/sandbox/events"):
+            return self._handle_sandbox_get(path)
+
         if path == "/api/demo/status":
             cfg = load_env()
             return self._json({"available": active_provider(cfg) is not None})
@@ -3463,6 +3470,8 @@ class RouteHandlerMixin:
             return self._json({"error": "This request did not come from Buinee."}, 403)
         handlers = {
             "/api/demo": self._handle_demo,
+            "/api/sandbox/sessions": self._handle_sandbox_create,
+            "/api/sandbox/pay": self._handle_sandbox_pay,
             "/api/demo/register": self._handle_demo_register,
             "/api/demo/contact": self._handle_demo_contact,
             "/api/consultation": self._handle_consultation_request,
@@ -3556,6 +3565,45 @@ class RouteHandlerMixin:
         if not handler:
             return self._json({"error": "not found"}, 404)
         return handler()
+
+    # ------------------------------------------------ BuineePay sandbox
+    # Public and sign-in free on purpose: these only ever carry test data, in
+    # their own short-lived store (sandbox_pay.py), never ledgerline.db.
+
+    def _handle_sandbox_get(self, path):
+        if rate_limited(f"sandbox-read:{client_ip(self)}", max_hits=400, window=600):
+            return self._json({"error": "Too many requests. Wait a minute and try again."}, 429)
+        query = parse_qs(urlparse(self.path).query)
+        sid = (query.get("id") or [""])[0]
+        try:
+            if path == "/api/sandbox/session":
+                return self._json(sandbox_pay.get_session(sid))
+            after = int((query.get("after") or ["0"])[0] or 0)
+            return self._json(sandbox_pay.events(sid, after))
+        except sandbox_pay.SandboxError as e:
+            return self._json({"error": str(e)}, 404)
+        except ValueError:
+            return self._json({"error": "Bad request."}, 400)
+
+    def _handle_sandbox_create(self):
+        if rate_limited(f"sandbox-create:{client_ip(self)}", max_hits=20, window=600):
+            return self._json({"error": "You've made a lot of QR codes. Wait a few minutes and try again."}, 429)
+        try:
+            return self._json(sandbox_pay.create_session(self._body(max_len=2000)))
+        except sandbox_pay.SandboxError as e:
+            return self._json({"error": str(e)}, 400)
+        except ValueError:
+            return self._json({"error": "Bad request."}, 400)
+
+    def _handle_sandbox_pay(self):
+        if rate_limited(f"sandbox-pay:{client_ip(self)}", max_hits=40, window=600):
+            return self._json({"error": "Too many test payments. Wait a few minutes and try again."}, 429)
+        try:
+            return self._json(sandbox_pay.pay(self._body(max_len=2000)))
+        except sandbox_pay.SandboxError as e:
+            return self._json({"error": str(e)}, 400)
+        except ValueError:
+            return self._json({"error": "Bad request."}, 400)
 
     def _handle_demo(self):
         ip = client_ip(self)

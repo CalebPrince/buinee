@@ -28,6 +28,7 @@
   --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;overflow-x:clip}
 body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--body);-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
@@ -233,6 +234,67 @@ a.btn{text-decoration:none;color:inherit}
 .setrow div span{color:var(--ink-3);font-size:12.5px}
 .setrow .toggle,.setrow .btn{margin-left:auto}
 
+/* try-as-a-customer tiles */
+.tries{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}
+.try{border:1px solid var(--line);border-radius:12px;padding:16px;background:#fff;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.try:hover{border-color:var(--green-deep);box-shadow:0 0 0 3px rgba(25,228,136,.15)}
+.try .ti{width:38px;height:38px;border-radius:10px;background:var(--green-soft);color:var(--green-deep);display:grid;place-items:center}
+.try .ti svg{width:20px;height:20px}
+.try b{font-family:var(--display);font-size:14.5px;font-weight:600}
+.try span{color:var(--ink-2);font-size:12.5px}
+.try em{margin-top:auto;font-style:normal;color:var(--green-deep);font-weight:600;font-size:12.5px}
+.try.soon{cursor:default;background:#fafcfb}
+.try.soon:hover{border-color:var(--line);box-shadow:none}
+.try.soon .ti{background:#eef1f0;color:var(--ink-3)}
+.soon-pill{display:inline-block;background:#eef1f0;color:var(--ink-2);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:5px;vertical-align:middle;margin-left:4px}
+.nav-label{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(236,244,240,.4);padding:16px 12px 6px}
+.nav .soon{display:flex;align-items:center;gap:11px;padding:9px 12px;color:rgba(236,244,240,.45);font-weight:500;cursor:default}
+.nav .soon svg{width:18px;height:18px;flex:none;opacity:.6}
+.nav .soon .soon-pill{margin-left:auto;background:rgba(255,255,255,.08);color:rgba(236,244,240,.6)}
+
+/* pay-from-your-phone QR */
+.qrbox{width:380px;max-width:100%;background:#fff;border-radius:20px;box-shadow:0 30px 60px rgba(0,0,0,.35);overflow:hidden}
+.qrbox header{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.qrbox header h3{font-family:var(--display);font-size:16px;margin:0;font-weight:600}
+.qrbox .inner{padding:18px}
+.qrimg{width:220px;height:220px;margin:4px auto 12px;padding:10px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.qrimg svg{width:100%;height:100%;display:block}
+.qrurl{font-family:var(--mono);font-size:11px;color:var(--ink-2);background:#f2f5f3;border-radius:8px;padding:7px 9px;word-break:break-all;margin-bottom:10px}
+.wait{display:flex;align-items:center;gap:10px;justify-content:center;color:var(--ink-2);font-size:13px;margin-top:6px}
+.pulse{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(25,228,136,.6);animation:pl 1.4s infinite}
+@keyframes pl{70%{box-shadow:0 0 0 12px rgba(25,228,136,0)}100%{box-shadow:0 0 0 0 rgba(25,228,136,0)}}
+.landed{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.landed li{display:flex;justify-content:space-between;gap:10px;background:var(--green-soft);border-radius:9px;padding:8px 10px;font-size:13px}
+.landed li.bad{background:var(--red-soft)}
+
+/* USSD on a basic phone */
+.fphone{width:280px;background:#1d2422;border-radius:34px;padding:48px 18px 18px;box-shadow:0 30px 60px rgba(0,0,0,.4);position:relative}
+.fphone .ph-close{position:absolute;top:10px;right:12px;background:rgba(255,255,255,.12);color:#fff;border:0;width:28px;height:28px;border-radius:8px;cursor:pointer}
+.fscreen{background:#c9d8c1;border-radius:8px;height:200px;padding:10px 11px;font-family:var(--mono);font-size:12.5px;line-height:1.45;color:#18221a;display:flex;flex-direction:column;box-shadow:inset 0 2px 6px rgba(0,0,0,.25)}
+.fscreen .msg{white-space:pre-wrap;flex:1;overflow:auto}
+.fscreen input{border:0;border-bottom:1px solid #6d7d68;background:transparent;font:inherit;color:inherit;outline:0;padding:2px 0;width:100%}
+.fkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:14px}
+.fkeys button{background:#2d3633;color:#e8efe9;border:0;border-radius:10px;padding:9px 0;font-weight:600;cursor:pointer}
+.fkeys button:active{background:#3c4743}
+.fkeys .send{background:#1f7a4b}.fkeys .end{background:#9b2f22}
+.fhint{color:rgba(236,244,240,.6);font-size:11.5px;text-align:center;margin-top:10px}
+
+/* invoices */
+.items{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px}
+.items td{padding:4px 4px 4px 0;vertical-align:top}
+.items input{width:100%}
+.items .q{width:56px}.items .pr{width:96px}
+.items .rm{border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:18px;line-height:1;padding:6px}
+.sums{display:grid;grid-template-columns:1fr auto;gap:4px 0;font-size:13.5px;margin-top:10px}
+.sums dt{color:var(--ink-2)}.sums dd{margin:0;padding-left:16px;text-align:right;font-variant-numeric:tabular-nums}
+.sums .tot{font-family:var(--display);font-weight:600;font-size:16px;color:var(--ink);border-top:1px solid var(--line);padding-top:6px;margin-top:4px}
+.wa{background:#e5ddd5;border-radius:12px;padding:12px}
+.wa .wa-head{display:flex;align-items:center;gap:8px;font-size:12px;color:#3b4a44;margin-bottom:8px}
+.wa .wa-head img{width:18px;height:18px}
+.wa .bubble{background:#dcf8c6;border-radius:10px 10px 2px 10px;padding:9px 11px;font-size:13px;white-space:pre-wrap;margin-left:24px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.wa .bubble small{display:block;text-align:right;color:#6b7c74;font-size:10.5px;margin-top:4px}
+.actions-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+
 @media (max-width:1100px){.hero{grid-template-columns:1fr 1fr}.bal{grid-column:1/-1}.grid2{grid-template-columns:1fr}}
 @media (max-width:820px){
   .app{grid-template-columns:1fr}
@@ -253,6 +315,7 @@ a.btn{text-decoration:none;color:inherit}
   .card-head .right{margin-left:0;width:100%}
   .toasts{left:16px;right:16px}.toast{width:auto}
   .kv{grid-template-columns:110px 1fr}
+  .tries{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -265,10 +328,14 @@ a.btn{text-decoration:none;color:inherit}
       <a href="#overview" data-v="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Overview</a>
       <a href="#payments" data-v="payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Payments</a>
       <a href="#links" data-v="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>Payment links</a>
+      <a href="#invoices" data-v="invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h7M9 17h5"/></svg>Invoices</a>
       <a href="#payouts" data-v="payouts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>Payouts</a>
       <a href="#settings" data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
+      <div class="nav-label">Coming soon</div>
+      <div class="soon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>Talking alerts<span class="soon-pill">Soon</span></div>
+      <div class="soon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Ask Muse<span class="soon-pill">Soon</span></div>
     </nav>
-    <div class="foot">A test account. Nothing here is real money.<br><a href="/">Buinee home</a></div>
+    <div class="foot"><b style="color:#fff;font-weight:600">2.5% per successful payment.</b><br>No setup fee, no monthly fee.<br><br>A test account. Nothing here is real money, and BuineePay is not live yet.<br><a href="/">Buinee home</a></div>
   </aside>
 
   <main>
@@ -294,6 +361,7 @@ a.btn{text-decoration:none;color:inherit}
 <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
+<script src="/assets/js/qrcode.js"></script>
 <script>
 (function(){
 "use strict";
@@ -311,6 +379,21 @@ var OUTCOMES = {
   insufficient: {label:"Insufficient funds",   reason:"The customer's wallet or card did not have enough funds."},
   timeout:      {label:"No response",          reason:"The customer did not approve within 60 seconds."}
 };
+// Ghana VAT Act 2025 (Act 1151), in force from 1 January 2026: VAT, NHIL and
+// GETFund are all charged on the same taxable value (no more compounding),
+// 20% in total. The COVID-19 levy was repealed from the same date.
+var TAX = [
+  {key:"nhil",    label:"NHIL",    rate:0.025},
+  {key:"getfund", label:"GETFund", rate:0.025},
+  {key:"vat",     label:"VAT",     rate:0.15}
+];
+// The sandbox's own USSD code. Not a live short code.
+var USSD_CODE = "*000#";
+// BuineePay pricing: 2.5% per successful transaction. No setup fee, no
+// monthly fee. The fee is kept when a payment is later refunded.
+var FEE_RATE = 0.025;
+function feeOf(p){ if(p.status==="failed") return 0; return p.fee!=null ? p.fee : Math.round(p.amount*FEE_RATE); }
+var CHANNELS = {person:"In person", link:"Payment link", phone:"Customer's phone (QR)", ussd:"USSD ("+USSD_CODE+")"};
 var NAMES = ["Kofi Asante","Ama Mensah","Yaw Boateng","Akosua Owusu","Kwame Darko","Efua Addo","Kojo Appiah","Abena Osei","Kwabena Frimpong","Adwoa Nyarko","Esi Quaye","Nana Ansah","Kweku Tetteh","Afia Sarpong","Selorm Agbeko","Dzifa Amegah","Fiifi Coleman","Naa Adjeley","Mawuli Kpodo","Yaa Asantewaa"];
 
 /* ---------- money: everything is integer pesewas ---------- */
@@ -337,6 +420,40 @@ function mask(num){ var d=String(num).replace(/\D/g,""); return d.length>=4 ? d.
 var S;
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 function load(){ try{ var raw=localStorage.getItem(KEY); if(raw){ var s=JSON.parse(raw); if(s && s.v===1) return s; } }catch(e){} return null; }
+// Fill in anything a sandbox saved by an earlier version of this page lacks,
+// so returning visitors get invoices, USSD and the phone QR too.
+function upgrade(s){
+  if(!s.business.merchantId) s.business.merchantId=String(100000+Math.floor(Math.random()*900000));
+  if(s.settings.vat===undefined) s.settings.vat=true;
+  if(!s.phone) s.phone=[];
+  if(!s.invoices){ s.invoices=[]; s.nextInvoice=1; seedInvoices(s); }
+  return s;
+}
+function invoiceNo(n){ return "INV-"+String(n).padStart(4,"0"); }
+function seedInvoices(s){
+  var specs=[
+    {customer:"Kwame Darko", phone:"024 318 2290", back:6, items:[{desc:"Kente stole, hand woven",qty:2,price:45000},{desc:"Gift wrapping",qty:2,price:1500}], pay:"mtn"},
+    {customer:"Grace Mensah (Mensah Bridal)", phone:"055 902 7731", back:3, items:[{desc:"Bridal kaba and slit, custom fit",qty:1,price:180000},{desc:"Beading and embellishment",qty:1,price:35000}], pay:"card"},
+    {customer:"Efua Addo", phone:"020 447 1189", back:1, items:[{desc:"Ankara fabric, 6 yards",qty:3,price:12000},{desc:"Tailoring, two dresses",qty:2,price:25000}]},
+    {customer:"St. Mary's Choir", phone:"027 650 4412", back:0, items:[{desc:"Choir robes, sewn",qty:12,price:22000}]}
+  ];
+  specs.forEach(function(sp){
+    var at=new Date(Date.now()-sp.back*864e5-3*3600e3);
+    var inv={id:rid("inv"), number:invoiceNo(s.nextInvoice++), customer:sp.customer, phone:sp.phone, items:sp.items, vat:true, createdAt:at.toISOString(), status:"unpaid", paymentId:null};
+    if(sp.pay){
+      var tot=invTotals(inv).total, pAt=new Date(at.getTime()+5*3600e3);
+      var p=mkPayment({amount:tot, method:sp.pay, customer:sp.customer, contact: sp.pay==="card"?"Visa **** 4417":sp.phone, outcome:"succeeded", at:pAt, settled:true, channel:"link", invoiceId:inv.id});
+      s.payments.push(p); inv.status="paid"; inv.paymentId=p.id; inv.paidAt=pAt.toISOString();
+    }
+    s.invoices.unshift(inv);
+  });
+  s.payments.sort(function(a,b){return b.createdAt<a.createdAt?-1:1;});
+}
+function invTotals(inv){
+  var sub=inv.items.reduce(function(a,it){return a+Math.round(it.qty*it.price);},0), lines=[], tax=0;
+  if(inv.vat) TAX.forEach(function(t){ var v=Math.round(sub*t.rate); lines.push({label:t.label+" "+(t.rate*100)+"%", amount:v}); tax+=v; });
+  return {sub:sub, lines:lines, tax:tax, total:sub+tax};
+}
 
 /* ---------- seed: two weeks of a small Accra fabric shop ---------- */
 function seed(){
@@ -361,7 +478,7 @@ function seed(){
       var p=mkPayment({amount:amount, method:method, customer:name, contact: method==="card" ? (rnd()<.6?"Visa":"Mastercard")+" **** "+(1000+Math.floor(rnd()*9000)) : phoneFor(pi), outcome: fail ? (rnd()<.5?"declined":"insufficient") : "succeeded", at:at, settled: back>0});
       if(!fail && rnd()<.04 && back>2){ p.refunded=p.amount; p.status="refunded"; p.events.push({t:new Date(at.getTime()+3600e3).toISOString(), text:"Refunded "+ghs(p.amount)}); }
       s.payments.push(p); pi++;
-      if(p.status==="succeeded"||p.status==="partially_refunded") dayTotal+=p.amount-p.refunded;
+      dayTotal+=net(p);
     }
     // Paid out by hand every few days, so the sample shop opens with money
     // waiting in "available" to try a payout on.
@@ -374,20 +491,21 @@ function seed(){
   }
   s.payments.sort(function(a,b){return b.createdAt<a.createdAt?-1:1;});
   s.payouts.sort(function(a,b){return b.createdAt<a.createdAt?-1:1;});
-  return s;
+  return upgrade(s);
 }
 function mkPayment(o){
   var at=o.at||new Date(), ok=o.outcome==="succeeded";
-  var ev=[{t:at.toISOString(), text:"Payment started by "+esc(o.customer)+" ("+METHODS[o.method].label+")"}];
+  var ch=o.channel||"person";
+  var ev=[{t:at.toISOString(), text:(ch==="ussd"?"Dialled "+USSD_CODE+" and paid with ":ch==="phone"?"Scanned the QR code and paid with ":"Payment started by "+esc(o.customer)+" with ")+METHODS[o.method].label}];
   if(o.method!=="card" && o.method!=="qr") ev.push({t:new Date(at.getTime()+4000).toISOString(), text:"Approval prompt sent to "+mask(o.contact)});
   ev.push(ok ? {t:new Date(at.getTime()+9000).toISOString(), text:"Approved"} : {t:new Date(at.getTime()+9000).toISOString(), text:OUTCOMES[o.outcome].label, bad:true});
   return {id:rid("pay"), amount:o.amount, method:o.method, customer:o.customer, contact:o.contact||"", status: ok?"succeeded":"failed",
-    failure: ok?null:OUTCOMES[o.outcome].reason, refunded:0, createdAt:at.toISOString(), settled:!!o.settled, linkId:o.linkId||null, note:o.note||"", events:ev};
+    failure: ok?null:OUTCOMES[o.outcome].reason, refunded:0, fee: ok?Math.round(o.amount*FEE_RATE):0, createdAt:at.toISOString(), settled:!!o.settled, linkId:o.linkId||null, invoiceId:o.invoiceId||null, channel:ch, note:o.note||"", events:ev};
 }
 function destLabel(d){ return d.type==="momo" ? (METHODS[d.network]?METHODS[d.network].label:"MoMo")+" "+mask(d.number) : (d.bank||"Bank")+" "+mask(d.number); }
 
 /* ---------- balances and nightly settlement ---------- */
-function net(p){ return (p.status==="succeeded"||p.status==="partially_refunded") ? p.amount-p.refunded : 0; }
+function net(p){ return p.status==="failed" ? 0 : Math.max(0, p.amount-p.refunded-feeOf(p)); }
 function balances(){
   var settled=0, pending=0, out=0;
   S.payments.forEach(function(p){ if(p.settled) settled+=net(p); else pending+=net(p); });
@@ -434,6 +552,21 @@ function toast(p){
   chime(ok);
   setTimeout(function(){ el.classList.add("out"); setTimeout(function(){ el.remove(); },320); }, 4200);
 }
+// Every new payment, whatever the channel, comes through here: it is added,
+// matched to its invoice (which is then marked paid), saved and announced.
+function landed(p){
+  S.payments.unshift(p);
+  if(p.status==="succeeded" && p.invoiceId){
+    var inv=findInvoice(p.invoiceId);
+    if(inv && inv.status!=="paid"){
+      inv.status="paid"; inv.paymentId=p.id; inv.paidAt=p.createdAt;
+      p.events.push({t:new Date().toISOString(), text:"Matched to invoice "+inv.number+", receipt sent on WhatsApp", grey:true});
+    }
+  }
+  save(); render(); toast(p);
+  return p;
+}
+function findInvoice(id){ return S.invoices.filter(function(i){return i.id===id;})[0]; }
 function flash(msg){
   var el=document.createElement("div"); el.className="toast";
   el.innerHTML='<div class="ic">'+CHECK+'</div><div><b>'+esc(msg)+'</b></div>';
@@ -483,12 +616,19 @@ var VIEWS={
     week.forEach(function(p){ mix[p.method]=(mix[p.method]||0)+net(p); });
     var mixHtml=Object.keys(METHODS).filter(function(m){return mix[m];}).sort(function(a,b){return mix[b]-mix[a];}).map(function(m){
       var pc=Math.round(mix[m]/wtot*100); return '<div><div class="line"><span class="method">'+badge(m)+METHODS[m].label+'</span><b>'+pc+'%</b></div><div class="track"><i style="width:'+pc+'%"></i></div></div>'; }).join("") || '<div class="empty">No payments in the last 7 days.</div>';
+    var tries='<div class="card" style="margin-bottom:14px"><div class="card-head"><h2>Try it as a customer</h2><span style="margin-left:auto;color:var(--ink-3);font-size:12px">Pay this shop and watch it land here</span></div><div class="card-body"><div class="tries">'+
+      '<button class="try" data-act="phone"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></span><b>Pay from your own phone</b><span>Scan a QR code with your phone, pay there, and see it arrive on this screen.</span><em>Show QR code</em></button>'+
+      '<button class="try" data-act="ussd"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M9 6h6v5H9z"/><path d="M9.5 14h.01M12 14h.01M14.5 14h.01M9.5 17h.01M12 17h.01M14.5 17h.01"/></svg></span><b>Pay by USSD on a basic phone</b><span>Dial '+USSD_CODE+' on a feature phone, no internet or smartphone needed.</span><em>Open the phone</em></button>'+
+      '<a class="try" href="#invoices" style="text-decoration:none;color:inherit"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h7M9 17h5"/></svg></span><b>Invoice that pays itself off</b><span>Send an invoice, get paid, and the receipt with VAT, NHIL and GETFund goes out by itself.</span><em>Open invoices</em></a>'+
+      '<div class="try soon"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></span><b>Talking payment alerts <span class="soon-pill">Soon</span></b><span>Hear "Payment received, eighty-five cedis, from Kofi" out loud, in English or Twi.</span></div>'+
+      '<div class="try soon"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span><b>Ask Muse <span class="soon-pill">Soon</span></b><span>Ask how your week went and get an end-of-day summary on WhatsApp.</span></div>'+
+      '</div></div></div>';
     var lastPo=S.payouts[0];
     return '<div class="hero">'+
       '<div class="bal"><small>Available to pay out</small><div class="amt"><span>GHS</span>'+fmt(b.available)+'</div><div class="row"><button class="btn go sm" data-act="payout"'+(b.available?'':' disabled')+'>Pay out now</button><button class="btn sm" data-act="settle"'+(b.pending?'':' disabled')+'>Settle today early</button></div></div>'+
-      '<div class="card stat"><small><span class="dot"></span>Taken today</small><div class="amt">'+ghs(takenToday)+'</div><div class="meta">'+okToday+' payment'+(okToday===1?'':'s')+' · '+(S.settings.autoPayout?'paid out tonight':'held until you pay out')+'</div></div>'+
+      '<div class="card stat"><small><span class="dot"></span>Taken today</small><div class="amt">'+ghs(takenToday)+'</div><div class="meta">'+okToday+' payment'+(okToday===1?'':'s')+' after the 2.5% fee · '+(S.settings.autoPayout?'paid out tonight':'held until you pay out')+'</div></div>'+
       '<div class="card stat"><small><span class="dot amber"></span>Pending payout</small><div class="amt">'+ghs(b.pending)+'</div><div class="meta">'+(lastPo?'Last payout '+ghs(lastPo.amount)+', '+when(lastPo.createdAt).toLowerCase():'No payouts yet')+'</div></div>'+
-    '</div>'+
+    '</div>'+tries+
     '<div class="grid2"><div class="card"><div class="card-head"><h2>Takings, last 14 days</h2></div><div class="card-body"><div class="chart">'+chart+'</div></div></div>'+
     '<div class="card"><div class="card-head"><h2>How customers paid</h2><span class="muted" style="margin-left:auto;color:var(--ink-3);font-size:12px">Last 7 days</span></div><div class="card-body mix">'+mixHtml+'</div></div></div>'+
     '<div class="card" style="margin-top:14px"><div class="card-head"><h2>Recent payments</h2><div class="right"><a class="btn sm" href="#payments">View all</a></div></div>'+payRows(S.payments.slice(0,6))+'</div>';
@@ -516,6 +656,14 @@ var VIEWS={
       (S.links.length?'<table class="tbl"><thead><tr><th>Link</th><th class="hide-sm">Amount</th><th class="hide-sm">Paid</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="empty">No links yet. Create one and open its checkout to pay it as a customer would.</div>')+'</div>'+
       '<p class="note" style="margin-top:14px">In the sandbox, links open a preview of the customer checkout right here. The <code>pay.buinee.app</code> addresses are examples and do not open outside this page.</p>';
   }},
+  invoices:{title:"Invoices", render:function(){
+    var rows=S.invoices.map(function(inv){ var t=invTotals(inv);
+      return '<tr class="click" data-inv="'+inv.id+'"><td class="who"><b>'+inv.number+'</b><span>'+esc(inv.customer)+'</span></td><td class="hide-sm muted">'+when(inv.createdAt)+'</td><td>'+(inv.status==="paid"?'<span class="status s-succeeded">Paid</span>':'<span class="status s-pending">Unpaid</span>')+'</td><td class="num">'+ghs(t.total)+'</td></tr>'; }).join("");
+    var owed=S.invoices.filter(function(i){return i.status!=="paid";}).reduce(function(a,i){return a+invTotals(i).total;},0);
+    return '<div class="card"><div class="card-head"><h2>Invoices</h2><span style="color:var(--ink-3);font-size:12.5px">'+ghs(owed)+' still owed</span><div class="right" style="margin-left:auto"><button class="btn primary sm" data-act="newinvoice">New invoice</button></div></div>'+
+      (rows?'<table class="tbl"><thead><tr><th>Invoice</th><th class="hide-sm">Issued</th><th>Status</th><th style="text-align:right">Total</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="empty">No invoices yet.</div>')+'</div>'+
+      '<p class="note" style="margin-top:14px">When a customer pays an invoice, by its payment link, from their phone or by USSD, BuineePay matches the payment to it, marks it paid and sends the receipt on WhatsApp with the tax broken out. Tax follows the Ghana VAT Act 2025 from 1 January 2026: VAT 15%, NHIL 2.5% and GETFund 2.5%, all on the same amount. Turn VAT off in Settings if the shop isn\'t VAT registered. WhatsApp messages here are previews; the sandbox sends nothing.</p>';
+  }},
   payouts:{title:"Payouts", render:function(){
     var b=balances();
     var rows=S.payouts.map(function(o){ return '<tr><td><b>'+ghs(o.amount)+'</b></td><td class="hide-sm muted">'+esc(o.dest)+'</td><td class="muted">'+when(o.createdAt)+'</td><td class="hide-sm">'+(o.auto?'Nightly':'Manual')+'</td><td><span class="status s-paid">Paid</span></td></tr>'; }).join("");
@@ -536,6 +684,8 @@ var VIEWS={
       '<button class="btn primary" type="submit">Save changes</button></form></div></div>'+
       '<div class="card"><div class="card-head"><h2>Preferences</h2></div><div class="card-body" style="padding-top:4px">'+
       '<div class="setrow"><div><b>Nightly payouts</b><span>Pay out the day\'s takings automatically at end of day.</span></div><label class="toggle"><input type="checkbox" data-set="autoPayout"'+(S.settings.autoPayout?' checked':'')+'><i></i></label></div>'+
+      '<div class="setrow"><div><b>Charge VAT on invoices</b><span>Adds NHIL 2.5%, GETFund 2.5% and VAT 15% to new invoices.</span></div><label class="toggle"><input type="checkbox" data-set="vat"'+(S.settings.vat?' checked':'')+'><i></i></label></div>'+
+      '<div class="setrow"><div><b>USSD shop number</b><span>Customers dial '+USSD_CODE+' and enter this to pay you.</span></div><b style="margin-left:auto;font-family:var(--display);font-size:17px;letter-spacing:.05em">'+S.business.merchantId+'</b></div>'+
       '<div class="setrow"><div><b>Payment sound</b><span>Play a chime when a payment lands.</span></div><label class="toggle"><input type="checkbox" data-set="sound"'+(S.settings.sound?' checked':'')+'><i></i></label></div>'+
       '<div class="setrow"><div><b>Start fresh</b><span>Clear every test payment, link and payout and load the sample shop again.</span></div><button class="btn danger sm" data-act="reset">Reset sandbox</button></div>'+
       '</div></div></div>';
@@ -583,8 +733,7 @@ function simDrawer(){
     $("simStage").innerHTML='<div class="result"><div class="spin"></div><p>'+wait+'</p></div>';
     setTimeout(function(){
       var contact = m==="card" ? (Math.random()<.6?"Visa":"Mastercard")+" **** "+(1000+Math.floor(Math.random()*9000)) : phoneFor(Math.floor(Math.random()*999));
-      var p=mkPayment({amount:amt, method:m, customer:name, contact:contact, outcome:out});
-      S.payments.unshift(p); save(); render(); toast(p);
+      var p=landed(mkPayment({amount:amt, method:m, customer:name, contact:contact, outcome:out}));
       $("simStage").innerHTML = p.status==="succeeded"
         ? '<div class="result ok"><div class="ic">'+CHECK+'</div><h4>'+ghs(amt)+' received</h4><p>From '+esc(name)+'. It is in your pending balance.</p></div>'
         : '<div class="result bad"><div class="ic">'+CROSS+'</div><h4>Payment failed</h4><p>'+esc(p.failure)+'</p></div>';
@@ -602,8 +751,11 @@ function payDrawer(id){
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><div class="big">'+ghs(p.amount)+'</div>'+statusPill(p)+'</div>'+
     '<div style="color:var(--ink-3);font-size:12.5px;margin-bottom:18px">'+when(p.createdAt)+'</div>'+
     '<dl class="kv"><dt>Customer</dt><dd>'+esc(p.customer)+'</dd><dt>Paid with</dt><dd>'+methodCell(p.method, p.contact)+'</dd><dt>'+(p.method==="card"?"Card":"Number")+'</dt><dd>'+esc(p.contact)+'</dd>'+
+    '<dt>Paid through</dt><dd>'+(CHANNELS[p.channel||"person"])+'</dd>'+
     (link?'<dt>Payment link</dt><dd>'+esc(link.title)+'</dd>':'')+
+    (p.invoiceId&&findInvoice(p.invoiceId)?'<dt>Invoice</dt><dd><a href="#invoices" data-inv="'+p.invoiceId+'">'+findInvoice(p.invoiceId).number+'</a></dd>':'')+
     (p.refunded?'<dt>Refunded</dt><dd>'+ghs(p.refunded)+'</dd>':'')+
+    (p.status!=="failed"?'<dt>BuineePay fee</dt><dd>'+ghs(feeOf(p))+' <span class="muted">(2.5%)</span></dd>':'')+
     '<dt>You receive</dt><dd><b>'+ghs(net(p))+'</b></dd><dt>Payout</dt><dd>'+(p.status==="failed"?"Not applicable":p.settled?"Settled":"Pending, settles tonight")+'</dd>'+
     '<dt>Payment ID</dt><dd style="font-family:var(--mono);font-size:12px">'+p.id+'</dd></dl>'+
     (p.failure?'<p class="note" style="margin-top:16px;color:var(--red)">'+esc(p.failure)+'</p>':'')+
@@ -660,13 +812,214 @@ function checkout(id){
     var contact = m==="card" ? (/^5/.test(num)?"Mastercard":"Visa")+" **** "+num.slice(-4) : $("coNum").value.trim();
     $("coBody").innerHTML='<div class="result"><div class="spin"></div><p>'+(m==="card"?"Confirming your card…":"Check your phone and approve the prompt…")+'</p></div>';
     setTimeout(function(){
-      var p=mkPayment({amount:amt, method:m, customer:name, contact:contact, outcome:out, linkId:l.id});
-      S.payments.unshift(p); save(); render(); toast(p);
+      var p=landed(mkPayment({amount:amt, method:m, customer:name, contact:contact, outcome:out, linkId:l.id, invoiceId:l.invoiceId||null, channel:"link"}));
       $("coBody").innerHTML = p.status==="succeeded"
         ? '<div class="result ok"><div class="ic">'+CHECK+'</div><h4>Paid '+ghs(amt)+'</h4><p>'+esc(S.business.name)+' has your payment. A receipt is on its way.</p></div><button class="btn" data-close style="width:100%;justify-content:center;margin-top:10px">Done</button>'
         : '<div class="result bad"><div class="ic">'+CROSS+'</div><h4>Payment not completed</h4><p>'+esc(p.failure)+'</p></div><button class="btn" data-retry="'+l.id+'" style="width:100%;justify-content:center;margin-top:10px">Try again</button>';
     }, 1800);
   });
+}
+
+
+/* ---------- invoices ---------- */
+function invoiceForm(){
+  var rows=[{desc:"",qty:1,price:""}];
+  function itemRows(){ return rows.map(function(r,i){ return '<tr><td><input class="input" data-i="'+i+'" data-k="desc" maxlength="80" placeholder="Item or service" value="'+esc(r.desc)+'"></td><td class="q"><input class="input" data-i="'+i+'" data-k="qty" inputmode="numeric" value="'+esc(r.qty)+'"></td><td class="pr"><input class="input" data-i="'+i+'" data-k="price" inputmode="decimal" placeholder="0.00" value="'+esc(r.price)+'"></td><td>'+(rows.length>1?'<button type="button" class="rm" data-rm="'+i+'" aria-label="Remove line">&times;</button>':'')+'</td></tr>'; }).join(""); }
+  function current(){ return {items:rows.map(function(r){return {desc:String(r.desc).trim(), qty:Math.max(0,parseInt(r.qty,10)||0), price:parseAmt(r.price)};}).filter(function(it){return it.desc&&it.qty&&it.price;}), vat:S.settings.vat}; }
+  function sums(){ var t=invTotals(current()); return '<dl class="sums"><dt>Subtotal</dt><dd>'+ghs(t.sub)+'</dd>'+t.lines.map(function(l){return '<dt>'+l.label+'</dt><dd>'+ghs(l.amount)+'</dd>';}).join("")+'<dt class="tot">Total</dt><dd class="tot">'+ghs(t.total)+'</dd></dl>'; }
+  openDrawer("New invoice",
+    '<form id="invForm" autocomplete="off"><div class="field"><label for="iCust">Customer</label><input class="input" id="iCust" maxlength="60" required placeholder="Name or business"></div>'+
+    '<div class="field"><label for="iPhone">Customer WhatsApp number</label><input class="input" id="iPhone" maxlength="16" inputmode="tel" placeholder="024 000 0000"><span class="hint">Used for the payment request and receipt previews. Sandbox only.</span></div>'+
+    '<div class="field"><label>Items</label><table class="items"><thead><tr><td class="muted" style="font-size:12px">Description</td><td class="muted" style="font-size:12px">Qty</td><td class="muted" style="font-size:12px">Price (GHS)</td><td></td></tr></thead><tbody id="iRows">'+itemRows()+'</tbody></table><button type="button" class="btn sm" id="iAdd">Add line</button></div>'+
+    '<div id="iSums">'+sums()+'</div>'+(S.settings.vat?'':'<p class="hint">VAT is off in Settings, so no tax is added.</p>')+'</form>',
+    '<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit" form="invForm">Create invoice</button>');
+  var body=$("iRows");
+  body.addEventListener("input",function(e){ var i=e.target.dataset.i; if(i===undefined) return; rows[i][e.target.dataset.k]=e.target.value; $("iSums").innerHTML=sums(); });
+  body.addEventListener("click",function(e){ var b=e.target.closest("[data-rm]"); if(!b) return; rows.splice(+b.dataset.rm,1); body.innerHTML=itemRows(); $("iSums").innerHTML=sums(); });
+  $("iAdd").addEventListener("click",function(){ if(rows.length>=10) return; rows.push({desc:"",qty:1,price:""}); body.innerHTML=itemRows(); });
+  $("invForm").addEventListener("submit",function(e){
+    e.preventDefault(); var c=current(), cust=$("iCust").value.trim();
+    if(!cust){ $("iCust").focus(); return; }
+    if(!c.items.length){ flash("Add at least one item with a price"); return; }
+    var t=invTotals(c); if(t.total<100||t.total>5000000){ flash("Invoice total must be between GHS 1 and GHS 50,000"); return; }
+    var inv={id:rid("inv"), number:invoiceNo(S.nextInvoice++), customer:cust, phone:$("iPhone").value.trim(), items:c.items, vat:c.vat, createdAt:new Date().toISOString(), status:"unpaid", paymentId:null};
+    S.invoices.unshift(inv); save(); location.hash="#invoices"; render(); invoiceDrawer(inv.id);
+  });
+}
+function invoiceLink(inv){
+  var l=S.links.filter(function(x){return x.invoiceId===inv.id;})[0];
+  if(!l){ l={id:rid("plink"), title:"Invoice "+inv.number, amount:invTotals(inv).total, createdAt:new Date().toISOString(), active:true, invoiceId:inv.id}; S.links.unshift(l); save(); }
+  return l;
+}
+function first(name){ return String(name||"").split(/[\s(]/)[0]||"there"; }
+function waBubble(to, text){
+  return '<div class="wa"><div class="wa-head"><img src="/assets/images/whatsapp.svg" alt="WhatsApp">WhatsApp to '+esc(to)+' · preview, not sent</div><div class="bubble">'+esc(text)+'<small>'+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})+'</small></div></div>';
+}
+function invoiceDrawer(id){
+  var inv=findInvoice(id); if(!inv) return;
+  var t=invTotals(inv), paid=inv.status==="paid", p=paid?S.payments.filter(function(x){return x.id===inv.paymentId;})[0]:null;
+  var lines=inv.items.map(function(it){return '<tr><td>'+esc(it.desc)+'<div class="muted">'+it.qty+' × '+ghs(it.price)+'</div></td><td class="num">'+ghs(it.qty*it.price)+'</td></tr>';}).join("");
+  var sums='<dl class="sums"><dt>Subtotal</dt><dd>'+ghs(t.sub)+'</dd>'+t.lines.map(function(l){return '<dt>'+l.label+'</dt><dd>'+ghs(l.amount)+'</dd>';}).join("")+'<dt class="tot">Total</dt><dd class="tot">'+ghs(t.total)+'</dd></dl>';
+  var body='<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><div class="big">'+ghs(t.total)+'</div>'+(paid?'<span class="status s-succeeded">Paid</span>':'<span class="status s-pending">Unpaid</span>')+'</div>'+
+    '<div style="color:var(--ink-3);font-size:12.5px;margin-bottom:16px">'+inv.number+' · issued '+when(inv.createdAt).toLowerCase()+' · to '+esc(inv.customer)+'</div>'+
+    '<table class="tbl" style="font-size:13.5px"><tbody>'+lines+'</tbody></table>'+sums;
+  if(paid){
+    body+='<div class="section-t">Receipt</div><dl class="kv"><dt>Paid</dt><dd>'+when(inv.paidAt)+'</dd>'+(p?'<dt>Paid with</dt><dd>'+methodCell(p.method,p.contact)+'</dd><dt>You receive</dt><dd>'+ghs(net(p))+' <span class="muted">after the 2.5% fee</span></dd><dt>Payment</dt><dd><a href="#invoices" data-pay="'+p.id+'" style="font-family:var(--mono);font-size:12px">'+p.id+'</a></dd>':'')+'</dl>'+
+      '<div class="section-t">Sent to the customer automatically</div>'+waBubble(inv.phone||inv.customer,
+        "Hello "+first(inv.customer)+", thank you for your payment to "+S.business.name+".\n\nReceipt for "+inv.number+"\n"+
+        inv.items.map(function(it){return it.qty+" × "+it.desc+"  "+ghs(it.qty*it.price);}).join("\n")+
+        "\nSubtotal "+ghs(t.sub)+(t.lines.length?"\n"+t.lines.map(function(l){return l.label+"  "+ghs(l.amount);}).join("\n"):"")+
+        "\nTotal paid "+ghs(t.total)+(p?"\nPaid with "+METHODS[p.method].label+" · Ref "+p.id:"")+"\n\nBuineePay");
+  } else {
+    var l=S.links.filter(function(x){return x.invoiceId===inv.id;})[0];
+    body+='<div class="section-t">Get paid</div><div class="actions-row">'+
+      '<button class="btn go sm" data-inv-act="send" data-id="'+inv.id+'">'+(l?'Payment request sent':'Send payment request')+'</button>'+
+      '<button class="btn sm" data-inv-act="checkout" data-id="'+inv.id+'">Pay as the customer</button>'+
+      '<button class="btn sm" data-inv-act="phone" data-id="'+inv.id+'">Pay from my phone</button>'+
+      '<button class="btn sm" data-inv-act="ussd" data-id="'+inv.id+'">Pay by USSD</button></div>'+
+      (l?'<div class="section-t">Payment request</div>'+waBubble(inv.phone||inv.customer,
+        "Hello "+first(inv.customer)+", here is invoice "+inv.number+" from "+S.business.name+" for "+ghs(t.total)+".\n\nPay with MoMo or card: pay.buinee.app/"+l.id.slice(6)+"\nNo smartphone? Dial "+USSD_CODE+", choose 2 and enter "+inv.number.replace("INV-","")+".\n\nBuineePay"):'');
+  }
+  openDrawer(inv.number, body, '<button class="btn" type="button" data-close>Close</button>'+(paid?'<button class="btn primary" type="button" data-inv-act="print" data-id="'+inv.id+'">Print receipt</button>':''));
+}
+function printReceipt(inv){
+  var t=invTotals(inv), p=S.payments.filter(function(x){return x.id===inv.paymentId;})[0];
+  var w=window.open("","_blank","width=420,height=640"); if(!w){ flash("Allow pop-ups to print the receipt"); return; }
+  var rows=inv.items.map(function(it){return '<tr><td>'+it.qty+' × '+esc(it.desc)+'</td><td style="text-align:right">'+ghs(it.qty*it.price)+'</td></tr>';}).join("")+
+    '<tr><td style="padding-top:8px">Subtotal</td><td style="text-align:right;padding-top:8px">'+ghs(t.sub)+'</td></tr>'+
+    t.lines.map(function(l){return '<tr><td>'+l.label+'</td><td style="text-align:right">'+ghs(l.amount)+'</td></tr>';}).join("")+
+    '<tr><td style="border-top:1px solid #000;font-weight:700">Total paid</td><td style="border-top:1px solid #000;text-align:right;font-weight:700">'+ghs(t.total)+'</td></tr>';
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Receipt '+inv.number+'</title></head><body style="font:13px/1.5 Arial,sans-serif;max-width:340px;margin:20px auto;color:#000">'+
+    '<h2 style="margin:0">'+esc(S.business.name)+'</h2><div>'+esc(S.business.city)+'</div><hr><b>Receipt for '+inv.number+'</b><div>Customer: '+esc(inv.customer)+'</div><div>Paid: '+new Date(inv.paidAt).toLocaleString("en-GB")+'</div>'+
+    (p?'<div>Paid with: '+METHODS[p.method].label+' ('+esc(p.contact)+')</div><div>Ref: '+p.id+'</div>':'')+
+    '<table style="width:100%;margin-top:10px;border-collapse:collapse">'+rows+'</table><hr><div style="font-size:11px">BuineePay sandbox receipt. Test data, not a tax document.</div></body></html>');
+  w.document.close(); w.focus(); w.print();
+}
+
+/* ---------- pay from your own phone (QR) ---------- */
+// The only feature that needs the server: a short-lived session the phone
+// pays into and this page polls (sandbox_pay.py). Everything else stays local.
+function api(path, body){
+  return fetch(path, body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{cache:"no-store"})
+    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||"Something went wrong."); return j; }); });
+}
+function phoneModal(opts){
+  opts=opts||{};
+  var inv=opts.invoiceId?findInvoice(opts.invoiceId):null;
+  var amt=inv?invTotals(inv).total:null;
+  $("modal").innerHTML='<div class="qrbox"><header><h3>Pay from your own phone</h3><button class="x" data-close aria-label="Close">&times;</button></header><div class="inner" id="qrInner">'+
+    (inv?'<p style="margin:0 0 12px;color:var(--ink-2)">Your phone pays invoice <b>'+inv.number+'</b> for <b>'+ghs(amt)+'</b>.</p>'
+        :'<form id="qrForm"><div class="field"><label for="qrAmt">Amount</label><div class="money-in"><span>GHS</span><input id="qrAmt" inputmode="decimal" placeholder="Leave empty to let the customer choose"></div></div></form>')+
+    '<button class="btn go" id="qrGo" style="width:100%;justify-content:center">Show QR code</button></div></div>';
+  $("modal").classList.add("on"); $("scrim").classList.add("on");
+  $("qrGo").addEventListener("click",function(){
+    if(!inv){ var v=$("qrAmt").value.trim(); amt=v?parseAmt(v):null; if(v&&(amt<100||amt>5000000)){ $("qrAmt").focus(); return; } }
+    this.disabled=true; this.textContent="Creating…";
+    api("/api/sandbox/sessions",{business:S.business.name, amount:amt, note:inv?"Invoice "+inv.number:""}).then(function(sess){
+      S.phone.push({id:sess.id, expires:sess.expires, after:0, invoiceId:inv?inv.id:null});
+      save(); poll();
+      var url=location.origin+"/buineepay/pay?s="+encodeURIComponent(sess.id);
+      var qr=qrcode(0,"M"); qr.addData(url); qr.make();
+      $("qrInner").innerHTML='<p style="margin:0 0 6px;text-align:center;color:var(--ink-2)">Scan with your phone camera'+(amt?', then pay <b>'+ghs(amt)+'</b>':'')+'.</p>'+
+        '<div class="qrimg">'+qr.createSvgTag({cellSize:4,margin:0,scalable:true})+'</div>'+
+        '<div class="qrurl">'+esc(url)+'</div>'+
+        '<div class="wait"><span class="pulse"></span>Waiting for your payment · code works for 30 minutes</div>'+
+        '<ul class="landed" id="qrLanded" data-sid="'+sess.id+'"></ul>'+
+        (/^(localhost|127\.|\[::1\])/.test(location.hostname)?'<p class="hint" style="margin-top:12px">This is running on your computer, so a phone can\'t open it. <a href="'+esc(url)+'" target="_blank" rel="noopener">Open the phone page in a new tab</a> instead.</p>':'');
+    }).catch(function(err){
+      $("qrInner").insertAdjacentHTML("beforeend",'<p class="note" style="color:var(--red);margin-top:10px">'+esc(err.message)+'</p>');
+      $("qrGo").disabled=false; $("qrGo").textContent="Try again";
+    });
+  });
+}
+var polling=false;
+function poll(){
+  if(polling) return;
+  var now=Date.now()/1000;
+  S.phone=S.phone.filter(function(x){return x.expires>now;});
+  if(!S.phone.length) return;
+  polling=true;
+  Promise.all(S.phone.map(function(sess){
+    return api("/api/sandbox/events?id="+encodeURIComponent(sess.id)+"&after="+sess.after).then(function(r){
+      r.payments.forEach(function(ev){
+        sess.after=Math.max(sess.after, ev.seq);
+        var p=landed(mkPayment({amount:ev.amount, method:ev.method, customer:ev.customer, contact:ev.contact, outcome:ev.outcome, at:new Date(ev.at), channel:"phone", invoiceId:sess.invoiceId}));
+        var list=document.querySelector('#qrLanded[data-sid="'+sess.id+'"]');
+        if(list) list.insertAdjacentHTML("beforeend",'<li class="'+(p.status==="succeeded"?"":"bad")+'"><span>'+(p.status==="succeeded"?"Received from ":"Failed: ")+esc(p.customer)+'</span><b>'+ghs(p.amount)+'</b></li>');
+      });
+    }).catch(function(){ sess.expires=0; });
+  })).then(function(){ save(); polling=false; setTimeout(poll, 2500); });
+}
+
+/* ---------- USSD on a basic phone ---------- */
+function ussdModal(opts){
+  opts=opts||{};
+  var st={step:"dial", amount:0, invoice:null};
+  $("modal").innerHTML='<div class="fphone"><button class="ph-close" data-close aria-label="Close">&times;</button>'+
+    '<div class="fscreen"><div class="msg" id="uMsg"></div><input id="uIn" inputmode="tel" autocomplete="off" aria-label="Phone input"></div>'+
+    '<div class="fkeys" id="uKeys">'+["1","2","3","4","5","6","7","8","9","*","0","#"].map(function(k){return '<button type="button" data-k="'+k+'">'+k+'</button>';}).join("")+
+    '<button type="button" class="end" data-k="end">End</button><button type="button" data-k="del">Del</button><button type="button" class="send" data-k="send">Send</button></div>'+
+    '<div class="fhint">Shop number '+S.business.merchantId+(opts.invoiceId?' · invoice '+findInvoice(opts.invoiceId).number.replace("INV-",""):'')+' · sandbox code '+USSD_CODE+'</div></div>';
+  $("modal").classList.add("on"); $("scrim").classList.add("on");
+  var msg=$("uMsg"), input=$("uIn");
+  function show(text){ msg.textContent=text; input.value=""; input.focus(); }
+  function dial(){ st={step:"dial",amount:0,invoice:null}; show("Dial "+USSD_CODE+" and press Send"); }
+  function wallets(){ st.step="wallet"; show("Pay "+ghs(st.amount)+" to\n"+S.business.name+(st.invoice?"\nfor "+st.invoice.number:"")+"\n\n1. MTN MoMo\n2. Telecel Cash\n3. AirtelTigo Money\n0. Cancel"); }
+  function send(){
+    var v=input.value.trim();
+    if(st.step==="dial"){
+      if(v.replace(/\s/g,"")!==USSD_CODE) return show("Unknown code.\nDial "+USSD_CODE+" and press Send");
+      st.step="menu"; return show("BuineePay\n1. Pay a shop\n2. Pay an invoice\n0. Exit");
+    }
+    if(st.step==="menu"){
+      if(v==="1"){ st.step="shop"; return show("Enter shop number:"); }
+      if(v==="2"){ st.step="invoice"; return show("Enter invoice number:"); }
+      if(v==="0") return dial();
+      return show("BuineePay\n1. Pay a shop\n2. Pay an invoice\n0. Exit");
+    }
+    if(st.step==="shop"){
+      if(v!==S.business.merchantId) return show("Shop not found.\nCheck the number and enter it again:");
+      st.step="amount"; return show(S.business.name+"\nEnter amount (GHS):");
+    }
+    if(st.step==="amount"){
+      var a=parseAmt(v); if(a<100||a>5000000) return show("Enter an amount from 1 to 50000:");
+      st.amount=a; return wallets();
+    }
+    if(st.step==="invoice"){
+      var n=parseInt(v.replace(/\D/g,""),10), inv=S.invoices.filter(function(i){return parseInt(i.number.replace("INV-",""),10)===n;})[0];
+      if(!inv) return show("Invoice not found.\nEnter invoice number:");
+      if(inv.status==="paid") return show(inv.number+" is already paid.\nThank you.\n\n0. Exit");
+      st.invoice=inv; st.amount=invTotals(inv).total; return wallets();
+    }
+    if(st.step==="wallet"){
+      var w={"1":"mtn","2":"telecel","3":"at"}[v]; if(v==="0") return dial();
+      if(!w) return wallets();
+      st.method=w; st.step="pin";
+      return show("Enter your 4-digit "+METHODS[w].label+" PIN to approve "+ghs(st.amount)+"\n\nSandbox: any 4 digits. Never your real PIN. 0000 declines.");
+    }
+    if(st.step==="pin"){
+      if(!/^\d{4}$/.test(v)) return show("PIN must be 4 digits.\nEnter PIN:");
+      st.step="done"; show("Processing…"); input.disabled=true;
+      setTimeout(function(){
+        input.disabled=false;
+        var num=phoneFor(Math.floor(Math.random()*999));
+        var p=landed(mkPayment({amount:st.amount, method:st.method, customer:NAMES[Math.floor(Math.random()*NAMES.length)], contact:num, outcome:v==="0000"?"declined":"succeeded", channel:"ussd", invoiceId:st.invoice?st.invoice.id:null}));
+        show(p.status==="succeeded" ? "Payment successful.\n"+ghs(st.amount)+" paid to "+S.business.name+".\nRef "+p.id.slice(4).toUpperCase()+"\n\nPress End to finish." : "Payment declined.\nNo money was taken.\n\nPress End to finish.");
+      }, 1500);
+      return;
+    }
+    if(st.step==="done") return dial();
+  }
+  $("uKeys").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return; var k=b.dataset.k;
+    if(k==="send") return send();
+    if(k==="end") return dial();
+    if(k==="del"){ input.value=input.value.slice(0,-1); return input.focus(); }
+    input.value+=k; input.focus();
+  });
+  input.addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); send(); } });
+  dial();
+  if(opts.invoiceId){ input.value=USSD_CODE; }
 }
 
 function payout(){
@@ -675,8 +1028,8 @@ function payout(){
   save(); render(); flash(ghs(b.available)+" sent to "+destLabel(S.settings.dest));
 }
 function csv(){
-  var rows=[["id","date","customer","contact","method","status","amount_ghs","refunded_ghs","net_ghs"]].concat(S.payments.map(function(p){
-    return [p.id,p.createdAt,p.customer,p.contact,METHODS[p.method].label,p.status,(p.amount/100).toFixed(2),(p.refunded/100).toFixed(2),(net(p)/100).toFixed(2)]; }));
+  var rows=[["id","date","customer","contact","method","channel","status","amount_ghs","fee_ghs","refunded_ghs","net_ghs"]].concat(S.payments.map(function(p){
+    return [p.id,p.createdAt,p.customer,p.contact,METHODS[p.method].label,CHANNELS[p.channel||"person"],p.status,(p.amount/100).toFixed(2),(feeOf(p)/100).toFixed(2),(p.refunded/100).toFixed(2),(net(p)/100).toFixed(2)]; }));
   var text=rows.map(function(r){return r.map(function(c){c=String(c); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(",");}).join("\n");
   var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"})); a.download="buineepay-sandbox-payments.csv"; document.body.appendChild(a); a.click(); a.remove();
 }
@@ -687,7 +1040,16 @@ document.addEventListener("click",function(e){
   var t=e.target;
   if(t.closest("[data-close]")||t===$("scrim")){ closeAll(); return; }
   var el;
-  if((el=t.closest("[data-pay]"))) return payDrawer(el.dataset.pay);
+  if((el=t.closest("[data-pay]"))){ e.preventDefault(); return payDrawer(el.dataset.pay); }
+  if((el=t.closest("[data-inv]"))){ e.preventDefault(); return invoiceDrawer(el.dataset.inv); }
+  if((el=t.closest("[data-inv-act]"))){
+    var inv=findInvoice(el.dataset.id), ia=el.dataset.invAct; if(!inv) return;
+    if(ia==="send"){ invoiceLink(inv); invoiceDrawer(inv.id); return flash("Payment request ready for "+inv.customer); }
+    if(ia==="checkout"){ closeAll(); return checkout(invoiceLink(inv).id); }
+    if(ia==="phone"){ closeAll(); return phoneModal({invoiceId:inv.id}); }
+    if(ia==="ussd"){ closeAll(); return ussdModal({invoiceId:inv.id}); }
+    if(ia==="print") return printReceipt(inv);
+  }
   if((el=t.closest("[data-open-link]"))) return checkout(el.dataset.openLink);
   if((el=t.closest("[data-retry]"))) return checkout(el.dataset.retry);
   if((el=t.closest("[data-toggle-link]"))){ S.links.forEach(function(l){ if(l.id===el.dataset.toggleLink) l.active=!l.active; }); save(); return render(); }
@@ -698,6 +1060,9 @@ document.addEventListener("click",function(e){
     if(a==="settle"){ var mv=settle(true); render(); return flash(ghs(mv)+" settled"+(S.settings.autoPayout?" and paid out":"")); }
     if(a==="csv") return csv();
     if(a==="newlink") return linkDrawer();
+    if(a==="newinvoice") return invoiceForm();
+    if(a==="phone") return phoneModal();
+    if(a==="ussd") return ussdModal();
     if(a==="reset") return reset();
   }
 });
@@ -721,9 +1086,10 @@ $("resetBtn").addEventListener("click",reset);
 $("menuBtn").addEventListener("click",function(){ $("rail").classList.add("on"); $("scrim").classList.add("on"); });
 window.addEventListener("hashchange",route);
 
-S=load()||seed();
+S=upgrade(load()||seed());
 settle(false);
 route();
+poll();
 })();
 </script>
 </body>

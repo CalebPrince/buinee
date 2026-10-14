@@ -138,6 +138,8 @@ section before assuming this applies):
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
 | `admin-settings.html` | Command Center: Settings — change the platform owner's own password |
 | `buineepay-sandbox.html` | Public BuineePay merchant sandbox at `/buineepay/sandbox`, see below |
+| `buineepay-pay.html` | The customer's side of the sandbox's "pay from your own phone", at `/buineepay/pay` |
+| `sandbox_pay.py` | Short-lived phone-payment sessions for the sandbox, in `storage/sandbox.db` |
 | `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes — routing logic is transport-agnostic, see Deployment above |
 | `passenger_wsgi.py` | WSGI entry point for cPanel's Python Selector — not used by local dev |
 | `requirements.txt` | Just `openpyxl` — everything else is stdlib or raw `urllib` (`providers.py`) |
@@ -163,33 +165,80 @@ as a correctness check; it's never served over HTTP.
 
 A public, sign-in-free try-it page for BuineePay (the payments product from
 the "Pay without the pause" ad). It is a merchant's dashboard for a sample
-shop (Ama's Fabrics, Makola) with two weeks of seeded payments, and
-everything on it is simulated in the visitor's own browser: state lives in
-`localStorage` under `buineepay-sandbox-v1`, nothing is sent to the server,
-and it never touches `storage/ledgerline.db`. Each visitor gets their own
-copy; "Reset sandbox" reloads the sample shop. It is linked as "Try BuineePay" in the
-menu on the landing page and the pricing page (desktop nav and mobile drawer).
+shop (Ama's Fabrics, Makola) with two weeks of seeded payments and four
+invoices. It is linked as "Try BuineePay" in the menu on the landing page and
+the pricing page (desktop nav and mobile drawer).
 
-What a visitor can do: take a test payment (card tap, MTN MoMo, Telecel
-Cash, AirtelTigo Money, BuineePay QR) with a chosen outcome (approved, declined,
-insufficient funds, no response); create payment links and pay them through
-a customer checkout preview (test numbers ending `0001` decline, `0002` have
-no funds, anything else is approved); open any payment for its timeline and
-issue full or partial refunds; settle the day early and pay out; toggle
-nightly payouts and the payment chime; export payments as CSV.
+**Where state lives.** Almost everything is simulated in the visitor's own
+browser: `localStorage` under `buineepay-sandbox-v1` (older saves are
+upgraded in place by `upgrade()`). Each visitor gets their own copy; "Reset
+sandbox" reloads the sample shop. The one exception is "pay from your own
+phone", below, which needs a small shared store. Neither ever touches
+`storage/ledgerline.db`.
 
-Settlement model: a payment is "pending" on the day it is taken and becomes
-"available" at the end of that day; with nightly payouts on, it is paid out
-at that point. Fees are not modelled (gross equals net) because BuineePay's
-real rate isn't set yet.
+**What a visitor can do:**
+- Take a test payment (card tap, MTN MoMo, Telecel Cash, AirtelTigo Money,
+  BuineePay QR) and pick the outcome (approved, declined, insufficient
+  funds, no response).
+- **Pay from their own phone.** "Show QR code" creates a 30-minute session;
+  scanning it opens `/buineepay/pay` (`buineepay-pay.html`) on the phone,
+  they pay there, and the dashboard (polling every 2.5s) shows it land with
+  the toast and chime. On localhost the modal offers a "new tab" link instead,
+  since a phone can't reach the dev machine.
+- **Pay by USSD** on a simulated basic phone: dial `*000#` (a sandbox code,
+  not a live short code), pay the shop by its 6-digit shop number (shown in
+  Settings) or pay an invoice by its number, choose a wallet, enter any
+  4-digit PIN (`0000` declines; the screen says never to use a real PIN).
+- **Invoices that close themselves.** Create an invoice with line items; send
+  a payment request (WhatsApp preview with the link and USSD instructions);
+  when it's paid by link checkout, phone QR or USSD, the payment is matched,
+  the invoice is marked paid, and the receipt goes out (WhatsApp preview +
+  printable receipt).
+- Payment links with a customer checkout preview (test numbers ending `0001`
+  decline, `0002` have no funds), refunds, settling early, payouts, nightly
+  payouts, CSV export.
+- Two "Coming soon" items are shown but not built: talking payment alerts
+  (English and Twi) and Ask Muse (questions about takings plus an end-of-day
+  WhatsApp summary).
 
-Payment brand marks are the real logos, in `assets/images/pay-logos/`:
-`mtn-momo.svg` (MoMo app icon from mtn.com.gh), `telecel.png` (the round mark
-cropped from telecel.com.gh's `Telecel-Icon-Red.png`),
-`airteltigo-money.png` (the AirtelTigo Money logo Caleb supplied), `visa.svg` and `mastercard.svg` (Wikimedia Commons, public domain as
-trademarks/simple geometry), and `buineepay-leaf.png` (cropped from the
-supplied BuineePay logo). Fonts are self-hosted under `assets/fonts/` (Sora
-and Inter, SIL OFL) because the CSP only allows `font-src 'self'`.
+**Fees.** 2.5% per successful payment, no setup or monthly fee (Caleb's
+pricing, Oct 2026). The fee is taken from each successful payment and kept
+on refunds; "You receive" and every balance are after the fee.
+
+**Tax on invoices** follows the Ghana VAT Act 2025 (Act 1151), in force from
+1 January 2026: VAT 15%, NHIL 2.5% and GETFund 2.5%, all charged on the same
+taxable value (no compounding), 20% in total, and no COVID-19 levy. There is a
+"Charge VAT on invoices" switch in Settings for shops that aren't registered.
+Note that `voucher.py` still uses the pre-2026 compounded model (5% levies,
+then 15% VAT on top); that is a separate fix for the voucher product.
+
+**The phone-payment API** (`sandbox_pay.py`, routes in `server.py`):
+
+| Route | What it does | Limit per IP |
+|---|---|---|
+| `POST /api/sandbox/sessions` | Create a session: business name, optional amount, note | 20 / 10 min |
+| `GET /api/sandbox/session?id=` | Read a session (the phone page) | 400 / 10 min |
+| `POST /api/sandbox/pay` | Pay a session with test details | 40 / 10 min |
+| `GET /api/sandbox/events?id=&after=` | New payments since `after` (the dashboard poll) | 400 / 10 min |
+
+Its own SQLite file, `storage/sandbox.db` (gitignored, safe across Passenger
+worker processes), separate from `ledgerline.db`. Sessions expire after 30
+minutes and are purged on each create; at most 2,000 live sessions and 20
+payments per session; ids are 128-bit random tokens; POSTs go through the
+existing same-origin check; bodies are capped at 2 KB; every field is
+validated and length-capped server side. Only test data is ever stored.
+
+**Assets.** Payment brand marks are the real logos, in
+`assets/images/pay-logos/`: `mtn-momo.svg` (MoMo app icon from mtn.com.gh),
+`telecel.png` (the round mark cropped from telecel.com.gh's
+`Telecel-Icon-Red.png`), `airteltigo-money.png` (the AirtelTigo Money logo
+Caleb supplied), `visa.svg` and `mastercard.svg` (Wikimedia Commons, public
+domain as trademarks/simple geometry), and `buineepay-leaf.png` (cropped from
+the supplied BuineePay logo). WhatsApp uses the existing
+`assets/images/whatsapp.svg`. Fonts are self-hosted under `assets/fonts/`
+(Sora and Inter, SIL OFL) and the QR code generator is vendored at
+`assets/js/qrcode.js` (qrcode-generator 1.4.4, MIT), because the CSP only
+allows `'self'` for fonts and scripts.
 
 ## Auth model
 

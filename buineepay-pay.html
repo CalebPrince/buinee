@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pay with BuineePay</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#02090b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2302090b'/%3E%3Cpath d='M9 16.5l5 5L23 11' fill='none' stroke='%2319e488' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Sora";src:url("/assets/fonts/sora-latin-wght.woff2") format("woff2");font-weight:100 800;font-display:swap}
+@font-face{font-family:"Inter";src:url("/assets/fonts/inter-latin-wght.woff2") format("woff2");font-weight:100 900;font-display:swap}
+/* The customer's side of the sandbox, opened by scanning the dashboard's QR
+   code. Same tokens as buineepay-sandbox.html. */
+:root{
+  --bg:#f3f6f4; --card:#fff; --ink:#0b1210; --ink-2:#4a5a54; --ink-3:#7c8b85; --line:#e2e8e4; --line-2:#cdd6d1;
+  --green:#19e488; --green-deep:#0a8f55; --green-soft:#e2fbef; --rail:#02090b;
+  --ochre:#c0611c; --ochre-soft:#fbeedd; --red:#c2412d; --red-soft:#fbe7e3;
+  --display:"Sora",Arial,sans-serif; --body:"Inter",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--rail);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased;min-height:100vh}
+button,input{font:inherit;color:inherit}
+.wrap{max-width:440px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.top{color:#fff;padding:22px 20px 26px;text-align:center}
+.top img{width:130px;height:auto;display:block;margin:0 auto 18px}
+.top small{color:rgba(236,244,240,.6);font-size:13px}
+.top h1{font-family:var(--display);font-size:19px;font-weight:600;margin:2px 0 4px}
+.top .note{color:rgba(236,244,240,.7);font-size:13px}
+.top .amt{font-family:var(--display);font-size:38px;font-weight:600;letter-spacing:-.03em;margin-top:10px}
+.top .amt span{font-size:17px;color:rgba(236,244,240,.6);margin-right:6px}
+.sheet{background:var(--bg);border-radius:24px 24px 0 0;padding:22px 18px 30px;flex:1}
+.pill{display:inline-block;background:var(--ochre);color:#fff;font-weight:700;font-size:11px;letter-spacing:.06em;padding:3px 8px;border-radius:6px;text-transform:uppercase}
+.sandbox{display:flex;gap:10px;align-items:flex-start;background:var(--ochre-soft);color:#7a3c0f;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-bottom:18px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field label{font-size:13px;font-weight:600;color:var(--ink-2)}
+.hint{font-size:12px;color:var(--ink-3)}
+.input{border:1px solid var(--line-2);border-radius:12px;padding:13px 14px;background:#fff;font-size:16px;width:100%}
+.input:focus{outline:2px solid rgba(25,228,136,.45);border-color:var(--green-deep)}
+.money-in{display:flex;align-items:center;border:1px solid var(--line-2);border-radius:12px;background:#fff;overflow:hidden}
+.money-in span{padding:0 12px;color:var(--ink-3);font-weight:600}
+.money-in input{border:0;padding:13px 12px 13px 0;font-family:var(--display);font-size:22px;font-weight:600;width:100%;outline:0}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chip{border:1px solid var(--line-2);background:#fff;border-radius:12px;padding:10px;display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600;font-size:13.5px;text-align:left;min-height:52px}
+.chip.on{border-color:var(--green-deep);background:var(--green-soft);box-shadow:inset 0 0 0 1px var(--green-deep)}
+.mbadge{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:2px;flex:none;background:#fff;border:1px solid var(--line);overflow:hidden;padding:3px}
+.mbadge img{max-width:100%;max-height:100%;display:block;object-fit:contain}
+.mbadge.pair{width:54px}.mbadge.pair img{max-width:48%}
+.mbadge.full{padding:0;border:0;background:none}.mbadge.full img{width:100%;height:100%}
+.mbadge.wide{width:64px}
+.pay{width:100%;border:0;border-radius:14px;background:var(--green);color:#03140c;font-weight:700;font-size:16px;padding:15px;cursor:pointer;margin-top:4px}
+.pay:disabled{opacity:.5}
+.err{background:var(--red-soft);color:var(--red);border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:14px;display:none}
+.state{text-align:center;padding:30px 6px}
+.state .ic{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;margin:0 auto 14px}
+.state .ic svg{width:36px;height:36px}
+.state.ok .ic{background:var(--green-soft);color:var(--green-deep)}
+.state.bad .ic{background:var(--red-soft);color:var(--red)}
+.state h2{font-family:var(--display);font-size:21px;margin:0 0 6px}
+.state p{color:var(--ink-2);margin:0 0 6px}
+.spin{width:52px;height:52px;border-radius:50%;border:5px solid #dfe8e3;border-top-color:var(--green-deep);animation:sp .8s linear infinite;margin:10px auto 16px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.again{margin-top:18px;background:#fff;border:1px solid var(--line-2);border-radius:12px;padding:12px 18px;font-weight:600;cursor:pointer}
+.foot{text-align:center;font-size:12px;color:var(--ink-3);margin-top:22px}
+.foot a{color:var(--green-deep)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top" id="top">
+    <img src="/assets/images/buineepay-logo.png" alt="BuineePay" width="480" height="114">
+    <small>Pay</small>
+    <h1 id="biz">Loading…</h1>
+    <div class="note" id="note"></div>
+    <div class="amt" id="amt"></div>
+  </div>
+  <div class="sheet" id="sheet">
+    <div class="sandbox"><span class="pill">Sandbox</span><span>This is a test checkout. No real money moves, and nothing is charged to you.</span></div>
+    <div class="err" id="err"></div>
+    <form id="form" autocomplete="off" hidden>
+      <div class="field" id="amtField" hidden><label for="amtIn">Amount</label><div class="money-in"><span>GHS</span><input id="amtIn" inputmode="decimal" placeholder="0.00"></div></div>
+      <div class="field"><label for="name">Your name</label><input class="input" id="name" maxlength="60" required></div>
+      <div class="field"><label>Pay with</label><div class="chips" id="methods"></div></div>
+      <div class="field"><label for="num" id="numL">Mobile money number</label><input class="input" id="num" inputmode="numeric" maxlength="19" placeholder="024 000 0000" required><span class="hint">Test numbers: ending <b>0001</b> declines, <b>0002</b> has no funds, anything else is approved. Don't use your real number.</span></div>
+      <button class="pay" id="payBtn" type="submit">Pay</button>
+    </form>
+    <div id="state"></div>
+    <div class="foot">Secured by BuineePay · test checkout · <a href="/buineepay/sandbox">Open the sandbox</a></div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+var LOGO="/assets/images/pay-logos/";
+var METHODS={
+  mtn:{label:"MTN MoMo", logo:["mtn-momo.svg"], full:true},
+  telecel:{label:"Telecel Cash", logo:["telecel.png"]},
+  at:{label:"AirtelTigo Money", logo:["airteltigo-money.png"], wide:true},
+  card:{label:"Card", logo:["visa.svg","mastercard.svg"]}
+};
+var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+var CROSS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function ghs(p){ return "GHS "+(p/100).toLocaleString("en-GH",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function badge(k){ var M=METHODS[k]; return '<span class="mbadge'+(M.logo.length>1?' pair':'')+(M.full?' full':'')+(M.wide?' wide':'')+'">'+M.logo.map(function(f){return '<img src="'+LOGO+f+'" alt="">';}).join("")+'</span>'; }
+function showErr(msg){ var e=$("err"); e.textContent=msg; e.style.display=msg?"block":"none"; }
+
+var sid=new URLSearchParams(location.search).get("s")||"", session=null, method="mtn";
+
+$("methods").innerHTML=Object.keys(METHODS).map(function(k){return '<button type="button" class="chip'+(k===method?' on':'')+'" data-m="'+k+'">'+badge(k)+METHODS[k].label+'</button>';}).join("");
+$("methods").addEventListener("click",function(e){
+  var c=e.target.closest(".chip"); if(!c) return; method=c.dataset.m;
+  Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===c);});
+  $("numL").textContent=method==="card"?"Card number":"Mobile money number";
+  $("num").placeholder=method==="card"?"4084 0840 8408 4081":"024 000 0000";
+});
+
+function expired(msg){
+  $("biz").textContent="BuineePay test checkout";
+  $("form").hidden=true;
+  $("state").innerHTML='<div class="state bad"><div class="ic">'+CROSS+'</div><h2>Code not available</h2><p>'+esc(msg)+'</p></div>';
+}
+
+fetch("/api/sandbox/session?id="+encodeURIComponent(sid),{cache:"no-store"}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});}).then(function(res){
+  if(!res.ok) return expired(res.j.error||"This payment code isn't valid.");
+  session=res.j;
+  $("biz").textContent=session.business;
+  $("note").textContent=session.note||"";
+  if(session.amount!=null) $("amt").innerHTML='<span>GHS</span>'+(session.amount/100).toLocaleString("en-GH",{minimumFractionDigits:2,maximumFractionDigits:2});
+  else $("amtField").hidden=false;
+  $("payBtn").textContent="Pay"+(session.amount!=null?" "+ghs(session.amount):"");
+  $("form").hidden=false;
+}).catch(function(){ expired("Couldn't reach BuineePay. Check your connection and scan again."); });
+
+$("form").addEventListener("submit",function(e){
+  e.preventDefault(); showErr("");
+  var body={id:sid, name:$("name").value.trim(), method:method, number:$("num").value};
+  if(session.amount==null){
+    var a=Math.round(parseFloat(String($("amtIn").value).replace(/[^0-9.]/g,""))*100);
+    if(!(a>=100&&a<=5000000)){ showErr("Enter an amount between GHS 1.00 and GHS 50,000.00."); $("amtIn").focus(); return; }
+    body.amount=a;
+  }
+  $("form").hidden=true;
+  $("state").innerHTML='<div class="state"><div class="spin"></div><p>'+(method==="card"?"Confirming your card…":"Approve the prompt on your phone…")+'</p></div>';
+  var started=Date.now();
+  fetch("/api/sandbox/pay",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+      // Hold the spinner briefly so it reads like a real approval round trip.
+      setTimeout(function(){
+        if(!res.ok){ $("state").innerHTML=""; $("form").hidden=false; return showErr(res.j.error||"Something went wrong."); }
+        var p=res.j;
+        if(p.outcome==="succeeded"){
+          $("state").innerHTML='<div class="state ok"><div class="ic">'+CHECK+'</div><h2>Paid '+ghs(p.amount)+'</h2><p>'+esc(session.business)+' has your payment.</p><p class="hint">Look at the dashboard: it just landed there.</p><button class="again" type="button" id="again">Make another test payment</button></div>';
+        } else {
+          $("state").innerHTML='<div class="state bad"><div class="ic">'+CROSS+'</div><h2>Payment not completed</h2><p>'+esc(p.failure)+'</p><button class="again" type="button" id="again">Try again</button></div>';
+        }
+        $("again").addEventListener("click",function(){ $("state").innerHTML=""; $("form").hidden=false; });
+      }, Math.max(0, 1600-(Date.now()-started)));
+    })
+    .catch(function(){ $("state").innerHTML=""; $("form").hidden=false; showErr("Couldn't reach BuineePay. Try again."); });
+});
+})();
+</script>
+</body>
+</html>
