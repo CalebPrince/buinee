@@ -247,12 +247,32 @@ STATIC_PAGES = {
     "/admin/ada": "admin-ada.html",
     "/admin/site-settings": "admin-site-settings.html",
     "/admin/site-contents": "admin-site-contents.html",
+    # BuineePay merchant sandbox: public, no sign-in, all data simulated in
+    # the visitor's own browser (localStorage). Never touches the database.
+    "/buineepay/sandbox": "buineepay-sandbox.html",
+}
+
+ASSET_MEDIA_TYPES = {
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".woff2": "font/woff2",
 }
 
 # Public brand imagery used by the landing page. Keep this explicit instead of
 # exposing the project directory as a general-purpose static file server.
 STATIC_ASSETS = {
     "/assets/images/buinee-logo.png": "assets/images/buinee-logo.png",
+    "/assets/images/buineepay-logo.png": "assets/images/buineepay-logo.png",
+    "/assets/images/pay-logos/mtn-momo.svg": "assets/images/pay-logos/mtn-momo.svg",
+    "/assets/images/pay-logos/telecel.png": "assets/images/pay-logos/telecel.png",
+    "/assets/images/pay-logos/airteltigo-money.png": "assets/images/pay-logos/airteltigo-money.png",
+    "/assets/images/pay-logos/visa.svg": "assets/images/pay-logos/visa.svg",
+    "/assets/images/pay-logos/mastercard.svg": "assets/images/pay-logos/mastercard.svg",
+    "/assets/images/pay-logos/buineepay-leaf.png": "assets/images/pay-logos/buineepay-leaf.png",
+    "/assets/fonts/sora-latin-wght.woff2": "assets/fonts/sora-latin-wght.woff2",
+    "/assets/fonts/inter-latin-wght.woff2": "assets/fonts/inter-latin-wght.woff2",
     "/assets/images/hero-image1.png": "assets/images/hero-image1.png",
     "/assets/images/pricing-hero.png": "assets/images/pricing-hero.png",
     "/assets/images/buinee-ad.png": "assets/images/buinee-ad.png",
@@ -326,6 +346,7 @@ LEGACY_PAGE_REDIRECTS = {
     "/admin-ada.html": "/admin/ada",
     "/admin-site-settings.html": "/admin/site-settings",
     "/admin-site-contents.html": "/admin/site-contents",
+    "/buineepay-sandbox.html": "/buineepay/sandbox",
 }
 
 # A signed-in client has no reason to see the marketing page or the sign-in/
@@ -3415,7 +3436,7 @@ class RouteHandlerMixin:
             asset = ROOT / STATIC_ASSETS[path]
             if not asset.is_file():
                 return self._json({"error": "asset missing"}, 404)
-            media_type = "image/svg+xml" if asset.suffix.lower() == ".svg" else "image/png"
+            media_type = ASSET_MEDIA_TYPES.get(asset.suffix.lower(), "image/png")
             return self._send(200, asset.read_bytes(), media_type)
 
         if path in STATIC_PAGES:

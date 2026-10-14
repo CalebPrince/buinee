@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BuineePay Sandbox</title>
+<meta name="description" content="Try the BuineePay merchant dashboard with test money. Take simulated tap and mobile money payments, share payment links, issue refunds and pay out, all in your browser.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2302090b'/%3E%3Cpath d='M9 16.5l5 5L23 11' fill='none' stroke='%2319e488' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Sora";src:url("/assets/fonts/sora-latin-wght.woff2") format("woff2");font-weight:100 800;font-display:swap}
+@font-face{font-family:"Inter";src:url("/assets/fonts/inter-latin-wght.woff2") format("woff2");font-weight:100 900;font-display:swap}
+/*
+  Visual direction: BuineePay brand green (#19e488) on a near-black rail
+  (#02090b) that carries the white-and-green logo, over a cool off-white
+  work surface. Sora for figures and headings, Inter for UI text.
+  Sandbox state is marked in ochre (#c0611c) so it never reads as live money.
+*/
+:root{
+  --bg:#f3f6f4; --card:#ffffff; --ink:#0b1210; --ink-2:#4a5a54; --ink-3:#7c8b85;
+  --line:#e2e8e4; --line-2:#cdd6d1;
+  --green:#19e488; --green-deep:#0a8f55; --green-soft:#e2fbef;
+  --rail:#02090b; --rail-ink:rgba(236,244,240,.78); --rail-line:rgba(255,255,255,.08);
+  --ochre:#c0611c; --ochre-soft:#fbeedd; --red:#c2412d; --red-soft:#fbe7e3;
+  --amber:#a36a00; --amber-soft:#fbf1d8;
+  --r:14px; --shadow:0 1px 2px rgba(11,18,16,.05),0 10px 28px rgba(11,18,16,.06);
+  --display:"Sora",Arial,sans-serif; --body:"Inter",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:clip}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--green-deep)}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* rail */
+.rail{background:var(--rail);color:var(--rail-ink);padding:22px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.rail .logo{display:block;padding:4px 10px 18px}
+.rail .logo img{width:150px;height:auto;display:block}
+.biz{margin:0 6px 14px;padding:12px;border:1px solid var(--rail-line);border-radius:12px}
+.biz b{display:block;color:#fff;font-family:var(--display);font-weight:600;font-size:14px}
+.biz span{font-size:12px;color:rgba(236,244,240,.55)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--rail-ink);text-decoration:none;font-weight:500}
+.nav a svg{width:18px;height:18px;flex:none;opacity:.8}
+.nav a:hover{background:rgba(255,255,255,.05)}
+.nav a.on{background:rgba(25,228,136,.14);color:#fff}
+.nav a.on svg{color:var(--green);opacity:1}
+.rail .foot{margin-top:auto;font-size:12px;color:rgba(236,244,240,.45);padding:10px}
+.rail .foot a{color:rgba(236,244,240,.7)}
+
+/* main */
+main{min-width:0}
+.testbar{background:var(--ochre-soft);color:#7a3c0f;border-bottom:1px solid #f0d6b8;padding:9px 28px;display:flex;align-items:center;gap:12px;font-size:13px}
+.testbar .pill{background:var(--ochre);color:#fff;font-weight:700;font-size:11px;letter-spacing:.06em;padding:3px 8px;border-radius:6px;text-transform:uppercase}
+.testbar button{margin-left:auto;background:none;border:1px solid #e3bf96;border-radius:8px;padding:4px 10px;cursor:pointer;color:#7a3c0f;font-size:12px;font-weight:600}
+.topbar{display:flex;align-items:center;gap:14px;padding:22px 28px 6px}
+.topbar h1{font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0}
+.topbar .sub{color:var(--ink-3);font-size:13px}
+.topbar .actions{margin-left:auto;display:flex;gap:8px}
+.btn.menu-btn{display:none}
+a.btn{text-decoration:none;color:inherit}
+.view{padding:16px 28px 48px}
+
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);background:var(--card);border-radius:10px;padding:9px 14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn svg{width:16px;height:16px}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.primary:hover{background:#1c2a26}
+.btn.go{background:var(--green);border-color:var(--green);color:#03140c}
+.btn.go:hover{background:#12d07b}
+.btn.danger{color:var(--red);border-color:#efc4bb}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card h2{font-family:var(--display);font-size:15px;font-weight:600;margin:0}
+.card-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.card-head .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.card-body{padding:18px}
+
+/* balance hero */
+.hero{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.bal{background:var(--rail);color:#fff;border-radius:var(--r);padding:20px 22px;position:relative;overflow:hidden}
+.bal::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(25,228,136,.35),transparent 70%)}
+.bal small{color:rgba(236,244,240,.6);font-size:12px;font-weight:500}
+.bal .amt{font-family:var(--display);font-size:34px;font-weight:600;letter-spacing:-.03em;margin:4px 0 12px}
+.bal .amt span{font-size:16px;color:rgba(236,244,240,.6);margin-right:4px;font-weight:500}
+.bal .row{display:flex;gap:8px;position:relative;z-index:1}
+.bal .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14);color:#fff}
+.bal .btn.go{background:var(--green);color:#03140c;border-color:var(--green)}
+.stat{padding:18px 20px}
+.stat small{color:var(--ink-3);font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px}
+.stat .amt{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:6px}
+.stat .meta{color:var(--ink-2);font-size:12.5px;margin-top:2px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+.dot.amber{background:#e0a21c}
+
+.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+.chart{height:200px;display:flex;align-items:flex-end;gap:6px;padding:8px 2px 0}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;position:relative;cursor:default}
+.bar i{display:block;width:100%;max-width:30px;background:#cfeedd;border-radius:6px 6px 3px 3px;min-height:3px;transition:background .15s}
+.bar.today i{background:var(--green)}
+.bar:hover i{background:var(--green-deep)}
+.bar em{font-style:normal;font-size:10.5px;color:var(--ink-3)}
+.bar .tip{position:absolute;bottom:calc(100% - 14px);background:var(--ink);color:#fff;font-size:11.5px;padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transform:translateY(4px);transition:.12s}
+.bar:hover .tip{opacity:1;transform:none}
+.bar:nth-last-child(-n+4) .tip{right:0}
+.bar:nth-child(-n+4) .tip{left:0}
+.mix{display:flex;flex-direction:column;gap:12px}
+.mix .line{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.mix .track{height:8px;background:#edf2ef;border-radius:5px;overflow:hidden}
+.mix .track i{display:block;height:100%;background:var(--green-deep);border-radius:5px}
+
+/* tables */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:11.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;padding:10px 18px;border-bottom:1px solid var(--line);background:#fafcfb}
+.tbl td{padding:12px 18px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr.click{cursor:pointer}
+.tbl tbody tr.click:hover{background:#f7faf8}
+.tbl .num{text-align:right;font-family:var(--display);font-weight:600;white-space:nowrap}
+.tbl .muted{color:var(--ink-3);font-size:12.5px}
+.tbl .show-sm{display:none}
+.who b{display:block;font-weight:600}
+.who span{color:var(--ink-3);font-size:12.5px}
+.method{display:inline-flex;align-items:center;gap:8px}
+.mbadge{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:2px;flex:none;background:#fff;border:1px solid var(--line);overflow:hidden;padding:3px}
+.mbadge img{max-width:100%;max-height:100%;display:block;object-fit:contain}
+.mbadge.pair{width:52px}
+.mbadge.pair img{max-width:48%}
+.mbadge.dark{background:var(--rail);border-color:var(--rail)}
+.mbadge.full{padding:0;border:0;background:none}
+.mbadge.wide{width:62px}
+.mbadge.full img{width:100%;height:100%}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px}
+.s-succeeded{background:var(--green-soft);color:var(--green-deep)}
+.s-pending{background:var(--amber-soft);color:var(--amber)}
+.s-failed{background:var(--red-soft);color:var(--red)}
+.s-refunded,.s-partially_refunded{background:#eceff3;color:#4b5563}
+.s-paid{background:var(--green-soft);color:var(--green-deep)}
+.empty{padding:36px 18px;text-align:center;color:var(--ink-3)}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.input,select.input{border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;background:#fff;min-width:0}
+.input:focus{outline:2px solid rgba(25,228,136,.45);border-color:var(--green-deep)}
+.seg{display:inline-flex;background:#e9efec;border-radius:9px;padding:3px}
+.seg button{border:0;background:none;padding:5px 11px;border-radius:7px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* drawer + modal */
+.scrim{position:fixed;inset:0;background:rgba(2,9,11,.45);opacity:0;pointer-events:none;transition:.18s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--card);z-index:41;transform:translateX(100%);visibility:hidden;transition:transform .22s ease,visibility 0s .22s;display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.12)}
+.drawer.on{transform:none;visibility:visible;transition:transform .22s ease}
+.drawer header{display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.drawer header h3{font-family:var(--display);font-size:17px;margin:0;font-weight:600}
+.x{margin-left:auto;border:0;background:#eef2f0;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1}
+.drawer .body{padding:20px;overflow:auto;flex:1}
+.drawer footer{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field label{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.field .hint{font-size:12px;color:var(--ink-3)}
+.money-in{display:flex;align-items:center;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;background:#fff}
+.money-in span{padding:0 12px;color:var(--ink-3);font-weight:600}
+.money-in input{border:0;padding:12px 12px 12px 0;font-family:var(--display);font-size:22px;font-weight:600;width:100%;outline:0}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.chip{border:1px solid var(--line-2);background:#fff;border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;text-align:left}
+.chip.on{border-color:var(--green-deep);background:var(--green-soft);box-shadow:inset 0 0 0 1px var(--green-deep)}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:8px 12px;font-size:13.5px}
+.kv dt{color:var(--ink-3)}
+.kv dd{margin:0;font-weight:500;word-break:break-word}
+.big{font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:-.02em}
+.timeline{list-style:none;margin:0;padding:0 0 0 4px}
+.timeline li{position:relative;padding:0 0 14px 20px;font-size:13px}
+.timeline li::before{content:"";position:absolute;left:0;top:5px;width:9px;height:9px;border-radius:50%;background:var(--green)}
+.timeline li::after{content:"";position:absolute;left:4px;top:16px;bottom:0;width:1px;background:var(--line-2)}
+.timeline li:last-child::after{display:none}
+.timeline li.bad::before{background:var(--red)}
+.timeline li.grey::before{background:#9aa6a1}
+.timeline span{display:block;color:var(--ink-3);font-size:12px}
+.section-t{font-family:var(--display);font-size:13px;font-weight:600;margin:22px 0 10px;color:var(--ink-2)}
+.note{background:#f5f8f6;border:1px dashed var(--line-2);border-radius:10px;padding:12px;font-size:12.5px;color:var(--ink-2)}
+.note code{font-family:var(--mono);background:#e8eeeb;padding:1px 5px;border-radius:4px}
+
+.modal{position:fixed;inset:0;display:grid;place-items:center;z-index:42;pointer-events:none;opacity:0;transition:.18s;padding:16px}
+.modal.on{opacity:1;pointer-events:auto}
+.phone{width:340px;max-width:100%;background:#fff;border-radius:30px;border:8px solid #0b1210;box-shadow:0 30px 60px rgba(0,0,0,.35);overflow:hidden;position:relative}
+.phone .ph-top{background:var(--rail);color:#fff;padding:22px 20px 20px;text-align:center}
+.phone .ph-top small{color:rgba(236,244,240,.6)}
+.phone .ph-top b{display:block;font-family:var(--display);font-size:17px;margin:2px 0 10px}
+.phone .ph-top .big{color:#fff}
+.phone .ph-body{padding:18px 18px 20px}
+.phone .ph-close{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.12);color:#fff;border:0;width:28px;height:28px;border-radius:8px;cursor:pointer}
+.phone .secured{font-size:11px;color:var(--ink-3);text-align:center;margin-top:12px;display:flex;justify-content:center;align-items:center;gap:6px}
+.phone .secured img{height:12px;filter:invert(1) brightness(.3)}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid #dfe8e3;border-top-color:var(--green-deep);animation:sp 0.8s linear infinite;margin:10px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.result{text-align:center;padding:10px 0}
+.result .ic{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px}
+.result .ic svg{width:28px;height:28px}
+.result.ok .ic{background:var(--green-soft);color:var(--green-deep)}
+.result.bad .ic{background:var(--red-soft);color:var(--red)}
+.result h4{font-family:var(--display);margin:0 0 4px;font-size:17px}
+.result p{margin:0;color:var(--ink-2);font-size:13px}
+
+/* toast, styled after the notification card in the BuineePay ad */
+.toasts{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:10px;z-index:60;pointer-events:none}
+.toast{width:310px;background:rgba(11,18,16,.94);color:#fff;border-radius:16px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 14px 30px rgba(0,0,0,.25);animation:tin .35s cubic-bezier(.2,.9,.3,1.2)}
+.toast .ic{width:38px;height:38px;border-radius:10px;background:var(--green);display:grid;place-items:center;color:#03140c;flex:none}
+.toast .ic svg{width:20px;height:20px}
+.toast.bad .ic{background:#ff8a73}
+.toast small{color:rgba(236,244,240,.6);font-size:11.5px;display:flex;justify-content:space-between}
+.toast b{display:block;font-size:13.5px}
+.toast .amt{font-family:var(--display);color:var(--green);font-weight:600;font-size:15px}
+.toast.bad .amt{color:#ff8a73}
+.toast.out{animation:tout .3s forwards}
+@media (min-width:821px){.drawer.on ~ .toasts{right:min(476px,calc(100% - 326px))}}
+@keyframes tin{from{opacity:0;transform:translateY(-12px) scale(.96)}}
+@keyframes tout{to{opacity:0;transform:translateX(30px)}}
+
+.link-url{font-family:var(--mono);font-size:12px;color:var(--ink-2);background:#f2f5f3;padding:3px 7px;border-radius:6px}
+.toggle{position:relative;width:40px;height:23px;flex:none}
+.toggle input{opacity:0;width:0;height:0}
+.toggle i{position:absolute;inset:0;background:#cdd6d1;border-radius:20px;cursor:pointer;transition:.15s}
+.toggle i::after{content:"";position:absolute;left:3px;top:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.15s}
+.toggle input:checked+i{background:var(--green-deep)}
+.toggle input:checked+i::after{transform:translateX(17px)}
+.setrow{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:0}
+.setrow div b{display:block;font-weight:600}
+.setrow div span{color:var(--ink-3);font-size:12.5px}
+.setrow .toggle,.setrow .btn{margin-left:auto}
+
+@media (max-width:1100px){.hero{grid-template-columns:1fr 1fr}.bal{grid-column:1/-1}.grid2{grid-template-columns:1fr}}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  .rail{position:fixed;left:0;top:0;bottom:0;width:250px;z-index:50;transform:translateX(-100%);transition:transform .2s}
+  .rail.on{transform:none}
+  .btn.menu-btn{display:inline-flex}
+  .topbar{padding:16px 16px 4px;flex-wrap:wrap}
+  .topbar h1{font-size:20px}
+  .topbar .actions{width:100%;margin-left:0}
+  .topbar .actions .btn{flex:1;justify-content:center}
+  .view{padding:12px 16px 40px}
+  .testbar{padding:8px 16px;flex-wrap:wrap}
+  .hero{grid-template-columns:1fr}
+  .tbl .hide-sm{display:none}
+  .tbl .show-sm{display:block}
+  .tbl th,.tbl td{padding:10px 12px}
+  .card-head{flex-wrap:wrap}
+  .card-head .right{margin-left:0;width:100%}
+  .toasts{left:16px;right:16px}.toast{width:auto}
+  .kv{grid-template-columns:110px 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" id="rail">
+    <a class="logo" href="#overview"><img src="/assets/images/buineepay-logo.png" alt="BuineePay" width="480" height="114"></a>
+    <div class="biz"><b id="bizName">Business</b><span>Sandbox account</span></div>
+    <nav class="nav" id="nav">
+      <a href="#overview" data-v="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Overview</a>
+      <a href="#payments" data-v="payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Payments</a>
+      <a href="#links" data-v="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>Payment links</a>
+      <a href="#payouts" data-v="payouts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>Payouts</a>
+      <a href="#settings" data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
+    </nav>
+    <div class="foot">A test account. Nothing here is real money.<br><a href="/">Buinee home</a></div>
+  </aside>
+
+  <main>
+    <div class="testbar">
+      <span class="pill">Sandbox</span>
+      <span>Test mode: payments are simulated and saved only in this browser. No real money moves.</span>
+      <button type="button" id="resetBtn">Reset sandbox</button>
+    </div>
+    <div class="topbar">
+      <button class="btn menu-btn" type="button" id="menuBtn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div><h1 id="title">Overview</h1><div class="sub" id="subtitle"></div></div>
+      <div class="actions">
+        <button class="btn" type="button" id="newLinkTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Payment link</button>
+        <button class="btn go" type="button" id="simTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Take a test payment</button>
+      </div>
+    </div>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-modal="true" role="dialog"><header><h3 id="dTitle"></h3><button class="x" type="button" data-close aria-label="Close">&times;</button></header><div class="body" id="dBody"></div><footer id="dFoot"></footer></aside>
+<div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+var KEY = "buineepay-sandbox-v1";
+var METHODS = {
+  card:    {label:"Card tap",          short:"Card",         logo:["visa.svg","mastercard.svg"]},
+  mtn:     {label:"MTN MoMo",          short:"MTN MoMo",     logo:["mtn-momo.svg"], full:true},
+  telecel: {label:"Telecel Cash",      short:"Telecel Cash", logo:["telecel.png"]},
+  at:      {label:"AirtelTigo Money",  short:"AirtelTigo Money", logo:["airteltigo-money.png"], wide:true},
+  qr:      {label:"BuineePay QR",      short:"BuineePay QR", logo:["buineepay-leaf.png"], dark:true}
+};
+var OUTCOMES = {
+  succeeded:    {label:"Approved"},
+  declined:     {label:"Declined by customer", reason:"The customer declined the prompt on their phone."},
+  insufficient: {label:"Insufficient funds",   reason:"The customer's wallet or card did not have enough funds."},
+  timeout:      {label:"No response",          reason:"The customer did not approve within 60 seconds."}
+};
+var NAMES = ["Kofi Asante","Ama Mensah","Yaw Boateng","Akosua Owusu","Kwame Darko","Efua Addo","Kojo Appiah","Abena Osei","Kwabena Frimpong","Adwoa Nyarko","Esi Quaye","Nana Ansah","Kweku Tetteh","Afia Sarpong","Selorm Agbeko","Dzifa Amegah","Fiifi Coleman","Naa Adjeley","Mawuli Kpodo","Yaa Asantewaa"];
+
+/* ---------- money: everything is integer pesewas ---------- */
+function fmt(p){ var n=(p/100); return n.toLocaleString("en-GH",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function ghs(p){ return "GHS " + fmt(p); }
+function parseAmt(v){ v=String(v||"").replace(/[^0-9.]/g,""); if(!v) return 0; var n=Math.round(parseFloat(v)*100); return isFinite(n)?n:0; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function rid(pre){ return pre + "_" + Math.random().toString(36).slice(2,10); }
+function dayKey(d){ d=new Date(d); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function startOfDay(d){ d=new Date(d); d.setHours(0,0,0,0); return d; }
+function short(name){ var p=String(name||"").trim().split(/\s+/); return p.length>1 ? p[0]+" "+p[p.length-1][0]+"." : (p[0]||"Customer"); }
+function when(iso){
+  var d=new Date(iso), now=new Date();
+  var t=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  if(dayKey(d)===dayKey(now)) return "Today, "+t;
+  var y=new Date(now); y.setDate(y.getDate()-1);
+  if(dayKey(d)===dayKey(y)) return "Yesterday, "+t;
+  return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"})+", "+t;
+}
+function phoneFor(i){ var pre=["024","054","055","020","050","027","026"]; return pre[i%pre.length]+" "+String(100+(i*37)%900)+" "+String(1000+(i*7919)%9000); }
+function mask(num){ var d=String(num).replace(/\D/g,""); return d.length>=4 ? d.slice(0,3)+" *** "+d.slice(-4) : num; }
+
+/* ---------- storage (guarded: private windows can throw) ---------- */
+var S;
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ var raw=localStorage.getItem(KEY); if(raw){ var s=JSON.parse(raw); if(s && s.v===1) return s; } }catch(e){} return null; }
+
+/* ---------- seed: two weeks of a small Accra fabric shop ---------- */
+function seed(){
+  var rnd=(function(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};})(20261014);
+  var s={v:1, business:{name:"Ama's Fabrics", city:"Makola, Accra"},
+    settings:{autoPayout:false, sound:true, dest:{type:"momo", network:"mtn", number:"024 555 0142", name:"Ama Mensah"}},
+    payments:[], links:[], payouts:[], lastSettled:dayKey(new Date())};
+  s.links.push({id:rid("plink"), title:"Kente stole (hand woven)", amount:45000, createdAt:new Date(Date.now()-9*864e5).toISOString(), active:true});
+  s.links.push({id:rid("plink"), title:"Deposit for custom kaba", amount:null, createdAt:new Date(Date.now()-4*864e5).toISOString(), active:true});
+  var today=startOfDay(new Date()), now=new Date(), pi=0, unpaid=0;
+  for(var back=13; back>=0; back--){
+    var day=new Date(today); day.setDate(day.getDate()-back);
+    var count = back===0 ? 6 : 6+Math.floor(rnd()*14);
+    var dayTotal=0;
+    for(var k=0;k<count;k++){
+      var at=new Date(day); at.setHours(8+Math.floor(rnd()*11), Math.floor(rnd()*60), Math.floor(rnd()*60));
+      if(back===0 && at>now) at=new Date(now.getTime()-(k+1)*37*60000);
+      var r=rnd(), method = r<.38?"mtn":r<.62?"card":r<.76?"telecel":r<.88?"qr":"at";
+      var amount = Math.round((20+Math.pow(rnd(),2.2)*600))*100 + (rnd()<.3?50:0);
+      var fail = rnd()<.06;
+      var name=NAMES[Math.floor(rnd()*NAMES.length)];
+      var p=mkPayment({amount:amount, method:method, customer:name, contact: method==="card" ? (rnd()<.6?"Visa":"Mastercard")+" **** "+(1000+Math.floor(rnd()*9000)) : phoneFor(pi), outcome: fail ? (rnd()<.5?"declined":"insufficient") : "succeeded", at:at, settled: back>0});
+      if(!fail && rnd()<.04 && back>2){ p.refunded=p.amount; p.status="refunded"; p.events.push({t:new Date(at.getTime()+3600e3).toISOString(), text:"Refunded "+ghs(p.amount)}); }
+      s.payments.push(p); pi++;
+      if(p.status==="succeeded"||p.status==="partially_refunded") dayTotal+=p.amount-p.refunded;
+    }
+    // Paid out by hand every few days, so the sample shop opens with money
+    // waiting in "available" to try a payout on.
+    unpaid+=dayTotal;
+    if(back>2 && back%3===0 && unpaid>0){
+      var pt=new Date(day); pt.setHours(18,30,0,0);
+      s.payouts.push({id:rid("po"), amount:unpaid, createdAt:pt.toISOString(), status:"paid", auto:false, dest:destLabel(s.settings.dest)});
+      unpaid=0;
+    }
+  }
+  s.payments.sort(function(a,b){return b.createdAt<a.createdAt?-1:1;});
+  s.payouts.sort(function(a,b){return b.createdAt<a.createdAt?-1:1;});
+  return s;
+}
+function mkPayment(o){
+  var at=o.at||new Date(), ok=o.outcome==="succeeded";
+  var ev=[{t:at.toISOString(), text:"Payment started by "+esc(o.customer)+" ("+METHODS[o.method].label+")"}];
+  if(o.method!=="card" && o.method!=="qr") ev.push({t:new Date(at.getTime()+4000).toISOString(), text:"Approval prompt sent to "+mask(o.contact)});
+  ev.push(ok ? {t:new Date(at.getTime()+9000).toISOString(), text:"Approved"} : {t:new Date(at.getTime()+9000).toISOString(), text:OUTCOMES[o.outcome].label, bad:true});
+  return {id:rid("pay"), amount:o.amount, method:o.method, customer:o.customer, contact:o.contact||"", status: ok?"succeeded":"failed",
+    failure: ok?null:OUTCOMES[o.outcome].reason, refunded:0, createdAt:at.toISOString(), settled:!!o.settled, linkId:o.linkId||null, note:o.note||"", events:ev};
+}
+function destLabel(d){ return d.type==="momo" ? (METHODS[d.network]?METHODS[d.network].label:"MoMo")+" "+mask(d.number) : (d.bank||"Bank")+" "+mask(d.number); }
+
+/* ---------- balances and nightly settlement ---------- */
+function net(p){ return (p.status==="succeeded"||p.status==="partially_refunded") ? p.amount-p.refunded : 0; }
+function balances(){
+  var settled=0, pending=0, out=0;
+  S.payments.forEach(function(p){ if(p.settled) settled+=net(p); else pending+=net(p); });
+  S.payouts.forEach(function(o){ out+=o.amount; });
+  return {available:Math.max(0,settled-out), pending:pending};
+}
+// Payments roll over to "available" at the end of the day they were taken.
+// With auto payout on, that night's takings are paid out straight away,
+// the way the ad promises ("paid out tonight").
+function settle(force){
+  var today=dayKey(new Date()), moved=0;
+  S.payments.forEach(function(p){
+    if(!p.settled && (force || dayKey(p.createdAt)!==today)){ p.settled=true; moved+=net(p); }
+  });
+  if(moved>0 && S.settings.autoPayout){
+    var avail=balances().available;
+    if(avail>0) S.payouts.unshift({id:rid("po"), amount:avail, createdAt:new Date().toISOString(), status:"paid", auto:true, dest:destLabel(S.settings.dest)});
+  }
+  S.lastSettled=today; save();
+  return moved;
+}
+
+/* ---------- sound (WebAudio, no files) ---------- */
+var actx=null;
+function chime(ok){
+  if(!S.settings.sound) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    var notes = ok ? [880,1318.5] : [330,247];
+    notes.forEach(function(f,i){
+      var o=actx.createOscillator(), g=actx.createGain(), t=actx.currentTime+i*0.12;
+      o.type="sine"; o.frequency.value=f; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.18,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.4);
+    });
+  }catch(e){}
+}
+var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+var CROSS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function toast(p){
+  var ok=p.status==="succeeded", el=document.createElement("div");
+  el.className="toast"+(ok?"":" bad");
+  el.innerHTML='<div class="ic">'+(ok?CHECK:CROSS)+'</div><div style="flex:1;min-width:0"><small><span>BuineePay · Business</span><span>now</span></small><b>'+(ok?"Payment received":"Payment failed")+'</b><div class="amt">'+(ok?"+ ":"")+ghs(p.amount)+'</div><small><span>'+(ok?"from ":"")+esc(short(p.customer))+' · '+METHODS[p.method].short+'</span></small></div>';
+  document.getElementById("toasts").appendChild(el);
+  chime(ok);
+  setTimeout(function(){ el.classList.add("out"); setTimeout(function(){ el.remove(); },320); }, 4200);
+}
+function flash(msg){
+  var el=document.createElement("div"); el.className="toast";
+  el.innerHTML='<div class="ic">'+CHECK+'</div><div><b>'+esc(msg)+'</b></div>';
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(function(){ el.classList.add("out"); setTimeout(function(){ el.remove(); },320); }, 2600);
+}
+
+/* ---------- small render helpers ---------- */
+// Real brand marks (assets/images/pay-logos). A card payment shows the
+// network of the card it was made with; the method picker shows both.
+var LOGO_DIR="/assets/images/pay-logos/";
+function cardBrand(contact){ return /^master/i.test(contact||"") ? "mastercard.svg" : "visa.svg"; }
+function badge(m, contact){
+  var M=METHODS[m], files = (m==="card" && contact) ? [cardBrand(contact)] : M.logo;
+  return '<span class="mbadge'+(files.length>1?' pair':'')+(M.dark?' dark':'')+(M.full?' full':'')+(M.wide?' wide':'')+'">'+files.map(function(f){return '<img src="'+LOGO_DIR+f+'" alt="">';}).join("")+'</span>';
+}
+function methodCell(m, contact){ return '<span class="method">'+badge(m, contact)+METHODS[m].short+'</span>'; }
+function statusPill(p){
+  var label={succeeded:"Succeeded",failed:"Failed",refunded:"Refunded",partially_refunded:"Part refunded"}[p.status];
+  if(p.status==="succeeded" && !p.settled) return '<span class="status s-pending">Pending payout</span>';
+  return '<span class="status s-'+p.status+'">'+label+'</span>';
+}
+function payRows(list, opts){
+  if(!list.length) return '<div class="empty">'+((opts&&opts.empty)||"No payments yet. Take a test payment to see one here.")+'</div>';
+  return '<table class="tbl"><thead><tr><th>Customer</th><th class="hide-sm">Method</th><th class="hide-sm">Status</th><th class="hide-sm">Date</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
+    list.map(function(p){
+      return '<tr class="click" data-pay="'+p.id+'"><td class="who"><b>'+esc(p.customer)+'</b><span>'+esc(p.contact)+'</span></td><td class="hide-sm">'+methodCell(p.method, p.contact)+'</td><td class="hide-sm">'+statusPill(p)+'</td><td class="hide-sm muted">'+when(p.createdAt)+'</td><td class="num"><span'+(p.status==="failed"?' style="color:var(--ink-3);text-decoration:line-through"':'')+'>'+ghs(p.amount)+'</span><div class="show-sm" style="margin-top:4px">'+statusPill(p)+'</div></td></tr>';
+    }).join("")+'</tbody></table>';
+}
+function $(id){ return document.getElementById(id); }
+
+/* ---------- views ---------- */
+var VIEWS={
+  overview:{title:"Overview", render:function(){
+    var b=balances(), today=dayKey(new Date());
+    var todays=S.payments.filter(function(p){return dayKey(p.createdAt)===today;});
+    var takenToday=todays.reduce(function(a,p){return a+net(p);},0), okToday=todays.filter(function(p){return p.status!=="failed";}).length;
+    // 14-day chart
+    var days=[], max=1;
+    for(var i=13;i>=0;i--){ var d=startOfDay(new Date()); d.setDate(d.getDate()-i); var k=dayKey(d);
+      var tot=S.payments.filter(function(p){return dayKey(p.createdAt)===k;}).reduce(function(a,p){return a+net(p);},0);
+      days.push({d:d,k:k,t:tot}); if(tot>max) max=tot; }
+    var chart=days.map(function(x,i){ var h=Math.max(2,Math.round(x.t/max*100));
+      return '<div class="bar'+(i===13?' today':'')+'"><span class="tip">'+x.d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+': '+ghs(x.t)+'</span><i style="height:'+h+'%"></i><em>'+(i===13?"Today":x.d.getDate())+'</em></div>'; }).join("");
+    var week=S.payments.filter(function(p){return Date.now()-new Date(p.createdAt)<7*864e5 && net(p)>0;});
+    var wtot=week.reduce(function(a,p){return a+net(p);},0)||1, mix={};
+    week.forEach(function(p){ mix[p.method]=(mix[p.method]||0)+net(p); });
+    var mixHtml=Object.keys(METHODS).filter(function(m){return mix[m];}).sort(function(a,b){return mix[b]-mix[a];}).map(function(m){
+      var pc=Math.round(mix[m]/wtot*100); return '<div><div class="line"><span class="method">'+badge(m)+METHODS[m].label+'</span><b>'+pc+'%</b></div><div class="track"><i style="width:'+pc+'%"></i></div></div>'; }).join("") || '<div class="empty">No payments in the last 7 days.</div>';
+    var lastPo=S.payouts[0];
+    return '<div class="hero">'+
+      '<div class="bal"><small>Available to pay out</small><div class="amt"><span>GHS</span>'+fmt(b.available)+'</div><div class="row"><button class="btn go sm" data-act="payout"'+(b.available?'':' disabled')+'>Pay out now</button><button class="btn sm" data-act="settle"'+(b.pending?'':' disabled')+'>Settle today early</button></div></div>'+
+      '<div class="card stat"><small><span class="dot"></span>Taken today</small><div class="amt">'+ghs(takenToday)+'</div><div class="meta">'+okToday+' payment'+(okToday===1?'':'s')+' · '+(S.settings.autoPayout?'paid out tonight':'held until you pay out')+'</div></div>'+
+      '<div class="card stat"><small><span class="dot amber"></span>Pending payout</small><div class="amt">'+ghs(b.pending)+'</div><div class="meta">'+(lastPo?'Last payout '+ghs(lastPo.amount)+', '+when(lastPo.createdAt).toLowerCase():'No payouts yet')+'</div></div>'+
+    '</div>'+
+    '<div class="grid2"><div class="card"><div class="card-head"><h2>Takings, last 14 days</h2></div><div class="card-body"><div class="chart">'+chart+'</div></div></div>'+
+    '<div class="card"><div class="card-head"><h2>How customers paid</h2><span class="muted" style="margin-left:auto;color:var(--ink-3);font-size:12px">Last 7 days</span></div><div class="card-body mix">'+mixHtml+'</div></div></div>'+
+    '<div class="card" style="margin-top:14px"><div class="card-head"><h2>Recent payments</h2><div class="right"><a class="btn sm" href="#payments">View all</a></div></div>'+payRows(S.payments.slice(0,6))+'</div>';
+  }},
+  payments:{title:"Payments", render:function(){
+    var f=UI.pf, q=(f.q||"").toLowerCase();
+    var list=S.payments.filter(function(p){
+      if(f.status==="succeeded" && !(p.status==="succeeded"||p.status==="partially_refunded")) return false;
+      if(f.status==="failed" && p.status!=="failed") return false;
+      if(f.status==="refunded" && !(p.status==="refunded"||p.status==="partially_refunded")) return false;
+      if(f.method && p.method!==f.method) return false;
+      if(q && (p.customer+" "+p.contact+" "+p.id+" "+fmt(p.amount)).toLowerCase().indexOf(q)<0) return false;
+      return true; });
+    var tot=list.reduce(function(a,p){return a+net(p);},0);
+    var seg=["all","succeeded","failed","refunded"].map(function(s){return '<button data-pf-status="'+s+'" class="'+((f.status||"all")===s?"on":"")+'">'+s[0].toUpperCase()+s.slice(1)+'</button>';}).join("");
+    var mopt='<option value="">All methods</option>'+Object.keys(METHODS).map(function(m){return '<option value="'+m+'"'+(f.method===m?' selected':'')+'>'+METHODS[m].label+'</option>';}).join("");
+    return '<div class="card"><div class="card-head"><div class="filters"><div class="seg">'+seg+'</div><select class="input" id="pfMethod">'+mopt+'</select><input class="input" id="pfQ" placeholder="Search name, number, ID" value="'+esc(f.q||"")+'" style="width:220px"></div><div class="right" style="margin-left:auto"><span style="color:var(--ink-3);font-size:12.5px">'+list.length+' shown · '+ghs(tot)+' net</span><button class="btn sm" data-act="csv">Export CSV</button></div></div>'+payRows(list.slice(0,200),{empty:"No payments match these filters."})+'</div>';
+  }},
+  links:{title:"Payment links", render:function(){
+    var rows=S.links.map(function(l){
+      var paid=S.payments.filter(function(p){return p.linkId===l.id && net(p)>0;});
+      var tot=paid.reduce(function(a,p){return a+net(p);},0);
+      return '<tr><td class="who"><b>'+esc(l.title)+'</b><span class="link-url">pay.buinee.app/'+l.id.slice(6)+'</span></td><td class="hide-sm">'+(l.amount?ghs(l.amount):'<span class="muted">Customer chooses</span>')+'</td><td class="hide-sm muted">'+paid.length+' paid · '+ghs(tot)+'</td><td>'+(l.active?'<span class="status s-succeeded">Active</span>':'<span class="status s-refunded">Off</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" data-open-link="'+l.id+'"'+(l.active?'':' disabled')+'>Open checkout</button> <button class="btn sm" data-toggle-link="'+l.id+'">'+(l.active?'Turn off':'Turn on')+'</button></td></tr>'; }).join("");
+    return '<div class="card"><div class="card-head"><h2>Your links</h2><div class="right" style="margin-left:auto"><button class="btn primary sm" data-act="newlink">New payment link</button></div></div>'+
+      (S.links.length?'<table class="tbl"><thead><tr><th>Link</th><th class="hide-sm">Amount</th><th class="hide-sm">Paid</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="empty">No links yet. Create one and open its checkout to pay it as a customer would.</div>')+'</div>'+
+      '<p class="note" style="margin-top:14px">In the sandbox, links open a preview of the customer checkout right here. The <code>pay.buinee.app</code> addresses are examples and do not open outside this page.</p>';
+  }},
+  payouts:{title:"Payouts", render:function(){
+    var b=balances();
+    var rows=S.payouts.map(function(o){ return '<tr><td><b>'+ghs(o.amount)+'</b></td><td class="hide-sm muted">'+esc(o.dest)+'</td><td class="muted">'+when(o.createdAt)+'</td><td class="hide-sm">'+(o.auto?'Nightly':'Manual')+'</td><td><span class="status s-paid">Paid</span></td></tr>'; }).join("");
+    return '<div class="hero" style="grid-template-columns:1fr 1fr">'+
+      '<div class="bal"><small>Available to pay out</small><div class="amt"><span>GHS</span>'+fmt(b.available)+'</div><div class="row"><button class="btn go sm" data-act="payout"'+(b.available?'':' disabled')+'>Pay out now</button></div></div>'+
+      '<div class="card stat"><small>Payout account</small><div class="amt" style="font-size:19px">'+esc(destLabel(S.settings.dest))+'</div><div class="meta">'+esc(S.settings.dest.name||"")+' · '+(S.settings.autoPayout?'nightly payouts on':'nightly payouts off')+' · <a href="#settings">Change</a></div></div></div>'+
+      '<div class="card"><div class="card-head"><h2>Payout history</h2></div>'+(rows?'<table class="tbl"><thead><tr><th>Amount</th><th class="hide-sm">To</th><th>Date</th><th class="hide-sm">Type</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="empty">No payouts yet.</div>')+'</div>';
+  }},
+  settings:{title:"Settings", render:function(){
+    var d=S.settings.dest;
+    var nets=["mtn","telecel","at"].map(function(m){return '<option value="'+m+'"'+(d.network===m?' selected':'')+'>'+METHODS[m].label+'</option>';}).join("");
+    return '<div class="grid2"><div class="card"><div class="card-head"><h2>Business and payouts</h2></div><div class="card-body"><form id="setForm" autocomplete="off">'+
+      '<div class="field"><label for="sName">Business name</label><input class="input" id="sName" maxlength="60" value="'+esc(S.business.name)+'"></div>'+
+      '<div class="field"><label for="sCity">Location</label><input class="input" id="sCity" maxlength="60" value="'+esc(S.business.city)+'"></div>'+
+      '<div class="field"><label for="sNet">Payout wallet</label><select class="input" id="sNet">'+nets+'</select></div>'+
+      '<div class="field"><label for="sNum">Wallet number</label><input class="input" id="sNum" maxlength="16" inputmode="tel" value="'+esc(d.number)+'"><span class="hint">Sandbox only. Use any test number, not a real one.</span></div>'+
+      '<div class="field"><label for="sHolder">Account holder</label><input class="input" id="sHolder" maxlength="60" value="'+esc(d.name||"")+'"></div>'+
+      '<button class="btn primary" type="submit">Save changes</button></form></div></div>'+
+      '<div class="card"><div class="card-head"><h2>Preferences</h2></div><div class="card-body" style="padding-top:4px">'+
+      '<div class="setrow"><div><b>Nightly payouts</b><span>Pay out the day\'s takings automatically at end of day.</span></div><label class="toggle"><input type="checkbox" data-set="autoPayout"'+(S.settings.autoPayout?' checked':'')+'><i></i></label></div>'+
+      '<div class="setrow"><div><b>Payment sound</b><span>Play a chime when a payment lands.</span></div><label class="toggle"><input type="checkbox" data-set="sound"'+(S.settings.sound?' checked':'')+'><i></i></label></div>'+
+      '<div class="setrow"><div><b>Start fresh</b><span>Clear every test payment, link and payout and load the sample shop again.</span></div><button class="btn danger sm" data-act="reset">Reset sandbox</button></div>'+
+      '</div></div></div>';
+  }}
+};
+var UI={view:"overview", pf:{status:"all",method:"",q:""}};
+
+function render(){
+  var v=VIEWS[UI.view]?UI.view:"overview";
+  $("view").innerHTML=VIEWS[v].render();
+  $("title").textContent=VIEWS[v].title;
+  $("subtitle").textContent=S.business.name+" · "+S.business.city;
+  $("bizName").textContent=S.business.name;
+  document.title=VIEWS[v].title+" · BuineePay Sandbox";
+  Array.prototype.forEach.call(document.querySelectorAll("#nav a"),function(a){a.classList.toggle("on",a.dataset.v===v);});
+}
+function route(){ UI.view=(location.hash||"#overview").slice(1); closeAll(); render(); }
+
+/* ---------- drawer ---------- */
+function openDrawer(title, body, foot){
+  $("dTitle").textContent=title; $("dBody").innerHTML=body; $("dFoot").innerHTML=foot||"";
+  $("drawer").classList.add("on"); $("scrim").classList.add("on");
+}
+function closeAll(){ $("drawer").classList.remove("on"); $("modal").classList.remove("on"); $("scrim").classList.remove("on"); $("rail").classList.remove("on"); }
+
+function simDrawer(){
+  var m="mtn", out="succeeded";
+  var chips=Object.keys(METHODS).map(function(k){return '<button type="button" class="chip'+(k===m?' on':'')+'" data-m="'+k+'">'+badge(k)+METHODS[k].label+'</button>';}).join("");
+  var outs=Object.keys(OUTCOMES).map(function(k){return '<option value="'+k+'">'+OUTCOMES[k].label+'</option>';}).join("");
+  openDrawer("Take a test payment",
+    '<form id="simForm" autocomplete="off"><div class="field"><label for="simAmt">Amount</label><div class="money-in"><span>GHS</span><input id="simAmt" inputmode="decimal" value="85.00" required></div></div>'+
+    '<div class="field"><label>How the customer pays</label><div class="chips" id="simMethods">'+chips+'</div></div>'+
+    '<div class="field"><label for="simName">Customer name</label><input class="input" id="simName" maxlength="60" value="'+esc(NAMES[Math.floor(Math.random()*NAMES.length)])+'"></div>'+
+    '<div class="field"><label for="simOut">What happens</label><select class="input" id="simOut">'+outs+'</select><span class="hint">Pick a failure to see how a declined payment looks.</span></div></form>'+
+    '<div id="simStage"></div>',
+    '<button class="btn" type="button" data-close>Cancel</button><button class="btn go" type="submit" form="simForm" id="simGo">Charge customer</button>');
+  $("simMethods").addEventListener("click",function(e){ var c=e.target.closest(".chip"); if(!c) return; m=c.dataset.m; Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===c);}); });
+  $("simForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var amt=parseAmt($("simAmt").value); out=$("simOut").value;
+    if(amt<100||amt>5000000){ $("simAmt").focus(); $("simStage").innerHTML='<p class="note" style="color:var(--red)">Enter an amount between GHS 1.00 and GHS 50,000.00.</p>'; return; }
+    var name=$("simName").value.trim()||"Walk-in customer";
+    $("simGo").disabled=true;
+    var wait = m==="card"||m==="qr" ? "Waiting for the tap…" : "Approval prompt sent to the customer's phone…";
+    $("simStage").innerHTML='<div class="result"><div class="spin"></div><p>'+wait+'</p></div>';
+    setTimeout(function(){
+      var contact = m==="card" ? (Math.random()<.6?"Visa":"Mastercard")+" **** "+(1000+Math.floor(Math.random()*9000)) : phoneFor(Math.floor(Math.random()*999));
+      var p=mkPayment({amount:amt, method:m, customer:name, contact:contact, outcome:out});
+      S.payments.unshift(p); save(); render(); toast(p);
+      $("simStage").innerHTML = p.status==="succeeded"
+        ? '<div class="result ok"><div class="ic">'+CHECK+'</div><h4>'+ghs(amt)+' received</h4><p>From '+esc(name)+'. It is in your pending balance.</p></div>'
+        : '<div class="result bad"><div class="ic">'+CROSS+'</div><h4>Payment failed</h4><p>'+esc(p.failure)+'</p></div>';
+      $("simGo").disabled=false; $("simGo").textContent="Charge another";
+    }, m==="card"?1100:2000);
+  });
+}
+
+function payDrawer(id){
+  var p=S.payments.filter(function(x){return x.id===id;})[0]; if(!p) return;
+  var link=p.linkId?S.links.filter(function(l){return l.id===p.linkId;})[0]:null;
+  var canRefund=(p.status==="succeeded"||p.status==="partially_refunded");
+  var left=p.amount-p.refunded;
+  openDrawer("Payment",
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><div class="big">'+ghs(p.amount)+'</div>'+statusPill(p)+'</div>'+
+    '<div style="color:var(--ink-3);font-size:12.5px;margin-bottom:18px">'+when(p.createdAt)+'</div>'+
+    '<dl class="kv"><dt>Customer</dt><dd>'+esc(p.customer)+'</dd><dt>Paid with</dt><dd>'+methodCell(p.method, p.contact)+'</dd><dt>'+(p.method==="card"?"Card":"Number")+'</dt><dd>'+esc(p.contact)+'</dd>'+
+    (link?'<dt>Payment link</dt><dd>'+esc(link.title)+'</dd>':'')+
+    (p.refunded?'<dt>Refunded</dt><dd>'+ghs(p.refunded)+'</dd>':'')+
+    '<dt>You receive</dt><dd><b>'+ghs(net(p))+'</b></dd><dt>Payout</dt><dd>'+(p.status==="failed"?"Not applicable":p.settled?"Settled":"Pending, settles tonight")+'</dd>'+
+    '<dt>Payment ID</dt><dd style="font-family:var(--mono);font-size:12px">'+p.id+'</dd></dl>'+
+    (p.failure?'<p class="note" style="margin-top:16px;color:var(--red)">'+esc(p.failure)+'</p>':'')+
+    '<div class="section-t">Timeline</div><ul class="timeline">'+p.events.map(function(e){return '<li class="'+(e.bad?'bad':e.grey?'grey':'')+'">'+e.text+'<span>'+when(e.t)+'</span></li>';}).join("")+'</ul>'+
+    (canRefund?'<div class="section-t">Refund</div><form id="refForm"><div class="field"><div class="money-in"><span>GHS</span><input id="refAmt" inputmode="decimal" value="'+fmt(left).replace(/,/g,"")+'"></div><span class="hint">Up to '+ghs(left)+'. Goes back to the customer\'s '+(p.method==="card"?"card":"wallet")+'.</span></div></form>':''),
+    '<button class="btn" type="button" data-close>Close</button>'+(canRefund?'<button class="btn danger" type="submit" form="refForm">Refund</button>':''));
+  if(canRefund) $("refForm").addEventListener("submit",function(e){
+    e.preventDefault(); var amt=parseAmt($("refAmt").value);
+    if(amt<=0||amt>left){ $("refAmt").focus(); return; }
+    p.refunded+=amt; p.status = p.refunded>=p.amount ? "refunded" : "partially_refunded";
+    p.events.push({t:new Date().toISOString(), text:"Refunded "+ghs(amt)+" to the customer", grey:true});
+    save(); render(); payDrawer(p.id); flash("Refunded "+ghs(amt));
+  });
+}
+
+function linkDrawer(){
+  openDrawer("New payment link",
+    '<form id="linkForm" autocomplete="off"><div class="field"><label for="lTitle">What is it for?</label><input class="input" id="lTitle" maxlength="80" placeholder="e.g. Ankara dress, size 12" required></div>'+
+    '<div class="field"><label>Price</label><div class="seg" id="lMode"><button type="button" class="on" data-mode="fixed">Fixed price</button><button type="button" data-mode="open">Customer chooses</button></div></div>'+
+    '<div class="field" id="lAmtWrap"><label for="lAmt">Amount</label><div class="money-in"><span>GHS</span><input id="lAmt" inputmode="decimal" placeholder="0.00"></div></div></form>',
+    '<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit" form="linkForm">Create link</button>');
+  var mode="fixed";
+  $("lMode").addEventListener("click",function(e){ var b=e.target.closest("button"); if(!b) return; mode=b.dataset.mode; Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===b);}); $("lAmtWrap").style.display=mode==="fixed"?"":"none"; });
+  $("linkForm").addEventListener("submit",function(e){
+    e.preventDefault(); var t=$("lTitle").value.trim(); if(!t) return;
+    var amt=mode==="fixed"?parseAmt($("lAmt").value):null;
+    if(mode==="fixed"&&(amt<100||amt>5000000)){ $("lAmt").focus(); return; }
+    var l={id:rid("plink"), title:t, amount:amt, createdAt:new Date().toISOString(), active:true};
+    S.links.unshift(l); save(); closeAll(); location.hash="#links"; render(); flash("Payment link created");
+  });
+}
+
+/* customer checkout preview: test numbers decide the outcome */
+function checkout(id){
+  var l=S.links.filter(function(x){return x.id===id;})[0]; if(!l) return;
+  var m="mtn";
+  var methods=["mtn","telecel","at","card"].map(function(k){return '<button type="button" class="chip'+(k===m?' on':'')+'" data-m="'+k+'">'+badge(k)+METHODS[k].short+'</button>';}).join("");
+  $("modal").innerHTML='<div class="phone"><button class="ph-close" data-close aria-label="Close">&times;</button><div class="ph-top"><small>Pay '+esc(S.business.name)+'</small><b>'+esc(l.title)+'</b>'+(l.amount?'<div class="big">'+ghs(l.amount)+'</div>':'<div class="money-in" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)"><span style="color:rgba(255,255,255,.6)">GHS</span><input id="coAmt" inputmode="decimal" placeholder="0.00" style="background:none;color:#fff"></div>')+'</div>'+
+    '<div class="ph-body" id="coBody"><form id="coForm" autocomplete="off"><div class="field"><label for="coName">Your name</label><input class="input" id="coName" maxlength="60" required></div>'+
+    '<div class="field"><label>Pay with</label><div class="chips" id="coM" style="grid-template-columns:1fr 1fr">'+methods+'</div></div>'+
+    '<div class="field"><label for="coNum" id="coNumL">Mobile money number</label><input class="input" id="coNum" inputmode="numeric" maxlength="19" placeholder="024 000 0000" required><span class="hint">Test numbers: ending <b>0001</b> declines, <b>0002</b> has no funds, anything else is approved.</span></div>'+
+    '<button class="btn go" type="submit" style="width:100%;justify-content:center">Pay'+(l.amount?' '+ghs(l.amount):'')+'</button></form>'+
+    '<div class="secured"><img src="/assets/images/buineepay-logo.png" alt="">Secured by BuineePay · test checkout</div></div></div>';
+  $("modal").classList.add("on"); $("scrim").classList.add("on");
+  $("coM").addEventListener("click",function(e){ var c=e.target.closest(".chip"); if(!c) return; m=c.dataset.m; Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===c);});
+    $("coNumL").textContent=m==="card"?"Card number":"Mobile money number"; $("coNum").placeholder=m==="card"?"4084 0840 8408 4081":"024 000 0000"; });
+  $("coForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var amt=l.amount||parseAmt($("coAmt").value);
+    if(amt<100||amt>5000000){ $("coAmt").focus(); return; }
+    var num=$("coNum").value.replace(/\D/g,""); if(num.length<8){ $("coNum").focus(); return; }
+    var out = /0001$/.test(num)?"declined":/0002$/.test(num)?"insufficient":"succeeded";
+    var name=$("coName").value.trim();
+    var contact = m==="card" ? (/^5/.test(num)?"Mastercard":"Visa")+" **** "+num.slice(-4) : $("coNum").value.trim();
+    $("coBody").innerHTML='<div class="result"><div class="spin"></div><p>'+(m==="card"?"Confirming your card…":"Check your phone and approve the prompt…")+'</p></div>';
+    setTimeout(function(){
+      var p=mkPayment({amount:amt, method:m, customer:name, contact:contact, outcome:out, linkId:l.id});
+      S.payments.unshift(p); save(); render(); toast(p);
+      $("coBody").innerHTML = p.status==="succeeded"
+        ? '<div class="result ok"><div class="ic">'+CHECK+'</div><h4>Paid '+ghs(amt)+'</h4><p>'+esc(S.business.name)+' has your payment. A receipt is on its way.</p></div><button class="btn" data-close style="width:100%;justify-content:center;margin-top:10px">Done</button>'
+        : '<div class="result bad"><div class="ic">'+CROSS+'</div><h4>Payment not completed</h4><p>'+esc(p.failure)+'</p></div><button class="btn" data-retry="'+l.id+'" style="width:100%;justify-content:center;margin-top:10px">Try again</button>';
+    }, 1800);
+  });
+}
+
+function payout(){
+  var b=balances(); if(!b.available) return;
+  S.payouts.unshift({id:rid("po"), amount:b.available, createdAt:new Date().toISOString(), status:"paid", auto:false, dest:destLabel(S.settings.dest)});
+  save(); render(); flash(ghs(b.available)+" sent to "+destLabel(S.settings.dest));
+}
+function csv(){
+  var rows=[["id","date","customer","contact","method","status","amount_ghs","refunded_ghs","net_ghs"]].concat(S.payments.map(function(p){
+    return [p.id,p.createdAt,p.customer,p.contact,METHODS[p.method].label,p.status,(p.amount/100).toFixed(2),(p.refunded/100).toFixed(2),(net(p)/100).toFixed(2)]; }));
+  var text=rows.map(function(r){return r.map(function(c){c=String(c); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(",");}).join("\n");
+  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"})); a.download="buineepay-sandbox-payments.csv"; document.body.appendChild(a); a.click(); a.remove();
+}
+function reset(){ if(!confirm("Reset the sandbox? Every test payment, link and payout in this browser is cleared and the sample shop is loaded again.")) return; S=seed(); save(); closeAll(); render(); flash("Sandbox reset"); }
+
+/* ---------- events ---------- */
+document.addEventListener("click",function(e){
+  var t=e.target;
+  if(t.closest("[data-close]")||t===$("scrim")){ closeAll(); return; }
+  var el;
+  if((el=t.closest("[data-pay]"))) return payDrawer(el.dataset.pay);
+  if((el=t.closest("[data-open-link]"))) return checkout(el.dataset.openLink);
+  if((el=t.closest("[data-retry]"))) return checkout(el.dataset.retry);
+  if((el=t.closest("[data-toggle-link]"))){ S.links.forEach(function(l){ if(l.id===el.dataset.toggleLink) l.active=!l.active; }); save(); return render(); }
+  if((el=t.closest("[data-pf-status]"))){ UI.pf.status=el.dataset.pfStatus; return render(); }
+  if((el=t.closest("[data-act]"))){
+    var a=el.dataset.act;
+    if(a==="payout") return payout();
+    if(a==="settle"){ var mv=settle(true); render(); return flash(ghs(mv)+" settled"+(S.settings.autoPayout?" and paid out":"")); }
+    if(a==="csv") return csv();
+    if(a==="newlink") return linkDrawer();
+    if(a==="reset") return reset();
+  }
+});
+document.addEventListener("change",function(e){
+  if(e.target.id==="pfMethod"){ UI.pf.method=e.target.value; render(); }
+  if(e.target.dataset && e.target.dataset.set){ S.settings[e.target.dataset.set]=e.target.checked; save(); flash("Saved"); }
+});
+document.addEventListener("input",function(e){
+  if(e.target.id==="pfQ"){ UI.pf.q=e.target.value; var pos=e.target.selectionStart; render(); var q=$("pfQ"); q.focus(); try{q.setSelectionRange(pos,pos);}catch(x){} }
+});
+document.addEventListener("submit",function(e){
+  if(e.target.id!=="setForm") return; e.preventDefault();
+  S.business.name=$("sName").value.trim()||S.business.name; S.business.city=$("sCity").value.trim();
+  S.settings.dest={type:"momo", network:$("sNet").value, number:$("sNum").value.trim()||S.settings.dest.number, name:$("sHolder").value.trim()};
+  save(); render(); flash("Settings saved");
+});
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeAll(); });
+$("simTop").addEventListener("click",simDrawer);
+$("newLinkTop").addEventListener("click",linkDrawer);
+$("resetBtn").addEventListener("click",reset);
+$("menuBtn").addEventListener("click",function(){ $("rail").classList.add("on"); $("scrim").classList.add("on"); });
+window.addEventListener("hashchange",route);
+
+S=load()||seed();
+settle(false);
+route();
+})();
+</script>
+</body>
+</html>

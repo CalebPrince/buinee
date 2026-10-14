@@ -137,6 +137,7 @@ section before assuming this applies):
 | `admin-payments.html` | Command Center: Paystack configuration status, verified totals and recent safe payment metadata |
 | `admin-login.html` | Platform owner sign in — separate identity from company login, see below |
 | `admin-settings.html` | Command Center: Settings — change the platform owner's own password |
+| `buineepay-sandbox.html` | Public BuineePay merchant sandbox at `/buineepay/sandbox`, see below |
 | `server.py` | Everything: static pages, the demo agent, and all `/api/*` auth routes — routing logic is transport-agnostic, see Deployment above |
 | `passenger_wsgi.py` | WSGI entry point for cPanel's Python Selector — not used by local dev |
 | `requirements.txt` | Just `openpyxl` — everything else is stdlib or raw `urllib` (`providers.py`) |
@@ -157,6 +158,38 @@ real BDDG invoice numbers — that's been scrubbed from anything public.
 as a correctness check; it's never served over HTTP.
 
 ---
+
+## BuineePay merchant sandbox (`/buineepay/sandbox`)
+
+A public, sign-in-free try-it page for BuineePay (the payments product from
+the "Pay without the pause" ad). It is a merchant's dashboard for a sample
+shop (Ama's Fabrics, Makola) with two weeks of seeded payments, and
+everything on it is simulated in the visitor's own browser: state lives in
+`localStorage` under `buineepay-sandbox-v1`, nothing is sent to the server,
+and it never touches `storage/ledgerline.db`. Each visitor gets their own
+copy; "Reset sandbox" reloads the sample shop. It is linked as "Try BuineePay" in the
+menu on the landing page and the pricing page (desktop nav and mobile drawer).
+
+What a visitor can do: take a test payment (card tap, MTN MoMo, Telecel
+Cash, AirtelTigo Money, BuineePay QR) with a chosen outcome (approved, declined,
+insufficient funds, no response); create payment links and pay them through
+a customer checkout preview (test numbers ending `0001` decline, `0002` have
+no funds, anything else is approved); open any payment for its timeline and
+issue full or partial refunds; settle the day early and pay out; toggle
+nightly payouts and the payment chime; export payments as CSV.
+
+Settlement model: a payment is "pending" on the day it is taken and becomes
+"available" at the end of that day; with nightly payouts on, it is paid out
+at that point. Fees are not modelled (gross equals net) because BuineePay's
+real rate isn't set yet.
+
+Payment brand marks are the real logos, in `assets/images/pay-logos/`:
+`mtn-momo.svg` (MoMo app icon from mtn.com.gh), `telecel.png` (the round mark
+cropped from telecel.com.gh's `Telecel-Icon-Red.png`),
+`airteltigo-money.png` (the AirtelTigo Money logo Caleb supplied), `visa.svg` and `mastercard.svg` (Wikimedia Commons, public domain as
+trademarks/simple geometry), and `buineepay-leaf.png` (cropped from the
+supplied BuineePay logo). Fonts are self-hosted under `assets/fonts/` (Sora
+and Inter, SIL OFL) because the CSP only allows `font-src 'self'`.
 
 ## Auth model
 
